@@ -1,3 +1,12 @@
+"""
+The following Python code sample shows how to access the
+"net_device_signal_samples" endpoint of the NCM REST API
+using the Python "requests" module with paging. It makes
+use of NCM and CP credential headers to authenticate and
+access the router data. The net_device_id is the key and
+the alert data is the value.
+"""
+
 import json
 import requests
 from datetime import datetime, timezone, timedelta
