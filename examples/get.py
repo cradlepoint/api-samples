@@ -1,131 +1,93 @@
-"""
-NOTE: Cradlepoint does not develop, maintain, or support NCM API applications.
-Applications are the sole responsibility of the developer.
-
-WARNING: NCM API Applications can introduce security and other potential issues
-when not carefully engineered. Test your code thoroughly before deploying it to
-production devices. This can affect production devices and data!
-"""
-
 import argparse
 import json
+import logging
 import os
 import requests
-import logging
-import pprint
-import sys
-from os import environ
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
-from datetime import datetime, timedelta
+from datetime import datetime
 
 headers = {
     "Content-Type": "application/json",
-    "X-CP-API-ID": environ.get("X_CP_API_ID"),
-    "X-CP-API-KEY": environ.get("X_CP_API_KEY"),
-    "X-ECM-API-ID": environ.get("X_ECM_API_ID"),
-    "X-ECM-API-KEY": environ.get("X_ECM_API_KEY"),
+    "X-CP-API-ID": os.environ.get("X_CP_API_ID"),
+    "X-CP-API-KEY": os.environ.get("X_CP_API_KEY"),
+    "X-ECM-API-ID": os.environ.get("X_ECM_API_ID"),
+    "X-ECM-API-KEY": os.environ.get("X_ECM_API_KEY"),
 }
 
-endpoints = [
-    'accounts',
-    'activity_logs',
-    'alerts',
-    'configuration_managers',
-    'device_app_bindings',
-    'device_app_states',
-    'device_app_versions',
-    'device_apps',
-    'firmwares',
-    'groups',
-    'locations',
-    'net_device_health',
-    'net_device_metrics',
-    'net_device_signal_samples',
-    'net_device_usage_samples',
-    'net_devices',
-    'products',
-    'reboot_activity',
-    'router_alerts',
-    'router_logs',
-    'router_state_samples',
-    'router_stream_usage_samples',
-    'routers',
-    'speed_tests',
-]
 
+class NcmAPIv2(object):
 
-class NCM_APIv2(object):
+    def __init__(self):
+        self.resp_data = {'data': []}
 
-    retry_total = 5
+    @staticmethod
+    def establish_session():
+        with requests.Session() as session:
+            retries = Retry(total=5,  # Total number of retries to allow.
+                            backoff_factor=2,
+                            status_forcelist=[408,  # 408 Request Timeout
+                                              500,  # 500 Internal Server Error
+                                              502,  # 502 Bad Gateway
+                                              503,  # 503 Service Unavailable
+                                              504,  # 504 Gateway Timeout
+                                              ],
+                            )
+            a = HTTPAdapter(max_retries=retries)
+            session.mount('https://', a)
 
-    retry_backoff = 2
+        return session
 
-    retry_list = [408,  # 408 Request Timeout
-                  500,  # 500 Internal Server Error
-                  502,  # 502 Bad Gateway
-                  503,  # 503 Service Unavailable
-                  504,  # 504 Gateway Timeout
-                  ]
+    def next_url(self):
 
-    def get_data(self, url, output):
+        for item in self.resp['data']:
+            self.resp_data['data'].append(item)
 
-        resp_data = {'data': []}
+        if args.page and self.resp['meta']['next']:
+            self.url = self.resp['meta']['next']
+            return self.url
 
-        while url:
+        if args.steps and self.resp['meta']['next']:
+            while args.steps != 0:
+                args.steps -= 1
+                self.url = self.resp['meta']['next']
+                return self.url
 
-            # /api/v2/accounts
-            if 'https://cradlepointecm.com/api/v2/accounts/' in url:
-                url = url.replace(f'&account={args.account}', f'&id={args.account}')
+    def get_data(self, get_url, json_output):
 
-            with requests.Session() as s:
+        session = self.establish_session()
 
-                retries = Retry(total=self.retry_total,
-                                backoff_factor=self.retry_backoff,
-                                status_forcelist=self.retry_list
-                                )
-                a = requests.adapters.HTTPAdapter(max_retries=retries)
-                s.mount('https://', a)
+        while get_url:
 
-                try:
-                    logging.info(url)
-                    r = s.get(url, headers=headers,
-                              timeout=30, stream=True)
+            logging.info(get_url)
 
-                    if r.status_code != 200:
-                        logging.info(str(r.status_code) + ": " + str(r.text))
+            try:
+                r = session.get(get_url, headers=headers,
+                                timeout=30, stream=True)
+
+                if r.status_code != 200:
+                    logging.info(str(r.status_code) + ": " + str(r.text))
+                    break
+
+                else:
+                    self.resp = json.loads(r.content.decode("utf-8"))
+
+                    if len(self.resp['data']) < 1:
+                        return self.resp
 
                     else:
-                        self.resp = json.loads(r.content.decode("utf-8"))
+                        get_url = self.next_url()
 
-                        if len(self.resp['data']) < 1:
-                            return self.resp
+            except Exception as e:
+                logging.info("Exception:", e)
+                raise
 
-                        else:
-                            for item in self.resp['data']:
-                                resp_data['data'].append(item)
+        json_data = json.dumps(self.resp_data, indent=4, sort_keys=False)
 
-                            if args.page and self.resp['meta']['next']:
-                                url = self.resp['meta']['next']
+        with open(f'json/{json_output}', 'w') as outfile:
+            outfile.write(json_data)
 
-                            if args.steps and self.resp['meta']['next']:
-                                while args.steps != 0:
-                                    args.steps -= 1
-                                    url = self.resp['meta']['next']
-                                    break
-                            else:
-                                url = None
-
-                except Exception as e:
-                    logging.info("Exception:", e)
-                    raise
-
-        data = json.dumps(resp_data, indent=4, sort_keys=False)
-
-        with open(f'json/{output}', 'w') as outfile:
-            outfile.write(data)
-
-        return data
+        return json_data
 
 
 if __name__ == '__main__':
@@ -146,72 +108,67 @@ if __name__ == '__main__':
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
 
-    try:
-        # Parse commandline options.
-        parser = argparse.ArgumentParser(
-            description="Query APIv2 Historical Locations")
+    # Parse commandline options.
+    parser = argparse.ArgumentParser(
+        description="Query APIv2 Historical Locations")
 
-        parser.add_argument("endpoint")
+    parser.add_argument("--ecm-api-id", help="Override X_ECM_API_ID")
+    parser.add_argument("--ecm-api-key", help="Override X_ECM_API_KEY")
+    parser.add_argument("--cp-api-id", help="Override X-CP-API-ID")
+    parser.add_argument("--cp-api-key", help="Override X-CP-API-KEY")
 
-        parser.add_argument("--ecm-api-id", help="Override X_ECM_API_ID")
-        parser.add_argument("--ecm-api-key", help="Override X_ECM_API_KEY")
-        parser.add_argument("--cp-api-id", help="Override X-CP-API-ID")
-        parser.add_argument("--cp-api-key", help="Override X-CP-API-KEY")
+    parser.add_argument(
+        "--endpoint", help="Name of API endpoint.", default='accounts'
+    )
+    parser.add_argument(
+        "--account", help="Your NCM ID found in settings."
+    )
+    parser.add_argument(
+        "--limit", help="Limit elements in reply, default is 500.",
+        default=500,
+    )
+    parser.add_argument(
+        "--page", help="Keep following the next URL.",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--server", default="https://cradlepointecm.com",
+        help="Base URL of server.",
+    )
+    parser.add_argument(
+        "--steps", type=int, help="Walk only this many steps.",
+        default=-1,
+    )
+    parser.add_argument(
+        "--output", help="json output file name and location",
+        default='example.json',
+    )
 
-        parser.add_argument(
-            "--account", help="Your NCM ID found NCM in settings.")
+    args = parser.parse_args()
 
-        parser.add_argument(
-            "--limit", help="Limit elements in reply, default is 500", default=500)
+    if args.ecm_api_id:
+        headers["X-ECM-API-ID"] = args.ecm_api_id
+    if args.ecm_api_key:
+        headers["X-ECM-API-KEY"] = args.ecm_api_key
+    if args.cp_api_id:
+        headers["X-CP-API-ID"] = args.cp_api_id
+    if args.cp_api_key:
+        headers["X-CP-API-KEY"] = args.cp_api_key
 
-        parser.add_argument(
-            "--page", action="store_true", help="Keep following the next URL."
-        )
-        parser.add_argument(
-            "--server", default="https://cradlepointecm.com", help="Base URL of server"
-        )
-        parser.add_argument(
-            "--steps", type=int, help="If --walk, Walk only this many steps.", default=-1
-        )
-        parser.add_argument(
-            "--output", help="json output file name and location", default='example.json'
-        )
+    url = f"{args.server}/api/v2/{args.endpoint}/"
 
-        args = parser.parse_args()
+    if args.limit:
+        url += f"?limit={args.limit}"
+    if args.account:
+        url += f"&account={args.account}"
 
-        if args.ecm_api_id:
-            headers["X-ECM-API-ID"] = args.ecm_api_id
-        if args.ecm_api_key:
-            headers["X-ECM-API-KEY"] = args.ecm_api_key
-        if args.cp_api_id:
-            headers["X-CP-API-ID"] = args.cp_api_id
-        if args.cp_api_key:
-            headers["X-CP-API-KEY"] = args.cp_api_key
-
-        if args.endpoint in endpoints:
-            url = f"{args.server}/api/v2/{args.endpoint}/"
-        else:
-            logging.info('Choose a valid endpoint.')
-            sys.exit()
-
-        if args.limit:
-            url += f"?limit={args.limit}"
-        if args.account:
-            url += f"&account={args.account}"
-        if args.output:
-            output = args.output
-
-    except Exception as e:
-        logging.info(e)
-        raise
+    output = args.output
 
     logging.info('Started')
 
     # Create an instance of the class
-    session = NCM_APIv2()
-    logging.info(session)
+    s = NcmAPIv2()
 
-    # Call the get routers function from the instance of the class
-    data = session.get_data(f'{url}', f'{output}')
+    data = s.get_data(f'{url}', f'{output}')
 
     logging.info('Finished')
