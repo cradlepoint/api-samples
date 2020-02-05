@@ -1,0 +1,52 @@
+{
+  "configuration": [
+    {
+        "gre": {
+            "tunnels": {
+                "00000000-adbb-3f47-962c-cd7ea9a221af": {
+                    "_id_": "00000000-adbb-3f47-962c-cd7ea9a221af",
+                    "enabled": false,
+                    "local_network": "0.0.0.0"
+                },
+                "00000001-3248-3c72-96d3-adb4353e0501": {
+                    "_id_": "00000001-3248-3c72-96d3-adb4353e0501",
+                    "enabled": false,
+                    "local_network": "0.0.0.0"
+                }
+            }
+        },
+        "lan": {
+            "00000000-0d93-319d-8220-4a1fb0372b51": {
+                "_id_": "00000000-0d93-319d-8220-4a1fb0372b51",
+                "ip_address": "192.168.0.1"
+            }
+        },
+        "nhrp": {
+            "interfaces": {
+                "0": {
+                    "enabled": false
+                },
+                "1": {
+                    "enabled": false
+                }
+            }
+        },
+        "routing": {
+            "bgp": {
+                "routers": {
+                    "0": {
+                        "enabled": false,
+                        "networks": {
+                            "0": {
+                                "ip_network": "0.0.0.0"
+                            }
+                        },
+                        "router_id": "0.0.0.0"
+                    }
+                }
+            }
+        }
+    },
+    []
+]
+}
