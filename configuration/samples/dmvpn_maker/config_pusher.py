@@ -35,7 +35,7 @@ def push_configs():
         indi_payload = json.loads(j.read())
 
     # open config CSV. CSV column 0 should be the router IDs
-    with open('test_routers.csv', 'r') as f:
+    with open('examples_routers.csv', 'r') as f: # Replace the example router IDs with your own!
         config_csv = csv.reader(f)
 
         # Open session to ncm

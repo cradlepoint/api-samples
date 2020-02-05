@@ -18,7 +18,7 @@ def restore_configs():
     """Pushes a config to remove all the additions from config_pusher.py"""
 
     # open CSV to read router ID's
-    with open('test_routers.csv', 'r') as f:
+    with open('example_routers.csv', 'r') as f: # Replace the example router IDs with your own!
         config_csv = csv.reader(f)
 
         # open session to ncm
