@@ -96,14 +96,14 @@ def push_configs():
 
                     # get configuration_managers id and save backup of config
                     cfg = s.get('https://cradlepointecm.com/api/v2/configuration_managers/?router.id={}'.format(router_id),
-                                   headers=headers).json()
+                                   headers=headers)
 
                     # Check authorization
-                    if cfg.status_code == "401":
+                    if cfg.status_code == 401:
                         raise requests.RequestException("401 Unauthorized response. Invalid Credentials i.e. missing or invalid keys.")
 
                     # Get the configuration_managers id from the response
-                    cfg_id = cfg.get("data")[0].get("id")
+                    cfg_id = cfg.json().get("data")[0].get("id")
 
                     # save cfg backup
                     with open('./configs/config_backups/{}.json'.format(router_id), 'w') as backup:
