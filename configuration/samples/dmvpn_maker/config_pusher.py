@@ -16,10 +16,10 @@ import json
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from headers import ncmheaders
+from headers import ncm_headers
 
 # Define headers
-headers = ncmheaders.laric_headers
+headers = ncm_headers.myheaders
 
 # create results csv and write headers
 with open('results.csv', 'a', newline='') as results:
@@ -96,8 +96,14 @@ def push_configs():
 
                     # get configuration_managers id and save backup of config
                     cfg = s.get('https://cradlepointecm.com/api/v2/configuration_managers/?router.id={}'.format(router_id),
-                                   headers=headers).json()
-                    cfg_id = cfg.get("data")[0].get("id")
+                                   headers=headers)
+
+                    # Check authorization
+                    if cfg.status_code == 401:
+                        raise requests.RequestException("401 Unauthorized response. Invalid Credentials i.e. missing or invalid keys.")
+
+                    # Get the configuration_managers id from the response
+                    cfg_id = cfg.json().get("data")[0].get("id")
 
                     # save cfg backup
                     with open('./configs/config_backups/{}.json'.format(router_id), 'w') as backup:

@@ -9,9 +9,9 @@ You can just replace myheaders with code to securely retrieve your
 keys from wherever you keep them.
 """
 
-myheader = {
-    'cp_api_id': 'MY_CP_API_ID',  # replace me
-    'cp_api_key': 'MY_CP_API_KEY',  # replace me
-    'ecm_api_id': 'MY_ECM_API_ID',  # replace me
-    'ecm_api_key': 'MY_ECM_API_KEY',  # replace me
+myheaders = {
+    'X-CP-API-ID': 'MY_CP_API_ID',  # replace me
+    'X-CP-API-KEY': 'MY_CP_API_KEY',  # replace me
+    'X-ECM-API-ID': 'MY_ECM_API_ID',  # replace me
+    'X-ECM-API-KEY': 'MY_ECM_API_KEY',  # replace me
 }
