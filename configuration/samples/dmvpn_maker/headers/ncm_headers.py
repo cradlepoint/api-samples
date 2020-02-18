@@ -9,7 +9,7 @@ You can just replace myheaders with code to securely retrieve your
 keys from wherever you keep them.
 """
 
-myheader = {
+myheaders = {
     'cp_api_id': 'MY_CP_API_ID',  # replace me
     'cp_api_key': 'MY_CP_API_KEY',  # replace me
     'ecm_api_id': 'MY_ECM_API_ID',  # replace me

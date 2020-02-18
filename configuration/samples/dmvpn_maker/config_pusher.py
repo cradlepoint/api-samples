@@ -16,10 +16,10 @@ import json
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from headers import ncmheaders
+from headers import ncm_headers
 
 # Define headers
-headers = ncmheaders.laric_headers
+headers = ncm_headers.myheaders
 
 # create results csv and write headers
 with open('results.csv', 'a', newline='') as results:
