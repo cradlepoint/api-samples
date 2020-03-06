@@ -132,7 +132,7 @@ if __name__ == '__main__':
         action="store_true",
     )
     parser.add_argument(
-        "--server", default="https://cradlepointecm.com",
+        "--server", default="https://www.cradlepointecm.com",
         help="Base URL of server.",
     )
     parser.add_argument(

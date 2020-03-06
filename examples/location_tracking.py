@@ -155,7 +155,7 @@ if __name__ == "__main__":
         help="Return data starting this many hours before the --before option (overrides --after)",
     )
     parser.add_argument(
-        "--server", default="https://cradlepointecm.com", help="Base URL of server"
+        "--server", default="https://www.cradlepointecm.com", help="Base URL of server"
     )
     parser.add_argument(
         "--steps", type=int, help="If --walk, walk only this many steps.", default=0
