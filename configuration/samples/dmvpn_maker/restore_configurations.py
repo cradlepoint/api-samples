@@ -54,12 +54,12 @@ def restore_configs():
 
                     # get configuration_managers id
                     cfg_id = \
-                    s.get('https://cradlepointecm.com/api/v2/configuration_managers/?router.id={}'.format(router_id),
+                    s.get('https://www.cradlepointecm.com/api/v2/configuration_managers/?router.id={}'.format(router_id),
                           headers=headers).json()
                     cfg_id = cfg_id.get("data")[0].get("id")
 
                     # patch payload
-                    patch = s.patch('https://cradlepointecm.com/api/v2/configuration_managers/{}/'.format(cfg_id),
+                    patch = s.patch('https://www.cradlepointecm.com/api/v2/configuration_managers/{}/'.format(cfg_id),
                                     headers=headers, data=json.dumps(payload))
 
                     # print result
