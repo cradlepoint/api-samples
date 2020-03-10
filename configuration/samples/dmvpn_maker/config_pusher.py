@@ -95,7 +95,7 @@ def push_configs():
                     payload = indi_payload
 
                     # get configuration_managers id and save backup of config
-                    cfg = s.get('https://cradlepointecm.com/api/v2/configuration_managers/?router.id={}'.format(router_id),
+                    cfg = s.get('https://www.cradlepointecm.com/api/v2/configuration_managers/?router.id={}'.format(router_id),
                                    headers=headers)
 
                     # Check authorization
@@ -111,7 +111,7 @@ def push_configs():
                         print('backup created for {}'.format(cfg_id))
 
                     # patch payload
-                    patch = s.patch('https://cradlepointecm.com/api/v2/configuration_managers/{}/'.format(cfg_id),
+                    patch = s.patch('https://www.cradlepointecm.com/api/v2/configuration_managers/{}/'.format(cfg_id),
                                     headers=headers, data=json.dumps(payload))
 
                     # print result
