@@ -13,14 +13,14 @@ Requirements:
 
 Usage:
     Instantiating the class:
-
-        If using pip:
-             from ncm import ncm
-             n = ncm.NcmClient(api_keys=api_keys)
-
-        If not using pip:
-             import ncm
-             n = ncm.NcmClient(api_keys=api_keys)
+        import ncm
+        api_keys = {
+           'X-CP-API-ID': 'b89a24a3',
+           'X-CP-API-KEY': '4b1d77fe271241b1cfafab993ef0891d',
+           'X-ECM-API-ID': 'c71b3e68-33f5-4e69-9853-14989700f204',
+           'X-ECM-API-KEY': 'f1ca6cd41f326c00e23322795c063068274caa30'
+        }
+        n = ncm.NcmClient(api_keys=api_keys)
 
     Example API call:
         n.get_accounts()
