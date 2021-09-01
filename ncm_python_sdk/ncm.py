@@ -1,3 +1,46 @@
+"""
+Cradlepoint NCM API class
+Created by: Nathan Wiens
+
+Overview:
+    The purpose of this class is to make it easier for users to interact with the Cradlepoint NCM API.
+    Within this class is a set of functions that closely matches the available API calls.
+    Full documentation of the Cradlepoint NCM API is available at https://developer.cradlepoint.com.
+
+Requirements:
+    A set of Cradlepoint NCM API Keys is required to make API calls. While the class can be instantiated
+    without supplying API keys, any subsequent calls will fail unless the keys are set via the set_api_keys() method.
+
+Usage:
+    Instantiating the class:
+
+        If using pip:
+             from ncm import ncm
+             n = ncm.NcmClient(api_keys=api_keys)
+
+        If not using pip:
+             import ncm
+             n = ncm.NcmClient(api_keys=api_keys)
+
+    Example API call:
+        n.get_accounts()
+
+Tips:
+    This python class includes a few optimizations to make it easier to work with the API.
+    The default record limit is set at 500 instead of the Cradlepoint default of 20, which reduces the number of
+    API calls required to return large sets of data.
+
+    This can be modified by specifying a "limit parameter":
+       n.get_accounts(limit=10)
+
+    You can also return the full list of records in a single array without the need for paging
+    by passing limit='all':
+       n.get_accounts(limit='all')
+
+    It also has native support for handling any number of "__in" filters beyond Cradlepoint's limit of 100.
+    The script automatically chunks the list into groups of 100 and combines the results into a single array.
+"""
+
 from requests import Session
 from requests.adapters import HTTPAdapter
 from http import HTTPStatus
@@ -7,40 +50,47 @@ import os
 import json
 
 
-def __isjson(myjson):
+def __is_json(test_json):
     """
     Checks if a string is a valid json object
     """
     try:
-        json_object = json.loads(myjson)
+        json.loads(test_json)
     except ValueError:
         return False
     return True
 
 
 class NcmClient:
+    """
+    This NCM Client class provides functions for interacting with the Cradlepoint NCM API.
+    Full documentation of the Cradlepoint API can be found at: https://developer.cradlepoint.com
+    """
+
     def __init__(self,
                  api_keys=None,
                  log_events=True,
                  retries=5,
                  retry_backoff_factor=2,
-                 retry_on=[
-                     HTTPStatus.REQUEST_TIMEOUT,
-                     HTTPStatus.GATEWAY_TIMEOUT,
-                     HTTPStatus.SERVICE_UNAVAILABLE
-                 ],
+                 retry_on=None,
                  base_url=os.environ.get(
                      'CP_BASE_URL', 'https://www.cradlepointecm.com/api/v2')
                  ):
         """
         Constructor. Sets up and opens request session.
-        :param api_keys: Dictionary of API credentials. Required.
+        :param api_keys: Dictionary of API credentials. Optional, but must be set before calling functions.
         :type api_keys: dict
         :param retries: number of retries on failure. Optional.
         :param retry_backoff_factor: backoff time multiplier for retries. Optional.
         :param retry_on: types of errors on which automatic retry will occur. Optional.
         :param base_url: # base url for calls. Configurable for testing. Optional.
         """
+        if retry_on is None:
+            retry_on = [
+                HTTPStatus.REQUEST_TIMEOUT,
+                HTTPStatus.GATEWAY_TIMEOUT,
+                HTTPStatus.SERVICE_UNAVAILABLE
+            ]
         if api_keys is None:
             api_keys = {}
         self.logEvents = log_events
@@ -61,46 +111,46 @@ class NcmClient:
             'Content-Type': 'application/json'
         })
 
-    def __returnhandler(self, statuscode, returntext, objtype):
+    def __return_handler(self, status_code, returntext, obj_type):
         """
         Prints returned HTTP request information if self.logEvents is True.
         """
-        if str(statuscode) == '200':
+        if str(status_code) == '200':
             if self.logEvents:
-                print('{0} Operation Successful\n'.format(str(objtype)))
+                print('{0} Operation Successful\n'.format(str(obj_type)))
             return None
-        elif str(statuscode) == '201':
+        elif str(status_code) == '201':
             if self.logEvents:
-                print('{0} Added Successfully\n'.format(str(objtype)))
+                print('{0} Added Successfully\n'.format(str(obj_type)))
             return None
-        elif str(statuscode) == '202':
+        elif str(status_code) == '202':
             if self.logEvents:
-                print('{0} Added Successfully\n'.format(str(objtype)))
+                print('{0} Added Successfully\n'.format(str(obj_type)))
             return None
-        elif str(statuscode) == '204':
+        elif str(status_code) == '204':
             if self.logEvents:
-                print('{0} Deleted Successfully\n'.format(str(objtype)))
+                print('{0} Deleted Successfully\n'.format(str(obj_type)))
             return None
-        elif str(statuscode) == '400':
+        elif str(status_code) == '400':
             if self.logEvents:
                 print('Bad Request\n')
             return None
-        elif str(statuscode) == '401':
+        elif str(status_code) == '401':
             if self.logEvents:
                 print('Unauthorized Access\n')
             return returntext
-        elif str(statuscode) == '404':
+        elif str(status_code) == '404':
             if self.logEvents:
                 print('Resource Not Found\n')
             return returntext
-        elif str(statuscode) == '500':
+        elif str(status_code) == '500':
             if self.logEvents:
                 print('HTTP 500 - Server Error\n')
             return returntext
         else:
-            print('HTTP Status Code: {0} - No returned data\n'.format(str(statuscode)))
+            print('HTTP Status Code: {0} - No returned data\n'.format(str(status_code)))
 
-    def __get_json(self, geturl, call_type, params=None):
+    def __get_json(self, get_url, call_type, params=None):
         """
         Returns full paginated results, and handles chunking "__in" params in groups of 100
         """
@@ -127,25 +177,25 @@ class NcmClient:
                     # For each chunk, get the full results list and filter by __in parameter
                     for chunk in chunks:
                         # Handles a list of int or list of str
-                        chunkstr = ','.join(map(str, chunk))
-                        params.update({key: chunkstr})
-                        url = geturl
+                        chunk_str = ','.join(map(str, chunk))
+                        params.update({key: chunk_str})
+                        url = get_url
                         while url and (len(results) < limit):
                             ncm = self.session.get(url, params=params)
                             if not (200 <= ncm.status_code < 300):
                                 break
-                            self.__returnhandler(ncm.status_code, ncm.json()['data'], call_type)
+                            self.__return_handler(ncm.status_code, ncm.json()['data'], call_type)
                             url = ncm.json()['meta']['next']
                             for d in ncm.json()['data']:
                                 results.append(d)
 
         if __in_keys == 0:
-            url = geturl
+            url = get_url
             while url and (len(results) < limit):
                 ncm = self.session.get(url, params=params)
                 if not (200 <= ncm.status_code < 300):
                     break
-                self.__returnhandler(ncm.status_code, ncm.json()['data'], call_type)
+                self.__return_handler(ncm.status_code, ncm.json()['data'], call_type)
                 url = ncm.json()['meta']['next']
                 for d in ncm.json()['data']:
                     results.append(d)
@@ -177,24 +227,26 @@ class NcmClient:
 
         return params
 
-    def __chunk_param(self, param):
+    @staticmethod
+    def __chunk_param(param):
         """
         Chunks parameters into groups of 100 per Cradlepoint limit. Iterate through chunks with a for loop.
         """
         n = 100
 
         if type(param) is str:
-            paramlist = param.split(",")
+            param_list = param.split(",")
         elif type(param) is list:
-            paramlist = param
+            param_list = param
         else:
             raise TypeError("Invalid param format. Must be str or list.")
 
         """Yield successive n-sized chunks from lst."""
-        for i in range(0, len(paramlist), n):
-            yield paramlist[i:i + n]
+        for i in range(0, len(param_list), n):
+            yield param_list[i:i + n]
 
-    def __validate_api_keys(self, api_keys):
+    @staticmethod
+    def __validate_api_keys(api_keys):
         """
         Checks NCM API Keys are a dictionary containing all necessary keys
         :param api_keys: Dictionary of API credentials. Optional.
@@ -234,13 +286,13 @@ class NcmClient:
         :return: A list of accounts based on API Key.
         """
         call_type = 'Accounts'
-        geturl = '{0}/accounts/'.format(self.base_url)
+        get_url = '{0}/accounts/'.format(self.base_url)
 
         allowed_params = ['account', 'account__in', 'id', 'id__in', 'name',
                           'name__in', 'expand', 'limit', 'offset']
         params = self.__parse_kwargs(kwargs, allowed_params)
 
-        return self.__get_json(geturl, call_type, params=params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_account_by_id(self, account_id):
         """
@@ -267,15 +319,15 @@ class NcmClient:
         :return:
         """
         call_type = 'Subaccount'
-        posturl = '{0}/accounts/'.format(self.base_url)
+        post_url = '{0}/accounts/'.format(self.base_url)
 
-        postdata = {
+        post_data = {
             'account': '/api/v1/accounts/{}/'.format(str(parent_account_id)),
             'name': str(subaccount_name)
         }
 
-        ncm = self.session.post(posturl, data=json.dumps(postdata))
-        result = self.__returnhandler(ncm.status_code, ncm.json(), call_type)
+        ncm = self.session.post(post_url, data=json.dumps(post_data))
+        result = self.__return_handler(ncm.status_code, ncm.json(), call_type)
         return result
 
     def create_subaccount_by_parent_name(self, parent_account_name, subaccount_name):
@@ -296,14 +348,14 @@ class NcmClient:
         :return:
         """
         call_type = 'Subaccount'
-        puturl = '{0}/accounts/{1}/'.format(self.base_url, str(subaccount_id))
+        put_url = '{0}/accounts/{1}/'.format(self.base_url, str(subaccount_id))
 
-        putdata = {
+        put_data = {
             "name": str(new_subaccount_name)
         }
 
-        ncm = self.session.put(puturl, data=json.dumps(putdata))
-        result = self.__returnhandler(ncm.status_code, ncm.json(), call_type)
+        ncm = self.session.put(put_url, data=json.dumps(put_data))
+        result = self.__return_handler(ncm.status_code, ncm.json(), call_type)
         return result
 
     def rename_subaccount_by_name(self, subaccount_name, new_subaccount_name):
@@ -322,11 +374,11 @@ class NcmClient:
         :param subaccount_id: ID of subaccount to delete
         :return:
         """
-        call_type = 'Subccount'
-        posturl = '{0}/accounts/{1}'.format(self.base_url, subaccount_id)
+        call_type = 'Subaccount'
+        post_url = '{0}/accounts/{1}'.format(self.base_url, subaccount_id)
 
-        ncm = self.session.delete(posturl)
-        result = self.__returnhandler(ncm.status_code, ncm.text, call_type)
+        ncm = self.session.delete(post_url)
+        result = self.__return_handler(ncm.status_code, ncm.text, call_type)
         return result
 
     def delete_subaccount_by_name(self, subaccount_name):
@@ -345,7 +397,7 @@ class NcmClient:
         :return:
         """
         call_type = 'Activity Logs'
-        geturl = '{0}/activity_logs/'.format(self.base_url)
+        get_url = '{0}/activity_logs/'.format(self.base_url)
 
         allowed_params = ['account', 'created_at__exact', 'created_at__lt', 'created_at__lte', 'created_at__gt',
                           'created_at__gte', 'action__timestamp__exact', 'action__timestamp__lt',
@@ -354,7 +406,7 @@ class NcmClient:
                           'limit']
         params = self.__parse_kwargs(kwargs, allowed_params)
 
-        return self.__get_json(geturl, call_type, params=params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_alerts(self, **kwargs):
         """
@@ -363,13 +415,13 @@ class NcmClient:
         :return:
         """
         call_type = 'Alerts'
-        geturl = '{0}/alerts/'.format(self.base_url)
+        get_url = '{0}/alerts/'.format(self.base_url)
 
         allowed_params = ['account', 'created_at', 'created_at_timeuuid', 'detected_at', 'friendly_info', 'info',
                           'router', 'type', 'order_by', 'limit', 'offset']
         params = self.__parse_kwargs(kwargs, allowed_params)
 
-        return self.__get_json(geturl, call_type, params=params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_configuration_managers(self, **kwargs):
         """
@@ -379,13 +431,13 @@ class NcmClient:
         :return:
         """
         call_type = 'Configuration Managers'
-        geturl = '{0}/configuration_managers/'.format(self.base_url)
+        get_url = '{0}/configuration_managers/'.format(self.base_url)
 
         allowed_params = ['account', 'account__in', 'fields', 'id', 'id__in', 'router', 'router__in', 'synched',
                           'suspended', 'expand', 'limit', 'offset']
         params = self.__parse_kwargs(kwargs, allowed_params)
 
-        return self.__get_json(geturl, call_type, params=params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_configuration_manager_id(self, router_id, **kwargs):
         """
@@ -396,33 +448,33 @@ class NcmClient:
         :return:
         """
         call_type = 'Configuration Managers'
-        geturl = '{0}/configuration_managers/?router.id={1}&fields=id'.format(self.base_url, router_id)
+        get_url = '{0}/configuration_managers/?router.id={1}&fields=id'.format(self.base_url, router_id)
 
         allowed_params = ['account', 'account__in', 'id', 'id__in', 'router', 'router__in', 'synched',
                           'suspended', 'expand', 'limit', 'offset']
         params = self.__parse_kwargs(kwargs, allowed_params)
 
-        return self.__get_json(geturl, call_type, params=params)[0]['id']
+        return self.__get_json(get_url, call_type, params=params)[0]['id']
 
-    def update_configuration_managers(self, configman_id, configman_json):
+    def update_configuration_managers(self, config_man_id, config_man_json):
         """
         This method updates an configuration_managers for associated id.
-        :param configman_id: ID of the Configuration Manager to modify
-        :param configman_json: JSON of the "configuration" field of the configuration manager
+        :param config_man_id: ID of the Configuration Manager to modify
+        :param config_man_json: JSON of the "configuration" field of the configuration manager
         :return:
         """
         call_type = 'Configuration Manager'
-        puturl = '{0}/configuration_managers/{1}/'.format(self.base_url, configman_id)
+        put_url = '{0}/configuration_managers/{1}/'.format(self.base_url, config_man_id)
 
-        ncm = self.session.put(puturl, json=configman_json)
-        result = self.__returnhandler(ncm.status_code, ncm.json(), call_type)
+        ncm = self.session.put(put_url, json=config_man_json)
+        result = self.__return_handler(ncm.status_code, ncm.json(), call_type)
         return result
 
-    def patch_configuration_managers(self, router_id, configman_json):
+    def patch_configuration_managers(self, router_id, config_man_json):
         """
         This method patches an configuration_managers for associated id.
         :param router_id: ID of router to update
-        :param configman_json: JSON of the "configuration" field of the configuration manager
+        :param config_man_json: JSON of the "configuration" field of the configuration manager
         :return:
         """
         call_type = 'Configuration Manager'
@@ -430,14 +482,14 @@ class NcmClient:
         response = self.session.get('{0}/configuration_managers/?router.id={1}&fields=id'.format(
             self.base_url, str(router_id)))  # Get Configuration Managers ID for current Router from API
         response = json.loads(response.content.decode("utf-8"))  # Decode the response and make it a dictionary
-        configman_id = response['data'][0]['id']  # get the Configuration Managers ID from response
+        config_man_id = response['data'][0]['id']  # get the Configuration Managers ID from response
 
-        payload = configman_json
+        payload = config_man_json
 
-        ncm = self.session.patch('{0}/configuration_managers/{1}/'.format(self.base_url, str(configman_id)),
+        ncm = self.session.patch('{0}/configuration_managers/{1}/'.format(self.base_url, str(config_man_id)),
                                  data=json.dumps(payload))  # Patch indie config with new values
 
-        result = self.__returnhandler(ncm.status_code, ncm.text, call_type)
+        result = self.__return_handler(ncm.status_code, ncm.text, call_type)
         return result
 
     def patch_group_configuration(self, group_id, config_json):
@@ -454,7 +506,7 @@ class NcmClient:
 
         ncm = self.session.patch('{0}/groups/{1}/'.format(self.base_url, str(group_id)),
                                  data=json.dumps(payload))  # Patch indie config with new values
-        result = self.__returnhandler(ncm.status_code, ncm.text, call_type)
+        result = self.__return_handler(ncm.status_code, ncm.text, call_type)
         return result
 
     def copy_router_configuration(self, src_router_id, dst_router_id):
@@ -474,12 +526,12 @@ class NcmClient:
             .replace(', "password": "*"', '').replace('"password": "*"', '')
 
         """Get destination router Configuration Manager ID"""
-        dst_configman_id = self.get_configuration_managers(router=dst_router_id)[0]['id']
+        dst_config_man_id = self.get_configuration_managers(router=dst_router_id)[0]['id']
 
-        puturl = '{0}/configuration_managers/{1}/'.format(self.base_url, dst_configman_id)
+        put_url = '{0}/configuration_managers/{1}/'.format(self.base_url, dst_config_man_id)
 
-        ncm = self.session.patch(puturl, data=src_config)
-        result = self.__returnhandler(ncm.status_code, ncm.json(), call_type)
+        ncm = self.session.patch(put_url, data=src_config)
+        result = self.__return_handler(ncm.status_code, ncm.json(), call_type)
         return result
 
     def get_device_app_bindings(self, **kwargs):
@@ -489,13 +541,13 @@ class NcmClient:
         :return:
         """
         call_type = 'Device App Bindings'
-        geturl = '{0}/device_app_bindings/'.format(self.base_url)
+        get_url = '{0}/device_app_bindings/'.format(self.base_url)
 
         allowed_params = ['account', 'account__in', 'group', 'group__in', 'app_version', 'app_version__in',
                           'id', 'id__in', 'state', 'state__in', 'expand', 'limit', 'offset']
         params = self.__parse_kwargs(kwargs, allowed_params)
 
-        return self.__get_json(geturl, call_type, params=params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_device_app_states(self, **kwargs):
         """
@@ -504,13 +556,13 @@ class NcmClient:
         :return:
         """
         call_type = 'Device App States'
-        geturl = '{0}/device_app_states/'.format(self.base_url)
+        get_url = '{0}/device_app_states/'.format(self.base_url)
 
         allowed_params = ['account', 'account__in', 'router', 'router__in', 'app_version', 'app_version__in',
                           'id', 'id__in', 'state', 'state__in', 'expand', 'limit', 'offset']
         params = self.__parse_kwargs(kwargs, allowed_params)
 
-        return self.__get_json(geturl, call_type, params=params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_device_app_versions(self, **kwargs):
         """
@@ -519,13 +571,13 @@ class NcmClient:
         :return:
         """
         call_type = 'Device App Versions'
-        geturl = '{0}/device_app_versions/'.format(self.base_url)
+        get_url = '{0}/device_app_versions/'.format(self.base_url)
 
         allowed_params = ['account', 'account__in', 'app', 'app__in', 'id', 'id__in', 'state', 'state__in',
                           'expand', 'limit', 'offset']
         params = self.__parse_kwargs(kwargs, allowed_params)
 
-        return self.__get_json(geturl, call_type, params=params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_device_apps(self, **kwargs):
         """
@@ -534,13 +586,13 @@ class NcmClient:
         :return:
         """
         call_type = 'Device Apps'
-        geturl = '{0}/device_apps/'.format(self.base_url)
+        get_url = '{0}/device_apps/'.format(self.base_url)
 
         allowed_params = ['account', 'account__in', 'name', 'name__in', 'id', 'id__in', 'uuid', 'uuid__in',
                           'expand', 'order_by', 'limit', 'offset']
         params = self.__parse_kwargs(kwargs, allowed_params)
 
-        return self.__get_json(geturl, call_type, params=params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_failovers(self, **kwargs):
         """
@@ -549,12 +601,12 @@ class NcmClient:
         :return:
         """
         call_type = 'Failovers'
-        geturl = '{0}/failovers/'.format(self.base_url)
+        get_url = '{0}/failovers/'.format(self.base_url)
 
         allowed_params = ['account_id', 'group_id', 'router_id', 'started_at', 'ended_at', 'order_by', 'limit', 'offset']
         params = self.__parse_kwargs(kwargs, allowed_params)
 
-        return self.__get_json(geturl, call_type, params=params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_firmwares(self, **kwargs):
         """
@@ -563,14 +615,14 @@ class NcmClient:
         :return:
         """
         call_type = 'Firmwares'
-        geturl = '{0}/firmwares/'.format(self.base_url)
+        get_url = '{0}/firmwares/'.format(self.base_url)
 
         allowed_params = ['id', 'id__in', 'version', 'version__in', 'limit', 'offset']
         params = self.__parse_kwargs(kwargs, allowed_params)
 
-        return self.__get_json(geturl, call_type, params=params)
+        return self.__get_json(get_url, call_type, params=params)
 
-    def get_firmware_for_productid_by_version(self, product_id, firmware_name):
+    def get_firmware_for_product_id_by_version(self, product_id, firmware_name):
         """
         This operation returns firmwares for a given model ID and version name.
         :param product_id: The ID of the product (e.g. 46)
@@ -582,7 +634,7 @@ class NcmClient:
                 return f
         raise ValueError("Invalid Firmware Version")
 
-    def get_firmware_for_productname_by_version(self, product_name, firmware_name):
+    def get_firmware_for_product_name_by_version(self, product_name, firmware_name):
         """
         This operation returns firmwares for a given model name and version name.
         :param product_name: The Name of the product (e.g. IBR200)
@@ -590,7 +642,7 @@ class NcmClient:
         :return:
         """
         product_id = self.get_product_by_name(product_name)['id']
-        return self.get_firmware_for_productid_by_version(product_id, firmware_name)
+        return self.get_firmware_for_product_id_by_version(product_id, firmware_name)
 
     def get_groups(self, **kwargs):
         """
@@ -599,12 +651,12 @@ class NcmClient:
         :return:
         """
         call_type = 'Groups'
-        geturl = '{0}/groups/'.format(self.base_url)
+        get_url = '{0}/groups/'.format(self.base_url)
 
         allowed_params = ['account', 'account__in', 'id', 'id__in', 'name', 'name__in', 'expand', 'limit', 'offset']
         params = self.__parse_kwargs(kwargs, allowed_params)
 
-        return self.__get_json(geturl, call_type, params=params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_group_by_id(self, group_id):
         """
@@ -634,19 +686,19 @@ class NcmClient:
         """
 
         call_type = 'Group'
-        posturl = '{0}/groups/'.format(self.base_url)
+        post_url = '{0}/groups/'.format(self.base_url)
 
-        firmware = self.get_firmware_for_productname_by_version(product_name, firmware_version)
+        firmware = self.get_firmware_for_product_name_by_version(product_name, firmware_version)
 
-        postdata = {
+        post_data = {
             'account': '/api/v1/accounts/{}/'.format(str(parent_account_id)),
             'name': str(group_name),
             'product': str(self.get_product_by_name(product_name)['resource_url']),
             'target_firmware': str(firmware['resource_url'])
         }
 
-        ncm = self.session.post(posturl, data=json.dumps(postdata))
-        result = self.__returnhandler(ncm.status_code, ncm.json(), call_type)
+        ncm = self.session.post(post_url, data=json.dumps(post_data))
+        result = self.__return_handler(ncm.status_code, ncm.json(), call_type)
         return result
 
     def create_group_by_parent_name(self, parent_account_name, group_name, product_name, firmware_version):
@@ -672,14 +724,14 @@ class NcmClient:
         :return:
         """
         call_type = 'Group'
-        puturl = '{0}/groups/{1}/'.format(self.base_url, group_id)
+        put_url = '{0}/groups/{1}/'.format(self.base_url, group_id)
 
-        putdata = {
+        put_data = {
             "name": str(new_group_name)
         }
 
-        ncm = self.session.put(puturl, data=json.dumps(putdata))
-        result = self.__returnhandler(ncm.status_code, ncm.json(), call_type)
+        ncm = self.session.put(put_url, data=json.dumps(put_data))
+        result = self.__return_handler(ncm.status_code, ncm.json(), call_type)
         return result
 
     def rename_group_by_name(self, existing_group_name, new_group_name):
@@ -699,10 +751,10 @@ class NcmClient:
         :return:
         """
         call_type = 'Group'
-        posturl = '{0}/groups/{1}/'.format(self.base_url, group_id)
+        post_url = '{0}/groups/{1}/'.format(self.base_url, group_id)
 
-        ncm = self.session.delete(posturl)
-        result = self.__returnhandler(ncm.status_code, ncm.text, call_type)
+        ncm = self.session.delete(post_url)
+        result = self.__return_handler(ncm.status_code, ncm.text, call_type)
         return result
 
     def delete_group_by_name(self, group_name):
@@ -722,12 +774,12 @@ class NcmClient:
         :return:
         """
         call_type = 'Historical Locations'
-        geturl = '{0}/historical_locations/?router={1}'.format(self.base_url, router_id)
+        get_url = '{0}/historical_locations/?router={1}'.format(self.base_url, router_id)
 
         allowed_params = ['created_at__gt', 'created_at_timeuuid__gt', 'created_at__lte', 'fields', 'limit', 'offset']
         params = self.__parse_kwargs(kwargs, allowed_params)
 
-        return self.__get_json(geturl, call_type, params=params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_historical_locations_for_date(self, router_id, date, tzoffset_hrs=0, limit='all', **kwargs):
         """
@@ -749,7 +801,7 @@ class NcmClient:
         end = (d + timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%S")
 
         call_type = 'Historical Locations'
-        geturl = '{0}/historical_locations/?router={1}'.format(self.base_url, router_id)
+        get_url = '{0}/historical_locations/?router={1}'.format(self.base_url, router_id)
 
         allowed_params = ['created_at__gt', 'created_at_timeuuid__gt', 'created_at__lte', 'fields', 'limit', 'offset']
         params = self.__parse_kwargs(kwargs, allowed_params)
@@ -758,7 +810,7 @@ class NcmClient:
                        'created_at__gt': start,
                        'limit': limit})
 
-        return self.__get_json(geturl, call_type, params=params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_locations(self, **kwargs):
         """
@@ -767,12 +819,12 @@ class NcmClient:
         :return:
         """
         call_type = 'Locations'
-        geturl = '{0}/locations/'.format(self.base_url)
+        get_url = '{0}/locations/'.format(self.base_url)
 
         allowed_params = ['id', 'id__in', 'router', 'limit', 'offset']
         params = self.__parse_kwargs(kwargs, allowed_params)
 
-        return self.__get_json(geturl, call_type, params=params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def create_location(self, account_id, latitude, longitude, router_id):
         """
@@ -787,9 +839,9 @@ class NcmClient:
         """
 
         call_type = 'Locations'
-        posturl = '{0}/locations/'.format(self.base_url)
+        post_url = '{0}/locations/'.format(self.base_url)
 
-        postdata = {
+        post_data = {
             'account': 'https://www.cradlepointecm.com/api/v2/accounts/{}/'.format(str(account_id)),
             'accuracy': 0,
             'latitude': latitude,
@@ -798,8 +850,8 @@ class NcmClient:
             'router': 'https://www.cradlepointecm.com/api/v2/routers/{}/'.format(str(router_id))
         }
 
-        ncm = self.session.post(posturl, data=json.dumps(postdata))
-        result = self.__returnhandler(ncm.status_code, ncm.json(), call_type)
+        ncm = self.session.post(post_url, data=json.dumps(post_data))
+        result = self.__return_handler(ncm.status_code, ncm.json(), call_type)
         return result
 
     def delete_location_for_router(self, router_id):
@@ -814,10 +866,10 @@ class NcmClient:
         if locations:
             location_id = locations[0]['id']
 
-            posturl = '{0}/locations/{1}/'.format(self.base_url, location_id)
+            post_url = '{0}/locations/{1}/'.format(self.base_url, location_id)
 
-            ncm = self.session.delete(posturl)
-            result = self.__returnhandler(ncm.status_code, ncm.text, call_type)
+            ncm = self.session.delete(post_url)
+            result = self.__return_handler(ncm.status_code, ncm.text, call_type)
             return result
         else:
             return "NO LOCATION FOUND"
@@ -829,12 +881,12 @@ class NcmClient:
         :return:
         """
         call_type = 'Net Device Health'
-        geturl = '{0}/net_device_health/'.format(self.base_url)
+        get_url = '{0}/net_device_health/'.format(self.base_url)
 
         allowed_params = ['net_device']
         params = self.__parse_kwargs(kwargs, allowed_params)
 
-        return self.__get_json(geturl, call_type, params=params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_net_device_metrics(self, **kwargs):
         """
@@ -845,12 +897,12 @@ class NcmClient:
         :return:
         """
         call_type = 'Net Device Metrics'
-        geturl = '{0}/net_device_metrics/'.format(self.base_url)
+        get_url = '{0}/net_device_metrics/'.format(self.base_url)
 
         allowed_params = ['net_device', 'net_device__in', 'update_ts__lt', 'update_ts__gt', 'limit', 'offset']
         params = self.__parse_kwargs(kwargs, allowed_params)
 
-        return self.__get_json(geturl, call_type, params=params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_net_devices_metrics_for_wan(self, **kwargs):
         """
@@ -889,7 +941,7 @@ class NcmClient:
         :return:
         """
         call_type = 'Get Net Device Signal Samples'
-        geturl = '{0}/net_device_signal_samples/'.format(self.base_url)
+        get_url = '{0}/net_device_signal_samples/'.format(self.base_url)
 
         allowed_params = ['net_device', 'net_device__in', 'created_at', 'created_at__lt', 'created_at__gt',
                           'created_at_timeuuid', 'created_at_timeuuid__in', 'created_at_timeuuid__gt',
@@ -897,7 +949,7 @@ class NcmClient:
                           'order_by', 'limit', 'offset']
         params = self.__parse_kwargs(kwargs, allowed_params)
 
-        return self.__get_json(geturl, call_type, params=params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_net_device_usage_samples(self, **kwargs):
         """
@@ -906,7 +958,7 @@ class NcmClient:
         :return:
         """
         call_type = 'Net Device Usage Samples'
-        geturl = '{0}/net_device_usage_samples/'.format(self.base_url)
+        get_url = '{0}/net_device_usage_samples/'.format(self.base_url)
 
         allowed_params = ['net_device', 'net_device__in', 'created_at', 'created_at__lt', 'created_at__gt',
                           'created_at_timeuuid', 'created_at_timeuuid__in', 'created_at_timeuuid__gt',
@@ -914,7 +966,7 @@ class NcmClient:
                           'order_by', 'limit', 'offset']
         params = self.__parse_kwargs(kwargs, allowed_params)
 
-        return self.__get_json(geturl, call_type, params=params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_net_devices(self, **kwargs):
         """
@@ -923,14 +975,14 @@ class NcmClient:
         :return:
         """
         call_type = 'Net Devices'
-        geturl = '{0}/net_devices/'.format(self.base_url)
+        get_url = '{0}/net_devices/'.format(self.base_url)
 
         allowed_params = ['account', 'account__in', 'connection_state', 'connection_state__in', 'id', 'id__in',
                           'is_asset', 'ipv4_address', 'ipv4_address__in', 'mode', 'mode__in', 'router', 'router__in',
                           'expand', 'limit', 'offset']
         params = self.__parse_kwargs(kwargs, allowed_params)
 
-        return self.__get_json(geturl, call_type, params=params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_net_devices_for_router(self, router_id, **kwargs):
         """
@@ -958,12 +1010,12 @@ class NcmClient:
         :return:
         """
         call_type = 'Products'
-        geturl = '{0}/products/'.format(self.base_url)
+        get_url = '{0}/products/'.format(self.base_url)
 
         allowed_params = ['id', 'id__in', 'limit', 'offset']
         params = self.__parse_kwargs(kwargs, allowed_params)
 
-        return self.__get_json(geturl, call_type, params=params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_product_by_id(self, product_id):
         """
@@ -991,14 +1043,14 @@ class NcmClient:
         :return:
         """
         call_type = 'Reboot Device'
-        posturl = '{0}/reboot_activity/'.format(self.base_url)
+        post_url = '{0}/reboot_activity/'.format(self.base_url)
 
-        postdata = {
+        post_data = {
             'router': '{0}/routers/{1}/'.format(self.base_url, str(router_id))
         }
 
-        ncm = self.session.post(posturl, data=json.dumps(postdata))
-        result = self.__returnhandler(ncm.status_code, ncm.text, call_type)
+        ncm = self.session.post(post_url, data=json.dumps(post_data))
+        result = self.__return_handler(ncm.status_code, ncm.text, call_type)
         return result
 
     def reboot_group(self, group_id):
@@ -1008,14 +1060,14 @@ class NcmClient:
         :return:
         """
         call_type = 'Reboot Group'
-        posturl = '{0}/reboot_activity/'.format(self.base_url)
+        post_url = '{0}/reboot_activity/'.format(self.base_url)
 
-        postdata = {
+        post_data = {
             'group': '{0}/groups/{1}/'.format(self.base_url, str(group_id))
         }
 
-        ncm = self.session.post(posturl, data=json.dumps(postdata))
-        result = self.__returnhandler(ncm.status_code, ncm.text, call_type)
+        ncm = self.session.post(post_url, data=json.dumps(post_data))
+        result = self.__return_handler(ncm.status_code, ncm.text, call_type)
         return result
 
     def get_router_alerts(self, **kwargs):
@@ -1027,7 +1079,7 @@ class NcmClient:
         :return:
         """
         call_type = 'Router Alerts'
-        geturl = '{0}/router_alerts/'.format(self.base_url)
+        get_url = '{0}/router_alerts/'.format(self.base_url)
 
         allowed_params = ['router', 'router__in', 'created_at', 'created_at__lt', 'created_at__gt',
                           'created_at_timeuuid', 'created_at_timeuuid__in', 'created_at_timeuuid__gt',
@@ -1035,7 +1087,7 @@ class NcmClient:
                           'order_by', 'limit', 'offset']
         params = self.__parse_kwargs(kwargs, allowed_params)
 
-        return self.__get_json(geturl, call_type, params=params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_router_alerts_last_24hrs(self, tzoffset_hrs=0, **kwargs):
         """
@@ -1052,7 +1104,7 @@ class NcmClient:
         start = (d - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%S")
 
         call_type = 'Router Alerts'
-        geturl = '{0}/router_alerts/'.format(self.base_url)
+        get_url = '{0}/router_alerts/'.format(self.base_url)
 
         allowed_params = ['router', 'router__in']
         params = self.__parse_kwargs(kwargs, allowed_params)
@@ -1062,7 +1114,7 @@ class NcmClient:
                        'order_by': 'created_at_timeuuid',
                        'limit': '500'})
 
-        return self.__get_json(geturl, call_type, params=params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_router_alerts_for_date(self, date, tzoffset_hrs=0, **kwargs):
         """
@@ -1082,7 +1134,7 @@ class NcmClient:
         end = (d + timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%S")
 
         call_type = 'Router Alerts'
-        geturl = '{0}/router_alerts/'.format(self.base_url)
+        get_url = '{0}/router_alerts/'.format(self.base_url)
 
         allowed_params = ['router', 'router__in']
         params = self.__parse_kwargs(kwargs, allowed_params)
@@ -1092,7 +1144,7 @@ class NcmClient:
                        'order_by': 'created_at_timeuuid',
                        'limit': '500'})
 
-        return self.__get_json(geturl, call_type, params=params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_router_logs(self, router_id, **kwargs):
         """
@@ -1104,14 +1156,14 @@ class NcmClient:
         :return:
         """
         call_type = 'Router Logs'
-        geturl = '{0}/router_logs/?router={1}'.format(self.base_url, router_id)
+        get_url = '{0}/router_logs/?router={1}'.format(self.base_url, router_id)
 
         allowed_params = ['created_at', 'created_at__lt', 'created_at__gt', 'created_at_timeuuid',
                           'created_at_timeuuid__in', 'created_at_timeuuid__gt', 'created_at_timeuuid__gte',
                           'created_at_timeuuid__lt', 'created_at_timeuuid__lte', 'order_by', 'limit', 'offset']
         params = self.__parse_kwargs(kwargs, allowed_params)
 
-        return self.__get_json(geturl, call_type, params=params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_router_logs_last_24hrs(self, router_id, tzoffset_hrs=0):
         """
@@ -1128,11 +1180,11 @@ class NcmClient:
         start = (d - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%S")
 
         call_type = 'Router Logs'
-        geturl = '{0}/router_logs/?router={1}'.format(self.base_url, router_id)
+        get_url = '{0}/router_logs/?router={1}'.format(self.base_url, router_id)
 
         params = {'created_at__lt': end, 'created_at__gt': start, 'order_by': 'created_at_timeuuid', 'limit': '500'}
 
-        return self.__get_json(geturl, call_type, params=params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_router_logs_for_date(self, router_id, date, tzoffset_hrs=0):
         """
@@ -1152,11 +1204,11 @@ class NcmClient:
         end = (d + timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%S")
 
         call_type = 'Router Logs'
-        geturl = '{0}/router_logs/?router={1}'.format(self.base_url, router_id)
+        get_url = '{0}/router_logs/?router={1}'.format(self.base_url, router_id)
 
         params = {'created_at__lt': end, 'created_at__gt': start, 'order_by': 'created_at_timeuuid', 'limit': '500'}
 
-        return self.__get_json(geturl, call_type, params=params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_router_state_samples(self, **kwargs):
         """
@@ -1165,7 +1217,7 @@ class NcmClient:
         :return:
         """
         call_type = 'Router State Samples'
-        geturl = '{0}/router_state_samples/'.format(self.base_url)
+        get_url = '{0}/router_state_samples/'.format(self.base_url)
 
         allowed_params = ['router', 'router__in', 'created_at', 'created_at__lt', 'created_at__gt',
                           'created_at_timeuuid', 'created_at_timeuuid__in', 'created_at_timeuuid__gt',
@@ -1173,7 +1225,7 @@ class NcmClient:
                           'order_by', 'limit', 'offset']
         params = self.__parse_kwargs(kwargs, allowed_params)
 
-        return self.__get_json(geturl, call_type, params=params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_router_stream_usage_samples(self, **kwargs):
         """
@@ -1182,7 +1234,7 @@ class NcmClient:
         :return:
         """
         call_type = 'Router Stream Usage Samples'
-        geturl = '{0}/router_stream_usage_samples/'.format(self.base_url)
+        get_url = '{0}/router_stream_usage_samples/'.format(self.base_url)
 
         allowed_params = ['router', 'router__in', 'created_at', 'created_at__lt', 'created_at__gt',
                           'created_at_timeuuid', 'created_at_timeuuid__in', 'created_at_timeuuid__gt',
@@ -1190,7 +1242,7 @@ class NcmClient:
                           'order_by', 'limit', 'offset']
         params = self.__parse_kwargs(kwargs, allowed_params)
 
-        return self.__get_json(geturl, call_type, params=params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_routers(self, **kwargs):
         """
@@ -1199,7 +1251,7 @@ class NcmClient:
         :return:
         """
         call_type = 'Routers'
-        geturl = '{0}/routers/'.format(self.base_url)
+        get_url = '{0}/routers/'.format(self.base_url)
 
         allowed_params = ['account', 'account__in', 'device_type', 'device_type__in', 'group', 'group__in', 'id',
                           'id__in', 'ipv4_address', 'ipv4_address__in', 'mac', 'mac__in', 'name', 'name__in',
@@ -1208,7 +1260,7 @@ class NcmClient:
                           'offset']
         params = self.__parse_kwargs(kwargs, allowed_params)
 
-        return self.__get_json(geturl, call_type, params=params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_router_by_id(self, router_id, **kwargs):
         """
@@ -1254,14 +1306,14 @@ class NcmClient:
         :return:
         """
         call_type = 'Router'
-        puturl = '{0}/routers/{1}/'.format(self.base_url, router_id)
+        put_url = '{0}/routers/{1}/'.format(self.base_url, router_id)
 
-        putdata = {
+        put_data = {
             'name': str(new_router_name)
         }
 
-        ncm = self.session.put(puturl, data=json.dumps(putdata))
-        result = self.__returnhandler(ncm.status_code, ncm.json(), call_type)
+        ncm = self.session.put(put_url, data=json.dumps(put_data))
+        result = self.__return_handler(ncm.status_code, ncm.json(), call_type)
         return result
 
     def rename_router_by_name(self, existing_router_name, new_router_name):
@@ -1283,14 +1335,14 @@ class NcmClient:
         """
         call_type = "Routers"
 
-        puturl = '{0}/routers/{1}/'.format(self.base_url, str(router_id))
+        put_url = '{0}/routers/{1}/'.format(self.base_url, str(router_id))
 
-        putdata = {
+        put_data = {
             "group": 'https://www.cradlepointecm.com/api/v2/groups/{}/'.format(group_id)
         }
 
-        ncm = self.session.put(puturl, data=json.dumps(putdata))
-        result = self.__returnhandler(ncm.status_code, ncm.json(), call_type)
+        ncm = self.session.put(put_url, data=json.dumps(put_data))
+        result = self.__return_handler(ncm.status_code, ncm.json(), call_type)
         return result
 
     def assign_router_to_account(self, router_id, account_id):
@@ -1302,14 +1354,14 @@ class NcmClient:
         """
         call_type = "Routers"
 
-        puturl = '{0}/routers/{1}/'.format(self.base_url, str(router_id))
+        put_url = '{0}/routers/{1}/'.format(self.base_url, str(router_id))
 
-        putdata = {
+        put_data = {
             "account": 'https://www.cradlepointecm.com/api/v2/accounts/{}/'.format(account_id)
         }
 
-        ncm = self.session.put(puturl, data=json.dumps(putdata))
-        result = self.__returnhandler(ncm.status_code, ncm.json(), call_type)
+        ncm = self.session.put(put_url, data=json.dumps(put_data))
+        result = self.__return_handler(ncm.status_code, ncm.json(), call_type)
         return result
 
     def delete_router_by_id(self, router_id):
@@ -1319,10 +1371,10 @@ class NcmClient:
         :return:
         """
         call_type = 'Router'
-        posturl = '{0}/routers/{1}/'.format(self.base_url, router_id)
+        post_url = '{0}/routers/{1}/'.format(self.base_url, router_id)
 
-        ncm = self.session.delete(posturl)
-        result = self.__returnhandler(ncm.status_code, ncm.text, call_type)
+        ncm = self.session.delete(post_url)
+        result = self.__return_handler(ncm.status_code, ncm.text, call_type)
         return result
 
     def delete_router_by_name(self, router_name):
@@ -1348,7 +1400,7 @@ class NcmClient:
         response = self.session.get('{0}/configuration_managers/?router.id={1}&fields=id'.format(
             self.base_url, str(router_id)))  # Get Configuration Managers ID for current Router from API
         response = json.loads(response.content.decode("utf-8"))  # Decode the response and make it a dictionary
-        configman_id = response['data'][0]['id']  # get the Configuration Managers ID from response
+        config_man_id = response['data'][0]['id']  # get the Configuration Managers ID from response
 
         if netmask:
             payload = {
@@ -1379,9 +1431,9 @@ class NcmClient:
                 ]
             }
 
-        ncm = self.session.patch('{0}/configuration_managers/{1}/'.format(self.base_url, str(configman_id)),
+        ncm = self.session.patch('{0}/configuration_managers/{1}/'.format(self.base_url, str(config_man_id)),
                                  data=json.dumps(payload))  # Patch indie config with new values
-        result = self.__returnhandler(ncm.status_code, ncm.text, call_type)
+        result = self.__return_handler(ncm.status_code, ncm.text, call_type)
         return result
 
     def set_custom1(self, router_id, text):
@@ -1393,14 +1445,14 @@ class NcmClient:
         """
         call_type = "NCM Field Update"
 
-        puturl = '{0}/routers/{1}/'.format(self.base_url, str(router_id))
+        put_url = '{0}/routers/{1}/'.format(self.base_url, str(router_id))
 
-        putdata = {
+        put_data = {
             "custom1": str(text)
         }
 
-        ncm = self.session.put(puturl, data=json.dumps(putdata))
-        result = self.__returnhandler(ncm.status_code, ncm.json(), call_type)
+        ncm = self.session.put(put_url, data=json.dumps(put_data))
+        result = self.__return_handler(ncm.status_code, ncm.json(), call_type)
         return result
 
     def set_custom2(self, router_id, text):
@@ -1412,12 +1464,12 @@ class NcmClient:
         """
         call_type = "NCM Field Update"
 
-        puturl = '{0}/routers/{1}/'.format(self.base_url, str(router_id))
+        put_url = '{0}/routers/{1}/'.format(self.base_url, str(router_id))
 
-        putdata = {
+        put_data = {
             "custom2": str(text)
         }
 
-        ncm = self.session.put(puturl, data=json.dumps(putdata))
-        result = self.__returnhandler(ncm.status_code, ncm.json(), call_type)
+        ncm = self.session.put(put_url, data=json.dumps(put_data))
+        result = self.__return_handler(ncm.status_code, ncm.json(), call_type)
         return result
