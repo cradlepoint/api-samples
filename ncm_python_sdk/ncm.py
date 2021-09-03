@@ -787,8 +787,8 @@ class NcmClient:
         call_type = 'Group'
         post_url = '{0}/groups/'.format(self.base_url)
 
-        firmware = self.get_firmware_for_product_name_by_version(product_name,
-                                                            firmware_version)
+        firmware = self.get_firmware_for_product_name_by_version(
+            product_name, firmware_version)
 
         post_data = {
             'account': '/api/v1/accounts/{}/'.format(str(parent_account_id)),
@@ -817,8 +817,7 @@ class NcmClient:
 
         return self.create_group_by_parent_id(
             self.get_account_by_name(parent_account_name)['id'], group_name,
-            product_name,
-            firmware_version)
+            product_name, firmware_version)
 
     def rename_group_by_id(self, group_id, new_group_name):
         """
@@ -957,8 +956,9 @@ class NcmClient:
         post_url = '{0}/locations/'.format(self.base_url)
 
         post_data = {
-            'account': 'https://www.cradlepointecm.com/api/v2/accounts/{}/'
-                .format(str(account_id)),
+            'account':
+                'https://www.cradlepointecm.com/api/v2/accounts/{}/'.format(
+                    str(account_id)),
             'accuracy': 0,
             'latitude': latitude,
             'longitude': longitude,
@@ -1551,8 +1551,9 @@ class NcmClient:
         put_url = '{0}/routers/{1}/'.format(self.base_url, str(router_id))
 
         put_data = {
-            "account": 'https://www.cradlepointecm.com/api/v2/accounts/{}/'
-                .format(account_id)
+            "account":
+                'https://www.cradlepointecm.com/api/v2/accounts/{}/'.format(
+                    account_id)
         }
 
         ncm = self.session.put(put_url, data=json.dumps(put_data))
