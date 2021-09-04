@@ -7,8 +7,8 @@ to create maps based on data such as signal strength
     ```
 	api_keys = {'X-ECM-API-ID': 'YOUR',
 	           'X-ECM-API-KEY': 'KEYS',
-           'X-CP-API-ID': 'GO',
-           'X-CP-API-KEY': 'HERE',
+               'X-CP-API-ID': 'GO',
+               'X-CP-API-KEY': 'HERE',
         	   'Content-Type': 'application/json'}
     ```
 
