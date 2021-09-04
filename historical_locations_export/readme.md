@@ -22,7 +22,7 @@ to create maps based on data such as signal strength
 	output_file = 'historical_locations.csv'
 	```
 
-4. Run script
+4. Run script - this can take a long time if there is a lot of data to export!
 
 5. Drag and drop output .csv file to http://kepler.gl/demo to create maps based on data
 such as signal strength.
