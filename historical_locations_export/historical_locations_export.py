@@ -1,4 +1,4 @@
-"""Export NCM API historical_locations/ data to .csv file
+"""Export NCM API historical_locations/ data to .csv file.
 
 This script will export the data from the Cradlepoint NCM API
 historical_locations/ endpoint for all devices for the given date range.
