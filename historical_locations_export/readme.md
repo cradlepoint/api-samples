@@ -1,14 +1,14 @@
 # historical_locations_export.py
 This is a Python script to export data from the Cradlepoint NCM API historical_locations/
-endpoint and write it to .csv file.  .csv file can be dropped into http://kepler.gl/demo
+endpoint and write it to .csv file.  The .csv file can be dropped into http://kepler.gl/demo
 to create maps based on data such as signal strength
 
 1. Enter Cradlepoint NCM API Keys at top of script
     ```
 	api_keys = {'X-ECM-API-ID': 'YOUR',
 	           'X-ECM-API-KEY': 'KEYS',
-    	       'X-CP-API-ID': 'GO',
-    	       'X-CP-API-KEY': 'HERE',
+               'X-CP-API-ID': 'GO',
+               'X-CP-API-KEY': 'HERE',
         	   'Content-Type': 'application/json'}
     ```
 
@@ -22,7 +22,7 @@ to create maps based on data such as signal strength
 	output_file = 'historical_locations.csv'
 	```
 
-4. Run script
+4. Run script - this can take a long time if there is a lot of data to export!
 
 5. Drag and drop output .csv file to http://kepler.gl/demo to create maps based on data
 such as signal strength.
