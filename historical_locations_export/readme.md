@@ -23,7 +23,7 @@ to create maps based on data such as signal strength
 	```
 
 4. Run script - this can take a long time if there is a lot of data to export!
-5. 
+
 Fields Exported:
 "router", "name", "accuracy", "carrier_id", "cinr", "created_at", "created_at_timeuuid", "dbm", "ecio", "latitude", "longitude", "mph", "net_device_name", "rfband", "rfband_5g", "rsrp", "rsrp_5g", "rsrq", "rsrq_5g", "rssi", "signal_percent", "sinr", "sinr_5g", "summary"
 	    
