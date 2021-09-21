@@ -49,7 +49,7 @@ with open(output_file, 'wt') as f:
             for router in routers:
                 locations_url = f'{server}/api/v2/historical_locations/' \
                     f'?router={router["id"]}&created_at__gt={start_date}' \
-                    f'&created_at__lt={end_date}'
+                    f'&created_at__lte={end_date}'
                 while locations_url:
                     locations_req = requests.get(
                         locations_url, headers=headers).json()
