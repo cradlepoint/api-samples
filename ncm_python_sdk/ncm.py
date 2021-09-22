@@ -654,8 +654,6 @@ class NcmClient:
             '{0}/configuration_managers/{1}/'.format(self.base_url,
                                                      str(configman_id)),
             json=payload)
-        print(ncm.json())
-        print(ncm.status_code)
         result = self.__returnhandler(ncm.status_code, ncm.text, call_type)
         return result
 
