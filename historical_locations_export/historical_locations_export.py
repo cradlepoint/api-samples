@@ -19,7 +19,6 @@ import csv
 start_date = '2021-09-02'
 end_date = '2021-09-03'
 
-server = 'https://www.cradlepointecm.com'
 output_file = 'historical_locations.csv'
 
 headers = {'X-ECM-API-ID': 'YOUR',
@@ -35,6 +34,8 @@ top_line = ["router", "name", "accuracy", "carrier_id", "cinr",
             "rsrq_5g", "rssi", "signal_percent", "sinr",
             "sinr_5g", "summary"]
 
+server = 'https://www.cradlepointecm.com'
+
 with open(output_file, 'wt') as f:
     writer = csv.writer(f, delimiter=',')
     writer.writerow(top_line)  # write header
@@ -45,7 +46,6 @@ with open(output_file, 'wt') as f:
         while routers_url:
             routers_req = requests.get(routers_url, headers=headers).json()
             routers = routers_req['data']
-            print(routers)
             for router in routers:
                 locations_url = f'{server}/api/v2/historical_locations/' \
                     f'?router={router["id"]}&created_at__gt={start_date}' \
@@ -53,12 +53,12 @@ with open(output_file, 'wt') as f:
                 while locations_url:
                     locations_req = requests.get(
                         locations_url, headers=headers).json()
+                    print(f'Router ID: {router["id"]} Historical Locations: {locations_req["data"]}')
                     locations = locations_req['data']
                     for location in locations:
                         if location['carrier_id']:
                             loc_values = [x for x in location.values()]
                             row = [router["id"], router["name"]] + loc_values
-                            print(row)
                             writer.writerow(row)
                     locations_url = locations_req['meta']['next']
             routers_url = routers_req['meta']['next']
