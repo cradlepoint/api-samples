@@ -53,7 +53,8 @@ with open(output_file, 'wt') as f:
                 while locations_url:
                     locations_req = requests.get(
                         locations_url, headers=headers).json()
-                    print(f'Router ID: {router["id"]} Historical Locations: {locations_req["data"]}')
+                    print(f'Router ID: {router["id"]} Historical Locations: '
+                          f'{locations_req["data"]}')
                     locations = locations_req['data']
                     for location in locations:
                         if location['carrier_id']:
