@@ -31,7 +31,12 @@ api_keys = {
     'X-CP-API-ID': 'GO',
     'X-CP-API-KEY': 'HERE'
 }
-
+api_keys = {
+    'X-ECM-API-ID': 'b39b3be3-05fc-45cd-90ed-70b5ca1c740c',
+    'X-ECM-API-KEY': 'c579827643e63c992b14e304cdc1a7fc5f272cb3',
+    'X-CP-API-ID': '80780c4c',
+    'X-CP-API-KEY': '1dd7f0c275d59c56b477d6820d91649b'
+}
 
 def build_config(column):
     """
@@ -42,11 +47,30 @@ def build_config(column):
     """
     # > > > Paste configuration *BELOW* the next line (don't touch "return \") < < <
     return \
-        [{
-            "system": {
-                "system_id": column["B"]
-            }
-        },
+        [
+            {
+                "system": {
+                    "system_id": column["B"]
+                },
+                "wlan": {
+                    "radio": {
+                        "0": {
+                            "bss": {
+                                "0": {
+                                    "ssid": column["d"]
+                                }
+                            }
+                        },
+                        "1": {
+                            "bss": {
+                                "0": {
+                                    "ssid": column["d"]
+                                }
+                            }
+                        }
+                    }
+                }
+            },
             []
         ]
     # > > > Paste configuration ^ ABOVE HERE ^  < < <
@@ -65,16 +89,20 @@ def load_csv(filename):
         with open(filename, 'rt') as f:
             rows = csv.reader(f)
             for row in rows:
-                column = {"A": row[0]}
-                i = 1
-                while True:
-                    try:
-                        column[chr(i + 97).upper()] = row[i]
-                        column[chr(i + 97).lower()] = row[i]
-                        i += 1
-                    except:
-                        break
-                router_configs[column["A"]] = column
+                try:
+                    router_id = int(row[0])
+                    column = {"A": router_id}
+                    i = 1
+                    while True:
+                        try:
+                            column[chr(i + 97).upper()] = row[i]
+                            column[chr(i + 97).lower()] = row[i]
+                            i += 1
+                        except:
+                            break
+                    router_configs[column["A"]] = column
+                except:
+                    pass
     except Exception as e:
         print(f'Exception reading csv file: {e}')
     return router_configs
