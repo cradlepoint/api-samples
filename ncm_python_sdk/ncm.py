@@ -558,6 +558,34 @@ class NcmClient:
         result = self.__return_handler(ncm.status_code, ncm.text, call_type)
         return result
 
+    def put_configuration_managers(self, router_id, configman_json):
+        """
+        This method overwrites the configuration for a router with id.
+        :param router_id: ID of router to update
+        :param configman_json: JSON of the "configuration" field of the
+          configuration manager
+        :return:
+        """
+        call_type = 'Configuration Manager'
+
+        response = self.session.get(
+            '{0}/configuration_managers/?router.id={1}&fields=id'.format(
+                self.base_url,
+                str(router_id)))  # Get Configuration Managers ID for router
+        response = json.loads(response.content.decode(
+            "utf-8"))  # Decode the response and make it a dictionary
+        configman_id = response['data'][0][
+            'id']  # get the Configuration Managers ID from response
+
+        payload = configman_json
+
+        ncm = self.session.put(
+            '{0}/configuration_managers/{1}/?fields=configuration'.format(
+                self.base_url, str(configman_id)),
+            json=payload)  # Patch indie config with new values
+        result = self.__returnhandler(ncm.status_code, ncm.text, call_type)
+        return result
+
     def patch_group_configuration(self, group_id, config_json):
         """
         This method patches an configuration_managers for associated id.
@@ -604,6 +632,29 @@ class NcmClient:
 
         ncm = self.session.patch(put_url, data=src_config)
         result = self.__return_handler(ncm.status_code, ncm.json(), call_type)
+        return result
+
+    def resume_updates_for_router(self, router_id):
+        """
+        This method will resume updates for a router in Sync Suspended state.
+        :param router_id: ID of router to update
+        :return:
+        """
+        call_type = 'Configuration Manager'
+
+        response = self.session.get(
+            '{0}/configuration_managers/?router.id={1}&fields=id'.format(
+                self.base_url,
+                str(router_id)))  # Get Configuration Managers ID for router
+        response = json.loads(response.content.decode("utf-8"))
+        configman_id = response['data'][0]['id']
+        payload = {"suspended": False}
+
+        ncm = self.session.put(
+            '{0}/configuration_managers/{1}/'.format(self.base_url,
+                                                     str(configman_id)),
+            json=payload)
+        result = self.__returnhandler(ncm.status_code, ncm.text, call_type)
         return result
 
     def get_device_app_bindings(self, **kwargs):
