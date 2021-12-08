@@ -31,7 +31,16 @@ api_keys = {
     'X-CP-API-ID': 'GO',
     'X-CP-API-KEY': 'HERE'
 }
+<<<<<<< HEAD
 
+=======
+api_keys = {
+    'X-ECM-API-ID': 'b39b3be3-05fc-45cd-90ed-70b5ca1c740c',
+    'X-ECM-API-KEY': 'c579827643e63c992b14e304cdc1a7fc5f272cb3',
+    'X-CP-API-ID': '80780c4c',
+    'X-CP-API-KEY': '1dd7f0c275d59c56b477d6820d91649b'
+}
+>>>>>>> ebac6646f03ee89bf17c7c2c6f1503b47eb4d3d8
 
 def build_config(column):
     """
@@ -40,7 +49,11 @@ def build_config(column):
     :type column: dict
     :return: router configuration (list)
     """
+<<<<<<< HEAD
     # > > > Paste configuration *BELOW* the next line ("return \") < < <
+=======
+    # > > > Paste configuration *BELOW* the next line (don't touch "return \") < < <
+>>>>>>> ebac6646f03ee89bf17c7c2c6f1503b47eb4d3d8
     return \
         [
             {
@@ -74,7 +87,11 @@ def build_config(column):
 
 def load_csv(filename):
     """
+<<<<<<< HEAD
     Returns a dictionary of router_ids containing config values from csv
+=======
+    Returns a dictionary of router_ids containing corresponding config values from csv
+>>>>>>> ebac6646f03ee89bf17c7c2c6f1503b47eb4d3d8
     :param filename: name of csv file
     :type filename: str
     :return: list of rows from csv file
