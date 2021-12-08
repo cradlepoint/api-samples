@@ -1,5 +1,7 @@
-# NCM_Config_Backup.py - Back up all NCM group and device configurations to timestamped folders.
-# Option to include/exclude devices with default (blank) configurations (can be useful for inventory/accounting)
+# NCM_Config_Backup.py - Back up all NCM group and device configurations to
+# timestamped folders.
+# Option to include/exclude devices with default (blank) configurations (can
+# be useful for inventory/accounting)
 # Enter API Keys below and run script!
 
 import requests
@@ -12,10 +14,10 @@ server = 'https://www.cradlepointecm.com/api/v2'
 include_blank_configs = True
 
 api_keys = {'X-ECM-API-ID': 'YOUR',
-           'X-ECM-API-KEY': 'KEYS',
-           'X-CP-API-ID': 'GO',
-           'X-CP-API-KEY': 'HERE',
-           'Content-Type': 'application/json'}
+            'X-ECM-API-KEY': 'KEYS',
+            'X-CP-API-ID': 'GO',
+            'X-CP-API-KEY': 'HERE',
+            'Content-Type': 'application/json'}
 
 # Create Backup Directories
 backups_dir = os.getcwd() + '/NCM Config Backups'
@@ -42,21 +44,26 @@ while routers_url:
         routers = get_routers["data"]
         routers = [x for x in routers if x["state"] != "initialized"]
         for router in routers:
-            config_url = f'{server}/configuration_managers/?router={router["id"]}'
+            config_url = f'{server}/configuration_managers/?router=' \
+                f'{router["id"]}'
             get_config = requests.get(config_url, headers=api_keys)
             if get_config.status_code < 300:
                 get_config = get_config.json()
                 try:
                     config = get_config["data"][0]["configuration"]
                     if include_blank_configs or config != [{}, []]:
-                        with open(f'{routers_dir}/{router["id"]} - {router["name"]}.json', 'wt') as f:
+                        with open(f'{routers_dir}/{router["id"]} - '
+                                  f'{router["name"]}.json', 'wt') as f:
                             f.write(json.dumps(config))
-                        print(f'Backed up config for router : {router["id"]} - {router["name"]}')
+                        print(f'Backed up config for router : {router["id"]} - '
+                              f'{router["name"]}')
                         routers_backed_up += 1
                 except Exception as e:
-                    print(f'Exception backing up config for {router["id"]} - {router["name"]}: {e}')
+                    print(f'Exception backing up config for {router["id"]} - '
+                          f'{router["name"]}: {e}')
             else:
-                print(f'Error getting config for {router["id"]} - {router["name"]}: {get_config.text}')
+                print(f'Error getting config for {router["id"]} - '
+                      f'{router["name"]}: {get_config.text}')
         routers_url = get_routers["meta"]["next"]
     else:
         print(f'Error getting routers: {get_routers.text}')
@@ -77,9 +84,11 @@ while groups_url:
             config = group["configuration"]
             if include_blank_configs or config != [{}, []]:
                 group_name = group["name"].replace('/', '_')
-                with open(f'{groups_dir}/{group["id"]} - {group_name}.json', 'wt') as f:
+                with open(f'{groups_dir}/{group["id"]} - {group_name}.json',
+                          'wt') as f:
                     f.write(json.dumps(config))
-                print(f'Backed up config for group : {group["id"]} - {group["name"]}')
+                print(f'Backed up config for group : {group["id"]} - '
+                      f'{group["name"]}')
                 groups_backed_up += 1
         groups_url = get_groups["meta"]["next"]
     else:
@@ -89,6 +98,3 @@ print(f'\nBacked up {routers_backed_up} router configurations.')
 print(f'\nBacked up {groups_backed_up} group configurations.')
 
 print('\nNCM Config Backup Complete!')
-
-
-
