@@ -1,10 +1,8 @@
 """Create, test and add a push alert rule to an alert rule.
-
 This is an example script showing how to create an alert push destination
 rule, tests it and create an alert rule with the push destination.
 The endpoints used are /api/v2/alert_push_destinations,
 /api/v2/test_alert_push_destinations and /api/v2/alert_rules.
-
 The alert_push_destinations endpoint requires a push server url and secret.
 """
 import requests
@@ -23,16 +21,12 @@ headers = {
 
 def post(url, body):
     """Do an HTTP post on `url`.
-
     Args:
         -url- the url to run the post request on
         -body- the body of the post request
-
     Returns:
         output- the data as a python dict.
-
     Forces a program exit on HTTP error.
-
     """
     r = requests.post(url, headers=headers, data=json.dumps(body))
     if r.status_code not in (200, 201):
