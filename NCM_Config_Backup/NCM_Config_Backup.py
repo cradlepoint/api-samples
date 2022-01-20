@@ -10,6 +10,10 @@ import requests
 import json
 import os
 from datetime import datetime
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
+import re
+
 
 server = 'https://www.cradlepointecm.com/api/v2'
 
@@ -37,10 +41,24 @@ print('\n¸,ø¤°º¤ø,¸¸,ø¤º°`°  NCM Config Backup  °º¤ø,¸¸,ø¤
 print(f'Creating Backups Here: \n{my_backup_dir}/\n')
 print('Backing up device configurations...\n')
 
+
+""" This will make all HTTP requests from the same session
+retry for a total of 10 times, sleeping between retries with an
+exponentially increasing backoff of 1s, 2s, 4s, and so on... It
+will retry on basic connectivity issues and the listed HTTP
+status codes. """
+
+session = requests.session()
+retries = Retry(total=10,  # Total number of retries to allow.
+                backoff_factor=1,
+                status_forcelist=[408, 429, 502, 503, 504],
+                )
+session.mount('https://', HTTPAdapter(max_retries=retries))
+
 routers_backed_up = 0
 routers_url = f'{server}/routers/'
 while routers_url:
-    get_routers = requests.get(routers_url, headers=api_keys)
+    get_routers = session.get(routers_url, headers=api_keys)
     if get_routers.status_code < 300:
         get_routers = get_routers.json()
         routers = get_routers["data"]
@@ -48,14 +66,16 @@ while routers_url:
         for router in routers:
             config_url = f'{server}/configuration_managers/?router=' \
                 f'{router["id"]}'
-            get_config = requests.get(config_url, headers=api_keys)
+            get_config = session.get(config_url, headers=api_keys)
             if get_config.status_code < 300:
                 get_config = get_config.json()
                 try:
                     config = get_config["data"][0]["configuration"]
                     if include_blank_configs or config != [{}, []]:
+                        router_name = re.sub(r'[\\/*?:"<>|]', "_",
+                                             router["name"])
                         with open(f'{routers_dir}/{router["id"]} - '
-                                  f'{router["name"]}.json', 'wt') as f:
+                                  f'{router_name}.json', 'wt') as f:
                             f.write(json.dumps(config))
                         print(f'Backed up config for router : {router["id"]} - '
                               f'{router["name"]}')
@@ -78,14 +98,14 @@ print('\nBacking up group configurations...\n')
 groups_backed_up = 0
 groups_url = f'{server}/groups/'
 while groups_url:
-    get_groups = requests.get(groups_url, headers=api_keys)
+    get_groups = session.get(groups_url, headers=api_keys)
     if get_groups.status_code < 300:
         get_groups = get_groups.json()
         groups = get_groups["data"]
         for group in groups:
             config = group["configuration"]
             if include_blank_configs or config != [{}, []]:
-                group_name = group["name"].replace('/', '_')
+                group_name = re.sub(r'[\\/*?:"<>|]', "_", group["name"])
                 with open(f'{groups_dir}/{group["id"]} - {group_name}.json',
                           'wt') as f:
                     f.write(json.dumps(config))
