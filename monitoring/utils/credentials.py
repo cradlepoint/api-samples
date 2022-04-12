@@ -9,10 +9,10 @@ keys from wherever you keep them.
 """
 
 my_creds = {
-    'cp_api_id': 'MY_CP_API_ID',  # replace me
-    'cp_api_key': 'MY_CP_API_KEY',  # replace me
-    'ecm_api_id': 'MY_ECM_API_ID',  # replace me
-    'ecm_api_key': 'MY_ECM_API_KEY',  # replace me
+    "cp_api_id": "MY_CP_API_ID",  # replace me
+    "cp_api_key": "MY_CP_API_KEY",  # replace me
+    "ecm_api_id": "MY_ECM_API_ID",  # replace me
+    "ecm_api_key": "MY_ECM_API_KEY",  # replace me
 }
 
 

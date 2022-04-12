@@ -33,31 +33,36 @@ def poll_for_state_changes(session=None):
 
     # first get current/prior state for all routers, so we can report
     # it as part of the info when the state changes.
-    recs = session.get(endpoint='routers',
-                       filter={'fields': 'id,state,state_updated_at'})
+    recs = session.get(
+        endpoint="routers", filter={"fields": "id,state,state_updated_at"}
+    )
     for rec in recs:
-        prior_state[rec['id']] = rec['state']
-        last_ts = get_max_ts(last_ts, rec['state_updated_at'])
+        prior_state[rec["id"]] = rec["state"]
+        last_ts = get_max_ts(last_ts, rec["state_updated_at"])
 
     # Now poll for any changes since the last one. Note that we will only
     # retrieve records from the server where the state has changed, so
     # we don't have to do any processing on unchanged records. We also
     # only retrieve the fields we need to save bandwidth/response time.
     while True:
-        recs = session.get(endpoint='routers',
-                           filter={'state_updated_at__gt': last_ts,
-                                   'fields': 'id,state,state_updated_at'})
+        recs = session.get(
+            endpoint="routers",
+            filter={
+                "state_updated_at__gt": last_ts,
+                "fields": "id,state,state_updated_at",
+            },
+        )
 
         for rec in recs:
             info = {
-                'router_id': rec['id'],
-                'state': rec['state'],
-                'state_updated_at': rec['state_updated_at'],
-                'prior_state': prior_state.get(rec['id'], 'unknown')
+                "router_id": rec["id"],
+                "state": rec["state"],
+                "state_updated_at": rec["state_updated_at"],
+                "prior_state": prior_state.get(rec["id"], "unknown"),
             }
             process_state_change(info)
-            prior_state[rec['id']] = rec['state']
-            last_ts = get_max_ts(last_ts, rec['state_updated_at'])
+            prior_state[rec["id"]] = rec["state"]
+            last_ts = get_max_ts(last_ts, rec["state_updated_at"])
 
         sleep(POLL_INTERVAL)
 
@@ -67,10 +72,13 @@ def process_state_change(change):
     pprint(change)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     logger = get_logger()
     try:
-        with APISession(**get_credentials(), logger=logger,) as s:
+        with APISession(
+            **get_credentials(),
+            logger=logger,
+        ) as s:
             poll_for_state_changes(s)
     except Exception as x:
-        logger.exception('Unexpected exception')
+        logger.exception("Unexpected exception")

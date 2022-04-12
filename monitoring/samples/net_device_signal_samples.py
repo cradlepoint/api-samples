@@ -9,7 +9,7 @@ from pprint import pprint
 from datetime import datetime, timedelta
 from time import sleep
 from monitoring.utils.session import APISession
-from monitoring.utils.timeuuid_endpoint import (get_filtered)
+from monitoring.utils.timeuuid_endpoint import get_filtered
 from monitoring.utils.credentials import get_credentials
 from monitoring.utils.logger import get_logger
 
@@ -20,7 +20,7 @@ POLL_START_TIME = datetime.utcnow() - timedelta(hours=1)
 
 
 def poll_for_new_samples(session=None, ids=[]):
-    endpoint = 'net_device_signal_samples'
+    endpoint = "net_device_signal_samples"
 
     start_ts = POLL_START_TIME
     last_uuid = None
@@ -31,18 +31,24 @@ def poll_for_new_samples(session=None, ids=[]):
         while batch_idx < len(ids):
             batch_ids = ids[batch_idx:ID_BATCH_LIMIT]
             if not last_uuid and start_ts:
-                recs = get_filtered(endpoint=endpoint, session=session,
-                                    after_time=start_ts,
-                                    order_by=['created_at_timeuuid'],
-                                    net_device_ids=batch_ids)
+                recs = get_filtered(
+                    endpoint=endpoint,
+                    session=session,
+                    after_time=start_ts,
+                    order_by=["created_at_timeuuid"],
+                    net_device_ids=batch_ids,
+                )
             else:
-                recs = get_filtered(endpoint=endpoint, session=session,
-                                    after_uuid=last_uuid,
-                                    order_by=['created_at_timeuuid'],
-                                    net_device_ids=batch_ids)
+                recs = get_filtered(
+                    endpoint=endpoint,
+                    session=session,
+                    after_uuid=last_uuid,
+                    order_by=["created_at_timeuuid"],
+                    net_device_ids=batch_ids,
+                )
             for r in recs:
                 process_signal_sample(r)
-                last_uuid = r['created_at_timeuuid']
+                last_uuid = r["created_at_timeuuid"]
             batch_idx += len(batch_ids)
 
         sleep(POLL_INTERVAL)
@@ -53,15 +59,15 @@ def process_signal_sample(s):
     pprint(s)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     logger = get_logger()
     try:
         with APISession(**get_credentials(), logger=logger) as s:
             # get a list of all my net device ids:
-            recs = s.get(endpoint='net_devices', filter={'fields': 'id'})
-            ids = [rec['id'] for rec in recs]
+            recs = s.get(endpoint="net_devices", filter={"fields": "id"})
+            ids = [rec["id"] for rec in recs]
 
             # poll them
             poll_for_new_samples(s, ids)
     except Exception as x:
-        logger.exception('Unexpected exception')
+        logger.exception("Unexpected exception")

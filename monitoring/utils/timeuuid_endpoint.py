@@ -10,10 +10,17 @@ DEFAULT_POLL_INTERVAL = 3600  # one hour
 
 
 def get_filtered(
-        session=None, endpoint=None,
-        after_rec=None, after_time=None, after_uuid=None, before_time=None,
-        router_ids=None, net_device_ids=None,
-        order_by=['created_at_timeuuid'], batchsize=500):
+    session=None,
+    endpoint=None,
+    after_rec=None,
+    after_time=None,
+    after_uuid=None,
+    before_time=None,
+    router_ids=None,
+    net_device_ids=None,
+    order_by=["created_at_timeuuid"],
+    batchsize=500,
+):
     """
     Retrieve a list of records based on a filter.
 
@@ -51,31 +58,31 @@ def get_filtered(
     """
     # add the time window for the query
     if after_time:
-        filter = {'created_at__gt': after_time.isoformat()}
+        filter = {"created_at__gt": after_time.isoformat()}
     elif after_rec:
-        filter = {
-            'created_at_timeuuid__gt': after_rec['created_at_timeuuid']}
+        filter = {"created_at_timeuuid__gt": after_rec["created_at_timeuuid"]}
     elif after_uuid:
-        filter = {'created_at_timeuuid__gt': after_uuid}
+        filter = {"created_at_timeuuid__gt": after_uuid}
     else:
         after_time = datetime.utcnow() - timedelta(days=1)
-        filter = {'created_at__gt': after_time.isoformat()}
+        filter = {"created_at__gt": after_time.isoformat()}
 
     if not before_time:
         before_time = datetime.utcnow() - timedelta(minutes=1)
-    filter['created_at__lt'] = before_time.isoformat()
+    filter["created_at__lt"] = before_time.isoformat()
 
     # apply filter for router IDs if present
     if router_ids:
-        filter['router__in'] = ','.join(router_ids)
+        filter["router__in"] = ",".join(router_ids)
 
     # apply filter for net device IDs if present
     if net_device_ids:
-        filter['net_device__in'] = ','.join(net_device_ids)
+        filter["net_device__in"] = ",".join(net_device_ids)
 
     # now that we've constructed our filter, do the actual fetching
-    return session.get(endpoint=endpoint, filter=filter,
-                       order_by=order_by, batchsize=batchsize)
+    return session.get(
+        endpoint=endpoint, filter=filter, order_by=order_by, batchsize=batchsize
+    )
 
 
 def get_one(session=None, endpoint=None, timeuuid=None):
@@ -88,7 +95,7 @@ def get_one(session=None, endpoint=None, timeuuid=None):
 
     :return: one record matching the arguments or None, if not found
     """
-    filter = {'created_at_timeuuid': timeuuid}
+    filter = {"created_at_timeuuid": timeuuid}
     alerts = list(session.get(endpoint=endpoint, filter=filter))
     if alerts:
         return alerts[0]
@@ -97,9 +104,15 @@ def get_one(session=None, endpoint=None, timeuuid=None):
 
 
 def poll(
-        session=None, endpoint=None, after_time=None, after_uuid=None,
-        sleeptime=DEFAULT_POLL_INTERVAL, process_one_fn=None,
-        router_ids=None, net_device_ids=None):
+    session=None,
+    endpoint=None,
+    after_time=None,
+    after_uuid=None,
+    sleeptime=DEFAULT_POLL_INTERVAL,
+    process_one_fn=None,
+    router_ids=None,
+    net_device_ids=None,
+):
     """
     Poll the server to return new records from the designated endpoint.
 
@@ -128,18 +141,24 @@ def poll(
 
     while True:
         if not last_uuid and after_time:
-            recs = get_filtered(endpoint=endpoint, session=session,
-                                after_time=after_time,
-                                order_by=['created_at_timeuuid'],
-                                router_ids=router_ids,
-                                net_device_ids=net_device_ids)
+            recs = get_filtered(
+                endpoint=endpoint,
+                session=session,
+                after_time=after_time,
+                order_by=["created_at_timeuuid"],
+                router_ids=router_ids,
+                net_device_ids=net_device_ids,
+            )
         else:
-            recs = get_filtered(endpoint=endpoint, session=session,
-                                after_uuid=last_uuid,
-                                order_by=['created_at_timeuuid'],
-                                router_ids=router_ids,
-                                net_device_ids=net_device_ids)
+            recs = get_filtered(
+                endpoint=endpoint,
+                session=session,
+                after_uuid=last_uuid,
+                order_by=["created_at_timeuuid"],
+                router_ids=router_ids,
+                net_device_ids=net_device_ids,
+            )
         for r in recs:
             process_one_fn(r)
-            last_uuid = r['created_at_timeuuid']
+            last_uuid = r["created_at_timeuuid"]
         sleep(sleeptime)

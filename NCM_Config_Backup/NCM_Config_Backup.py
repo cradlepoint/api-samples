@@ -15,15 +15,17 @@ from requests.packages.urllib3.util.retry import Retry
 import re
 
 
-server = 'https://www.cradlepointecm.com/api/v2'
+server = "https://www.cradlepointecm.com/api/v2"
 
 include_blank_configs = True
 
-api_keys = {'X-ECM-API-ID': 'YOUR',
-            'X-ECM-API-KEY': 'KEYS',
-            'X-CP-API-ID': 'GO',
-            'X-CP-API-KEY': 'HERE',
-            'Content-Type': 'application/json'}
+api_keys = {
+    "X-ECM-API-ID": "YOUR",
+    "X-ECM-API-KEY": "KEYS",
+    "X-CP-API-ID": "GO",
+    "X-CP-API-KEY": "HERE",
+    "Content-Type": "application/json",
+}
 
 """ This will make all HTTP requests from the same session
 retry for a total of 10 times, sleeping between retries with an
@@ -32,14 +34,15 @@ will retry on basic connectivity issues and the listed HTTP
 status codes. """
 
 session = requests.session()
-retries = Retry(total=10,  # Total number of retries to allow.
-                backoff_factor=1,
-                status_forcelist=[408, 429, 502, 503, 504],
-                )
-session.mount('https://', HTTPAdapter(max_retries=retries))
+retries = Retry(
+    total=10,  # Total number of retries to allow.
+    backoff_factor=1,
+    status_forcelist=[408, 429, 502, 503, 504],
+)
+session.mount("https://", HTTPAdapter(max_retries=retries))
 
 # Get root account name for backup directory name
-accounts_url = f'{server}/accounts/'
+accounts_url = f"{server}/accounts/"
 while accounts_url:
     get_accounts = session.get(accounts_url, headers=api_keys)
     accounts_url = None
@@ -56,23 +59,23 @@ while accounts_url:
                 pass
 
 # Create Backup Directories
-backups_dir = os.getcwd() + '/NCM Config Backups'
+backups_dir = os.getcwd() + "/NCM Config Backups"
 if not os.path.exists(backups_dir):
     os.makedirs(backups_dir)
 timestamp = datetime.now().strftime("%m-%d-%Y %I.%M.%S%p").lower()
-my_backup_dir = f'{backups_dir}/{account_name} {timestamp}'
+my_backup_dir = f"{backups_dir}/{account_name} {timestamp}"
 os.makedirs(my_backup_dir)  # Timestamped Backup Directory
-routers_dir = f'{my_backup_dir}/routers'
-groups_dir = f'{my_backup_dir}/groups'
+routers_dir = f"{my_backup_dir}/routers"
+groups_dir = f"{my_backup_dir}/groups"
 os.makedirs(routers_dir)  # Subdirectory for routers
 os.makedirs(groups_dir)  # Subdirectory for groups
 
-print('\n¸,ø¤°º¤ø,¸¸,ø¤º°`°  NCM Config Backup  °º¤ø,¸¸,ø¤º°`°º¤ø,¸\n')
-print(f'Creating Backups Here: \n{my_backup_dir}/\n')
-print('Backing up device configurations...\n')
+print("\n¸,ø¤°º¤ø,¸¸,ø¤º°`°  NCM Config Backup  °º¤ø,¸¸,ø¤º°`°º¤ø,¸\n")
+print(f"Creating Backups Here: \n{my_backup_dir}/\n")
+print("Backing up device configurations...\n")
 
 routers_backed_up = 0
-routers_url = f'{server}/routers/'
+routers_url = f"{server}/routers/"
 while routers_url:
     get_routers = session.get(routers_url, headers=api_keys)
     if get_routers.status_code < 300:
@@ -80,39 +83,45 @@ while routers_url:
         routers = get_routers["data"]
         routers = [x for x in routers if x["state"] != "initialized"]
         for router in routers:
-            config_url = f'{server}/configuration_managers/?router=' \
-                f'{router["id"]}'
+            config_url = f"{server}/configuration_managers/?router=" f'{router["id"]}'
             get_config = session.get(config_url, headers=api_keys)
             if get_config.status_code < 300:
                 get_config = get_config.json()
                 try:
                     config = get_config["data"][0]["configuration"]
                     if include_blank_configs or config != [{}, []]:
-                        router_name = re.sub(r'[\\/*?:"<>|]', "_",
-                                             router["name"])
-                        with open(f'{routers_dir}/{router["id"]} - '
-                                  f'{router_name}.json', 'wt') as f:
+                        router_name = re.sub(r'[\\/*?:"<>|]', "_", router["name"])
+                        with open(
+                            f'{routers_dir}/{router["id"]} - ' f"{router_name}.json",
+                            "wt",
+                        ) as f:
                             f.write(json.dumps(config))
-                        print(f'Backed up config for router : {router["id"]} - '
-                              f'{router["name"]}')
+                        print(
+                            f'Backed up config for router : {router["id"]} - '
+                            f'{router["name"]}'
+                        )
                         routers_backed_up += 1
                 except Exception as e:
-                    print(f'Exception backing up config for {router["id"]} - '
-                          f'{router["name"]}: {e}')
+                    print(
+                        f'Exception backing up config for {router["id"]} - '
+                        f'{router["name"]}: {e}'
+                    )
             else:
-                print(f'Error getting config for {router["id"]} - '
-                      f'{router["name"]}: {get_config.text}')
+                print(
+                    f'Error getting config for {router["id"]} - '
+                    f'{router["name"]}: {get_config.text}'
+                )
         routers_url = get_routers["meta"]["next"]
     else:
-        print(f'Error getting routers: {get_routers.text}')
+        print(f"Error getting routers: {get_routers.text}")
         break
 
-print(f'\nBacked up {routers_backed_up} router configurations.')
+print(f"\nBacked up {routers_backed_up} router configurations.")
 
-print('\nBacking up group configurations...\n')
+print("\nBacking up group configurations...\n")
 
 groups_backed_up = 0
-groups_url = f'{server}/groups/'
+groups_url = f"{server}/groups/"
 while groups_url:
     get_groups = session.get(groups_url, headers=api_keys)
     if get_groups.status_code < 300:
@@ -122,17 +131,17 @@ while groups_url:
             config = group["configuration"]
             if include_blank_configs or config != [{}, []]:
                 group_name = re.sub(r'[\\/*?:"<>|]', "_", group["name"])
-                with open(f'{groups_dir}/{group["id"]} - {group_name}.json',
-                          'wt') as f:
+                with open(f'{groups_dir}/{group["id"]} - {group_name}.json', "wt") as f:
                     f.write(json.dumps(config))
-                print(f'Backed up config for group : {group["id"]} - '
-                      f'{group["name"]}')
+                print(
+                    f'Backed up config for group : {group["id"]} - ' f'{group["name"]}'
+                )
                 groups_backed_up += 1
         groups_url = get_groups["meta"]["next"]
     else:
-        print(f'Error getting groups: {get_groups.text}')
+        print(f"Error getting groups: {get_groups.text}")
 
-print(f'\nBacked up {routers_backed_up} router configurations.')
-print(f'\nBacked up {groups_backed_up} group configurations.')
+print(f"\nBacked up {routers_backed_up} router configurations.")
+print(f"\nBacked up {groups_backed_up} group configurations.")
 
-print('\nNCM Config Backup Complete!')
+print("\nNCM Config Backup Complete!")

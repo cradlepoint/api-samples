@@ -9,7 +9,7 @@ to your admin, write the alert to your database, send it to a log server)
 from monitoring.utils.session import APISession
 from pprint import pprint
 from datetime import datetime, timedelta
-from monitoring.utils.timeuuid_endpoint import (get_filtered, poll)
+from monitoring.utils.timeuuid_endpoint import get_filtered, poll
 from monitoring.utils.credentials import get_credentials
 from monitoring.utils.logger import get_logger
 
@@ -17,11 +17,12 @@ POLL_INTERVAL = 600  # 10 minutes; adjust to your needs
 POLL_START_TIME = datetime.utcnow() - timedelta(hours=1)
 
 
-def retrieve_all_alerts(session=None,
-                        start_ts=POLL_START_TIME,
-                        start_uuid=None,
-                        router_ids=[]  # optional restriction by router
-                        ):
+def retrieve_all_alerts(
+    session=None,
+    start_ts=POLL_START_TIME,
+    start_uuid=None,
+    router_ids=[],  # optional restriction by router
+):
     """
     Calls process_alert() for all alerts in a given time range.
 
@@ -35,11 +36,19 @@ def retrieve_all_alerts(session=None,
     for more information about defaults and behavior.
     """
     if start_uuid:
-        alerts = get_filtered(session=session, endpoint='alerts',
-                              after_uuid=start_uuid, router_ids=router_ids)
+        alerts = get_filtered(
+            session=session,
+            endpoint="alerts",
+            after_uuid=start_uuid,
+            router_ids=router_ids,
+        )
     else:
-        alerts = get_filtered(session=session, endpoint='alerts',
-                              after_time=start_ts, router_ids=router_ids)
+        alerts = get_filtered(
+            session=session,
+            endpoint="alerts",
+            after_time=start_ts,
+            router_ids=router_ids,
+        )
     for a in alerts:
         process_alert(a)
 
@@ -52,11 +61,13 @@ def poll_for_new_alerts(session=None, start_ts=POLL_START_TIME):
     :param session: APISession object. Required.
     :param start_ts: Starting timestamp for polling time window.
     """
-    poll(session=session,
-         endpoint='alerts',
-         sleeptime=POLL_INTERVAL,
-         process_one_fn=process_alert,
-         after_time=start_ts)
+    poll(
+        session=session,
+        endpoint="alerts",
+        sleeptime=POLL_INTERVAL,
+        process_one_fn=process_alert,
+        after_time=start_ts,
+    )
 
 
 def process_alert(a):
@@ -64,7 +75,7 @@ def process_alert(a):
     pprint(a)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     """
     Run the alert poll
     """
@@ -73,5 +84,4 @@ if __name__ == '__main__':
         with APISession(**get_credentials(), logger=logger) as s:
             poll_for_new_alerts(s)
     except Exception as x:
-        logger.exception('Unexpected exception')
-
+        logger.exception("Unexpected exception")

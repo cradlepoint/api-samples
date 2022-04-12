@@ -14,8 +14,7 @@ from monitoring.utils.credentials import get_credentials
 from monitoring.utils.logger import get_logger
 
 POLL_INTERVAL = 600  # 10 minutes; adjust to your needs
-POLL_START_TIME = datetime.utcnow().replace(
-    tzinfo=timezone.utc) - timedelta(hours=1)
+POLL_START_TIME = datetime.utcnow().replace(tzinfo=timezone.utc) - timedelta(hours=1)
 
 
 def get_max_ts(ts1, ts2):
@@ -35,11 +34,12 @@ def poll_for_metrics_changes(session=None):
     # we don't have to do any processing on unchanged records.
     last_ts = POLL_START_TIME
     while True:
-        recs = session.get(endpoint='net_device_metrics',
-                           filter={'update_ts__gt': last_ts})
+        recs = session.get(
+            endpoint="net_device_metrics", filter={"update_ts__gt": last_ts}
+        )
         for rec in recs:
             process_metrics_change(rec)
-            last_ts = get_max_ts(last_ts, parser.isoparse(rec['update_ts']))
+            last_ts = get_max_ts(last_ts, parser.isoparse(rec["update_ts"]))
 
         sleep(POLL_INTERVAL)
 
@@ -49,17 +49,11 @@ def process_metrics_change(change):
     pprint(change)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     logger = get_logger()
     try:
         with APISession(**get_credentials(), logger=logger) as s:
             start_ts = POLL_START_TIME
             poll_for_metrics_changes(session=s)
     except Exception as x:
-        logger.exception('Unexpected exception')
-
-
-
-
-
-
+        logger.exception("Unexpected exception")

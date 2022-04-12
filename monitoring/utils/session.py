@@ -22,21 +22,23 @@ class APISession(object):
     """
     Wrapper for API session and GET requests.
     """
-    def __init__(self,
-                 logger=None,
-                 ecm_api_id=None,
-                 ecm_api_key=None,
-                 cp_api_id=None,
-                 cp_api_key=None,
-                 retries=5,
-                 retry_backoff_factor=2,
-                 retry_on=[  #
-                     HTTPStatus.REQUEST_TIMEOUT,
-                     HTTPStatus.GATEWAY_TIMEOUT,
-                     HTTPStatus.SERVICE_UNAVAILABLE
-                 ],
-                 base_url=os.environ.get(
-                     'CP_BASE_URL', 'https://www.cradlepointecm.com/api/v2')):
+
+    def __init__(
+        self,
+        logger=None,
+        ecm_api_id=None,
+        ecm_api_key=None,
+        cp_api_id=None,
+        cp_api_key=None,
+        retries=5,
+        retry_backoff_factor=2,
+        retry_on=[  #
+            HTTPStatus.REQUEST_TIMEOUT,
+            HTTPStatus.GATEWAY_TIMEOUT,
+            HTTPStatus.SERVICE_UNAVAILABLE,
+        ],
+        base_url=os.environ.get("CP_BASE_URL", "https://www.cradlepointecm.com/api/v2"),
+    ):
         """
         Constructor.  Sets up and opens request session.
 
@@ -53,20 +55,24 @@ class APISession(object):
         self.base_url = base_url
         self.session = Session()
         self.adapter = HTTPAdapter(
-            max_retries=Retry(total=retries,
-                              backoff_factor=retry_backoff_factor,
-                              status_forcelist=retry_on,
-                              redirect=3
-                              ))
+            max_retries=Retry(
+                total=retries,
+                backoff_factor=retry_backoff_factor,
+                status_forcelist=retry_on,
+                redirect=3,
+            )
+        )
         self.session.mount(base_url, self.adapter)
-        self.session.headers.update({
-            'X-ECM-API-ID': ecm_api_id,
-            'X-ECM-API-KEY': ecm_api_key,
-            'X-CP-API-ID': cp_api_id,
-            'X-CP-API-KEY': cp_api_key
-        })
+        self.session.headers.update(
+            {
+                "X-ECM-API-ID": ecm_api_id,
+                "X-ECM-API-KEY": ecm_api_key,
+                "X-CP-API-ID": cp_api_id,
+                "X-CP-API-KEY": cp_api_key,
+            }
+        )
         self.logger = logger
-        self.logger.info('Opening session')
+        self.logger.info("Opening session")
 
     def __enter__(self):
         """
@@ -85,7 +91,7 @@ class APISession(object):
         Close session opened in constructor.
         """
         self.session.close()
-        self.logger.info('Closing session')
+        self.logger.info("Closing session")
 
     def _get_iterator(self, response, next):
         """
@@ -100,8 +106,7 @@ class APISession(object):
         else:
             yield response
 
-    def get(self, endpoint=None, url=None,
-            batchsize=25, order_by=[], filter={}):
+    def get(self, endpoint=None, url=None, batchsize=25, order_by=[], filter={}):
         """
         Execute a "GET" against the given endpoint.
 
@@ -116,20 +121,21 @@ class APISession(object):
         pages and retries, as necessary.
         """
         if not url:
-            url = f'{self.base_url}/{endpoint}/'
+            url = f"{self.base_url}/{endpoint}/"
 
         params = filter.copy()
-        params['limit'] = batchsize
+        params["limit"] = batchsize
         if order_by:
-            params['order_by'] = ",".join(order_by)
+            params["order_by"] = ",".join(order_by)
         response = self.session.get(url, params=params)
-        self.logger.info(f'Getting from URL {response.url}')
+        self.logger.info(f"Getting from URL {response.url}")
         if response.ok:
             response = response.json()
-            next = response.get('meta', {}).get('next')
-            response = response.get('data', response)
+            next = response.get("meta", {}).get("next")
+            response = response.get("data", response)
             return self._get_iterator(response, next)
         else:
-            raise Exception(f'Error executing GET {url}: '
-                            f'{response.status_code}: {response.content}')
-
+            raise Exception(
+                f"Error executing GET {url}: "
+                f"{response.status_code}: {response.content}"
+            )

@@ -10,8 +10,8 @@ keys from wherever you keep them.
 """
 
 myheaders = {
-    'X-CP-API-ID': 'MY_CP_API_ID',  # replace me
-    'X-CP-API-KEY': 'MY_CP_API_KEY',  # replace me
-    'X-ECM-API-ID': 'MY_ECM_API_ID',  # replace me
-    'X-ECM-API-KEY': 'MY_ECM_API_KEY',  # replace me
+    "X-CP-API-ID": "MY_CP_API_ID",  # replace me
+    "X-CP-API-KEY": "MY_CP_API_KEY",  # replace me
+    "X-ECM-API-ID": "MY_ECM_API_ID",  # replace me
+    "X-ECM-API-KEY": "MY_ECM_API_KEY",  # replace me
 }
