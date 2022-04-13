@@ -42,8 +42,7 @@ def push_configs():
         with requests.Session() as s:
             # Set max retries to 3
             retries = Retry(
-                total=3, backoff_factor=0.2,
-                status_forcelist=[500, 502, 503, 504]
+                total=3, backoff_factor=0.2, status_forcelist=[500, 502, 503, 504]
             )
 
             s.mount("https://", HTTPAdapter(max_retries=retries))
@@ -92,13 +91,11 @@ def push_configs():
 
                     # BGP config info
                     indi_payload["configuration"][0]["routing"]["bgp"]
-                    ["routers"]["0"][
-                        "router_id"
-                    ] = local_network_ip
+                    ["routers"]["0"]["router_id"] = local_network_ip
                     indi_payload["configuration"][0]["routing"]["bgp"]
-                    ["routers"]["0"][
-                        "networks"
-                    ]["0"]["ip_network"] = (local_network_ip + "/27")
+                    ["routers"]["0"]["networks"]["0"]["ip_network"] = (
+                        local_network_ip + "/27"
+                    )
 
                     # Use this payload as the payload for this router
                     payload = indi_payload
@@ -124,8 +121,7 @@ def push_configs():
 
                     # save cfg backup
                     with open(
-                        "./configs/config_backups/{}.json".format(router_id),
-                        "w"
+                        "./configs/config_backups/{}.json".format(router_id), "w"
                     ) as backup:
                         backup.write(str(cfg.json()))
                         print("backup created for {}".format(cfg_id))
@@ -143,8 +139,7 @@ def push_configs():
                     # print result
                     patch_result = patch.status_code
                     print(
-                        "Config patch sent to router {}\nResponse = {}\n"
-                        .format(
+                        "Config patch sent to router {}\nResponse = {}\n".format(
                             router_id, patch_result
                         )
                     )
@@ -170,8 +165,7 @@ def push_configs():
 
                 # catch broad exceptions
                 except Exception as e:
-                    print("Error patching to {}\nException = {}\n"
-                          .format(router_id, e))
+                    print("Error patching to {}\nException = {}\n".format(router_id, e))
 
                 # write patch result to csv
                 finally:

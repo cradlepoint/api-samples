@@ -14,8 +14,7 @@ from monitoring.utils.credentials import get_credentials
 from monitoring.utils.logger import get_logger
 
 POLL_INTERVAL = 600  # 10 minutes; adjust to your needs
-POLL_START_TIME = datetime.utcnow().replace(
-    tzinfo=timezone.utc) - timedelta(hours=1)
+POLL_START_TIME = datetime.utcnow().replace(tzinfo=timezone.utc) - timedelta(hours=1)
 
 
 def get_max_ts(ts1, ts2):

@@ -87,8 +87,7 @@ def get_filtered(
 
     # now that we've constructed our filter, do the actual fetching
     return session.get(
-        endpoint=endpoint, filter=filter, order_by=order_by,
-        batchsize=batchsize
+        endpoint=endpoint, filter=filter, order_by=order_by, batchsize=batchsize
     )
 
 

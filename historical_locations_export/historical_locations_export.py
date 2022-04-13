@@ -62,8 +62,11 @@ with open(output_file, "wt") as f:
     writer = csv.writer(f, delimiter=",")
     writer.writerow(top_line)  # write header
 
-    routers_url = f"{server}/api/v2/routers/?state__in= \
-    online,offline" f"&limit=500"
+    routers_url = (
+        f"{server}/api/v2/routers/?state__in= \
+    online,offline"
+        f"&limit=500"
+    )
     try:
         while routers_url:
             routers_req = requests.get(routers_url, headers=headers).json()
@@ -75,8 +78,7 @@ with open(output_file, "wt") as f:
                     f"&created_at__lte={end_date}"
                 )
                 while locations_url:
-                    locations_req = requests.get(locations_url,
-                                                 headers=headers).json()
+                    locations_req = requests.get(locations_url, headers=headers).json()
                     print(
                         f'Router ID: {router["id"]} Historical Locations: '
                         f'{locations_req["data"]}'

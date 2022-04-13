@@ -30,8 +30,7 @@ def post(url, body):
     """
     r = requests.post(url, headers=headers, data=json.dumps(body))
     if r.status_code not in (200, 201):
-        print(f"Request failed with HTTP status {r.status_code}",
-              file=sys.stderr)
+        print(f"Request failed with HTTP status {r.status_code}", file=sys.stderr)
         print(r.text, file=sys.stderr)
         sys.exit(1)
     return json.loads(r.content.decode("utf-8"))

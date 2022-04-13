@@ -41,8 +41,7 @@ def get(url, filt=None):
     """
     r = requests.get(url, headers=HEADERS)
     if r.status_code not in (200, 201):
-        print(f"Request failed with HTTP status {r.status_code}",
-              file=sys.stderr)
+        print(f"Request failed with HTTP status {r.status_code}", file=sys.stderr)
         print(r.text, file=sys.stderr)
         sys.exit(1)
     return r.json()
@@ -108,8 +107,7 @@ def get_locations(args):
     def _fetch(url):
         data = get(url)
         if start:
-            data["data"] = [x for x in data["data"] if x["updated_at"] >=
-                            start]
+            data["data"] = [x for x in data["data"] if x["updated_at"] >= start]
         locations.extend(data["data"])
         return data["meta"]["next"]
 
@@ -137,8 +135,10 @@ def get_all_data(args):
 if __name__ == "__main__":
 
     # Parse commandline options.
-    parser = argparse.ArgumentParser(description="Query api/v2/ \
-                                     historical_locations")
+    parser = argparse.ArgumentParser(
+        description="Query api/v2/ \
+                                     historical_locations"
+    )
     cmd = parser.add_subparsers(title="commands", dest="cmd")
 
     parser.add_argument(
@@ -161,12 +161,13 @@ if __name__ == "__main__":
             (overrides --after)",
     )
     parser.add_argument(
-        "--server", default="https://www.cradlepointecm.com", help="Base URL \
-            of server"
+        "--server",
+        default="https://www.cradlepointecm.com",
+        help="Base URL \
+            of server",
     )
     parser.add_argument(
-        "--steps", type=int, help="If --walk, walk only this many steps.",
-        default=0
+        "--steps", type=int, help="If --walk, walk only this many steps.", default=0
     )
     parser.add_argument(
         "--units",

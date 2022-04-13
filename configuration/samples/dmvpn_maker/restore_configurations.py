@@ -28,8 +28,7 @@ def restore_configs():
         with requests.Session() as s:
             # Set max retries to 3
             retries = Retry(
-                total=3, backoff_factor=0.2,
-                status_forcelist=[500, 502, 503, 504]
+                total=3, backoff_factor=0.2, status_forcelist=[500, 502, 503, 504]
             )
 
             s.mount("https://", HTTPAdapter(max_retries=retries))
@@ -79,8 +78,7 @@ def restore_configs():
                     # print result
                     patch_result = patch.status_code
                     print(
-                        "Config patch sent to router {}\nResponse = {}\n"
-                        .format(
+                        "Config patch sent to router {}\nResponse = {}\n".format(
                             router_id, patch_result
                         )
                     )
@@ -105,8 +103,7 @@ def restore_configs():
 
                 # catch very broad exceptions
                 except Exception as e:
-                    print("Error patching to {}\nException = {}\n".format(
-                        router_id, e))
+                    print("Error patching to {}\nException = {}\n".format(router_id, e))
 
 
 if __name__ == "__main__":

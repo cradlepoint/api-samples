@@ -37,8 +37,7 @@ class APISession(object):
             HTTPStatus.GATEWAY_TIMEOUT,
             HTTPStatus.SERVICE_UNAVAILABLE,
         ],
-        base_url=os.environ.get("CP_BASE_URL",
-                                "https://www.cradlepointecm.com/api/v2"),
+        base_url=os.environ.get("CP_BASE_URL", "https://www.cradlepointecm.com/api/v2"),
     ):
         """
         Constructor.  Sets up and opens request session.
@@ -110,8 +109,7 @@ class APISession(object):
         else:
             yield response
 
-    def get(self, endpoint=None, url=None, batchsize=25, order_by=[],
-            filter={}):
+    def get(self, endpoint=None, url=None, batchsize=25, order_by=[], filter={}):
         """
         Execute a "GET" against the given endpoint.
 
