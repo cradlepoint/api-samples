@@ -26,12 +26,18 @@ def get_filtered(
 
     :param session: APISession instance. Required.
     :param endpoint: Endpoint to query. Required.
-    :param after_rec: Return records that were written after this record. Optional.
-    :param after_time: Return records that were written after this time. Optional.
-    :param after_uuid: Return records that were written after this timeuuid. Optional.
-    :param before_time: Return records that were written before this time. Optional.
-    :param router_ids: Return records where the router_id is in this list. Optional.
-    :param net_device_ids: Return records where the net_device_id is in this list. Optional.
+    :param after_rec: Return records that were written after this record.
+        Optional.
+    :param after_time: Return records that were written after this time.
+        Optional.
+    :param after_uuid: Return records that were written after this timeuuid.
+        Optional.
+    :param before_time: Return records that were written before this time.
+        Optional.
+    :param router_ids: Return records where the router_id is in this list.
+        Optional.
+    :param net_device_ids: Return records where the net_device_id is in this
+        list. Optional.
     :param order_by: Field to sort by
     :param batchsize: Maximum number of rows per server page.
     :return: An iterable generator that will yield all the records matching
@@ -81,7 +87,8 @@ def get_filtered(
 
     # now that we've constructed our filter, do the actual fetching
     return session.get(
-        endpoint=endpoint, filter=filter, order_by=order_by, batchsize=batchsize
+        endpoint=endpoint, filter=filter, order_by=order_by,
+        batchsize=batchsize
     )
 
 
@@ -127,8 +134,10 @@ def poll(
     :param after_uuid: Start poll for records after this uuid. Optional.
     :param sleeptime: time to sleep between polls in seconds. Optional.
     :param process_one_fn: function to execute when a new record is found.
-    :param router_ids: Return records where the router_id is in this list. Optional.
-    :param net_device_ids: Return records where the net_device_id is in this list. Optional.
+    :param router_ids: Return records where the router_id is in this list.
+    Optional.
+    :param net_device_ids: Return records where the net_device_id is in this
+    list. Optional.
 
     Note: this function mostly delegates to get_filtered() in a loop, so see
     get_filtered()

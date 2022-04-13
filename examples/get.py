@@ -63,7 +63,8 @@ class NcmAPIv2(object):
             logging.info(get_url)
 
             try:
-                r = session.get(get_url, headers=headers, timeout=30, stream=True)
+                r = session.get(get_url, headers=headers, timeout=30,
+                                stream=True)
 
                 if r.status_code != 200:
                     logging.info(str(r.status_code) + ": " + str(r.text))
@@ -109,14 +110,16 @@ if __name__ == "__main__":
     )
 
     # Parse commandline options.
-    parser = argparse.ArgumentParser(description="Query APIv2 Historical Locations")
+    parser = argparse.ArgumentParser(
+        description="Query APIv2 Historical Locations")
 
     parser.add_argument("--ecm-api-id", help="Override X_ECM_API_ID")
     parser.add_argument("--ecm-api-key", help="Override X_ECM_API_KEY")
     parser.add_argument("--cp-api-id", help="Override X-CP-API-ID")
     parser.add_argument("--cp-api-key", help="Override X-CP-API-KEY")
 
-    parser.add_argument("--endpoint", help="Name of API endpoint.", default="accounts")
+    parser.add_argument("--endpoint", help="Name of API endpoint.",
+                        default="accounts")
     parser.add_argument("--account", help="Your NCM ID found in settings.")
     parser.add_argument(
         "--limit",

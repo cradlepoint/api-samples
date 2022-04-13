@@ -1,9 +1,9 @@
 """
 This file contains a sample using the functions in the utils module
-to poll the net_device_metrics endpoint for all metrics changes on your account.
-The sample process_metrics_change() function just prints any new metrics to the
-console, but you can replace it with anything you want (e.g., write the info
- to your database, send it to a log server)
+to poll the net_device_metrics endpoint for all metrics changes on your
+account. The sample process_metrics_change() function just prints any new
+metrics to the console, but you can replace it with anything you want (e.g.,
+write the info to your database, send it to a log server)
 """
 from pprint import pprint
 from time import sleep
@@ -14,7 +14,8 @@ from monitoring.utils.credentials import get_credentials
 from monitoring.utils.logger import get_logger
 
 POLL_INTERVAL = 600  # 10 minutes; adjust to your needs
-POLL_START_TIME = datetime.utcnow().replace(tzinfo=timezone.utc) - timedelta(hours=1)
+POLL_START_TIME = datetime.utcnow().replace(
+    tzinfo=timezone.utc) - timedelta(hours=1)
 
 
 def get_max_ts(ts1, ts2):
@@ -56,4 +57,4 @@ if __name__ == "__main__":
             start_ts = POLL_START_TIME
             poll_for_metrics_changes(session=s)
     except Exception as x:
-        logger.exception("Unexpected exception")
+        logger.exception(f"Unexpected exception {x}")

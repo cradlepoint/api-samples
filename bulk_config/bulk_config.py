@@ -77,10 +77,10 @@ def load_csv(filename):
                             column[chr(i + 97).upper()] = row[i]
                             column[chr(i + 97).lower()] = row[i]
                             i += 1
-                        except:
+                        except Exception as e:
                             break
                     router_configs[column["A"]] = column
-                except:
+                except Exception as e:
                     pass
     except Exception as e:
         print(f"Exception reading csv file: {e}")

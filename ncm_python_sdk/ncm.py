@@ -80,7 +80,8 @@ class NcmClient:
         retries=5,
         retry_backoff_factor=2,
         retry_on=None,
-        base_url=os.environ.get("CP_BASE_URL", "https://www.cradlepointecm.com/api/v2"),
+        base_url=os.environ.get("CP_BASE_URL",
+                                "https://www.cradlepointecm.com/api/v2"),
     ):
         """
         Constructor. Sets up and opens request session.
@@ -157,7 +158,8 @@ class NcmClient:
                 print("HTTP 500 - Server Error\n")
             return returntext
         else:
-            print("HTTP Status Code: {0} - No returned data\n".format(str(status_code)))
+            print("HTTP Status Code: {0} - No returned data\n"
+                  .format(str(status_code)))
 
     def __get_json(self, get_url, call_type, params=None):
         """
@@ -174,13 +176,15 @@ class NcmClient:
             # Ensures that order_by is passed as a comma separated string
             if "order_by" in params.keys():
                 if type(params["order_by"]) is list:
-                    params["order_by"] = ",".join(str(x) for x in params["order_by"])
+                    params["order_by"] = ",".join(str(x) for x in
+                                                  params["order_by"])
                 elif (
                     type(params["order_by"]) is not list
                     and type(params["order_by"]) is not str
                 ):
                     raise TypeError(
-                        "Invalid 'order_by' parameter. " "Must be 'list' or 'str'."
+                        "Invalid 'order_by' parameter. " "Must be 'list' or \
+                            'str'."
                     )
 
             for key, val in params.items():
@@ -214,7 +218,8 @@ class NcmClient:
                 ncm = self.session.get(url, params=params)
                 if not (200 <= ncm.status_code < 300):
                     break
-                self.__return_handler(ncm.status_code, ncm.json()["data"], call_type)
+                self.__return_handler(ncm.status_code, ncm.json()["data"],
+                                      call_type)
                 url = ncm.json()["meta"]["next"]
                 for d in ncm.json()["data"]:
                     results.append(d)
@@ -229,28 +234,33 @@ class NcmClient:
         if "limit" not in params:
             params.update({"limit": "500"})
 
-        bad_params = {k: v for (k, v) in kwargs.items() if k not in allowed_params}
+        bad_params = {k: v for (k, v) in kwargs.items() if k not in
+                      allowed_params}
         if len(bad_params) > 0:
             raise ValueError("Invalid parameters: {}".format(bad_params))
 
         if "X-CP-API-ID" not in self.session.headers:
             raise KeyError(
-                "X-CP-API-ID missing. " "Please ensure all API Keys are present."
+                "X-CP-API-ID missing. "
+                "Please ensure all API Keys are present."
             )
 
         if "X-CP-API-KEY" not in self.session.headers:
             raise KeyError(
-                "X-CP-API-KEY missing. " "Please ensure all API Keys are present."
+                "X-CP-API-KEY missing. "
+                "Please ensure all API Keys are present."
             )
 
         if "X-ECM-API-ID" not in self.session.headers:
             raise KeyError(
-                "X-ECM-API-ID missing. " "Please ensure all API Keys are present."
+                "X-ECM-API-ID missing. "
+                "Please ensure all API Keys are present."
             )
 
         if "X-ECM-API-KEY" not in self.session.headers:
             raise KeyError(
-                "X-ECM-API-KEY missing. " "Please ensure all API Keys are present."
+                "X-ECM-API-KEY missing. "
+                "Please ensure all API Keys are present."
             )
 
         return params
@@ -272,7 +282,7 @@ class NcmClient:
 
         """Yield successive n-sized chunks from lst."""
         for i in range(0, len(param_list), n):
-            yield param_list[i : i + n]
+            yield param_list[i: i + n]
 
     @staticmethod
     def __validate_api_keys(api_keys):
@@ -287,22 +297,26 @@ class NcmClient:
 
         if "X-CP-API-ID" not in api_keys:
             raise KeyError(
-                "X-CP-API-ID missing. " "Please ensure all API Keys are present."
+                "X-CP-API-ID missing. "
+                "Please ensure all API Keys are present."
             )
 
         if "X-CP-API-KEY" not in api_keys:
             raise KeyError(
-                "X-CP-API-KEY missing. " "Please ensure all API Keys are present."
+                "X-CP-API-KEY missing. "
+                "Please ensure all API Keys are present."
             )
 
         if "X-ECM-API-ID" not in api_keys:
             raise KeyError(
-                "X-ECM-API-ID missing. " "Please ensure all API Keys are present."
+                "X-ECM-API-ID missing. "
+                "Please ensure all API Keys are present."
             )
 
         if "X-ECM-API-KEY" not in api_keys:
             raise KeyError(
-                "X-ECM-API-KEY missing. " "Please ensure all API Keys are present."
+                "X-ECM-API-KEY missing. "
+                "Please ensure all API Keys are present."
             )
         return True
 
@@ -358,7 +372,8 @@ class NcmClient:
 
         return self.get_accounts(name=account_name)[0]
 
-    def create_subaccount_by_parent_id(self, parent_account_id, subaccount_name):
+    def create_subaccount_by_parent_id(self, parent_account_id,
+                                       subaccount_name):
         """
         This operation creates a new subaccount.
         :param parent_account_id: ID of parent account.
@@ -377,7 +392,8 @@ class NcmClient:
         result = self.__return_handler(ncm.status_code, ncm.json(), call_type)
         return result
 
-    def create_subaccount_by_parent_name(self, parent_account_name, subaccount_name):
+    def create_subaccount_by_parent_name(self, parent_account_name,
+                                         subaccount_name):
         """
         This operation creates a new subaccount.
         :param parent_account_name: Name of parent account.
@@ -385,7 +401,8 @@ class NcmClient:
         :return:
         """
         return self.create_subaccount_by_parent_id(
-            self.get_account_by_name(parent_account_name)["id"], subaccount_name
+            self.get_account_by_name(parent_account_name)["id"],
+            subaccount_name
         )
 
     def rename_subaccount_by_id(self, subaccount_id, new_subaccount_name):
@@ -412,7 +429,8 @@ class NcmClient:
         :return:
         """
         return self.rename_subaccount_by_id(
-            self.get_account_by_name(subaccount_name)["id"], new_subaccount_name
+            self.get_account_by_name(subaccount_name)["id"],
+            new_subaccount_name
         )
 
     def delete_subaccount_by_id(self, subaccount_id):
@@ -571,7 +589,8 @@ class NcmClient:
         :return:
         """
         call_type = "Configuration Manager"
-        put_url = "{0}/configuration_managers/{1}/".format(self.base_url, config_man_id)
+        put_url = "{0}/configuration_managers/{1}/".format(self.base_url,
+                                                           config_man_id)
 
         ncm = self.session.put(put_url, json=config_man_json)
         result = self.__return_handler(ncm.status_code, ncm.json(), call_type)
@@ -602,7 +621,8 @@ class NcmClient:
         payload = config_man_json
 
         ncm = self.session.patch(
-            "{0}/configuration_managers/{1}/".format(self.base_url, str(config_man_id)),
+            "{0}/configuration_managers/{1}/".format(self.base_url,
+                                                     str(config_man_id)),
             data=json.dumps(payload),
         )  # Patch indie config with new values
 
@@ -685,7 +705,8 @@ class NcmClient:
         )
 
         """Get destination router Configuration Manager ID"""
-        dst_config_man_id = self.get_configuration_managers(router=dst_router_id)[0][
+        dst_config_man_id = self.get_configuration_managers(
+            router=dst_router_id)[0][
             "id"
         ]
 
@@ -715,7 +736,8 @@ class NcmClient:
         payload = {"suspended": False}
 
         ncm = self.session.put(
-            "{0}/configuration_managers/{1}/".format(self.base_url, str(configman_id)),
+            "{0}/configuration_managers/{1}/".format(self.base_url,
+                                                     str(configman_id)),
             json=payload,
         )
         result = self.__returnhandler(ncm.status_code, ncm.text, call_type)
@@ -873,12 +895,14 @@ class NcmClient:
         call_type = "Firmwares"
         get_url = "{0}/firmwares/".format(self.base_url)
 
-        allowed_params = ["id", "id__in", "version", "version__in", "limit", "offset"]
+        allowed_params = ["id", "id__in", "version", "version__in", "limit",
+                          "offset"]
         params = self.__parse_kwargs(kwargs, allowed_params)
 
         return self.__get_json(get_url, call_type, params=params)
 
-    def get_firmware_for_product_id_by_version(self, product_id, firmware_name):
+    def get_firmware_for_product_id_by_version(self, product_id,
+                                               firmware_name):
         """
         This operation returns firmwares for a given model ID and version name.
         :param product_id: The ID of the product (e.g. 46)
@@ -892,7 +916,8 @@ class NcmClient:
                 return f
         raise ValueError("Invalid Firmware Version")
 
-    def get_firmware_for_product_name_by_version(self, product_name, firmware_name):
+    def get_firmware_for_product_name_by_version(self, product_name,
+                                                 firmware_name):
         """
         This operation returns firmwares for a given model and version name.
         :param product_name: The Name of the product (e.g. IBR200)
@@ -900,7 +925,8 @@ class NcmClient:
         :return:
         """
         product_id = self.get_product_by_name(product_name)["id"]
-        return self.get_firmware_for_product_id_by_version(product_id, firmware_name)
+        return self.get_firmware_for_product_id_by_version(product_id,
+                                                           firmware_name)
 
     def get_groups(self, **kwargs):
         """
@@ -967,12 +993,14 @@ class NcmClient:
         post_data = {
             "account": "/api/v1/accounts/{}/".format(str(parent_account_id)),
             "name": str(group_name),
-            "product": str(self.get_product_by_name(product_name)["resource_url"]),
+            "product": str(self.get_product_by_name(product_name)
+                           ["resource_url"]),
             "target_firmware": str(firmware["resource_url"]),
         }
 
         ncm = self.session.post(post_url, data=json.dumps(post_data))
-        result = self.__return_handler(ncm.status_code, ncm.json(), call_type)
+        result = self.__return_handler(ncm.status_code, ncm.json(),
+                                       call_type)
         return result
 
     def create_group_by_parent_name(
@@ -1042,7 +1070,8 @@ class NcmClient:
         :param group_name: Name of the group to delete
         :return:
         """
-        return self.delete_group_by_id(self.get_group_by_name(group_name)["id"])
+        return self.delete_group_by_id(self.get_group_by_name(group_name)
+                                       ["id"])
 
     def get_historical_locations(self, router_id, **kwargs):
         """
@@ -1108,7 +1137,8 @@ class NcmClient:
         ]
         params = self.__parse_kwargs(kwargs, allowed_params)
 
-        params.update({"created_at__lte": end, "created_at__gt": start, "limit": limit})
+        params.update({"created_at__lte": end, "created_at__gt": start,
+                       "limit": limit})
 
         return self.__get_json(get_url, call_type, params=params)
 
@@ -1143,14 +1173,16 @@ class NcmClient:
         post_url = "{0}/locations/".format(self.base_url)
 
         post_data = {
-            "account": "https://www.cradlepointecm.com/api/v2/accounts/{}/".format(
+            "account": "https://www.cradlepointecm.com/api/v2/accounts/{}/"
+            .format(
                 str(account_id)
             ),
             "accuracy": 0,
             "latitude": latitude,
             "longitude": longitude,
             "method": "manual",
-            "router": "https://www.cradlepointecm.com/api/v2/routers/{}/".format(
+            "router": "https://www.cradlepointecm.com/api/v2/routers/{}/"
+            .format(
                 str(router_id)
             ),
         }
@@ -1174,7 +1206,8 @@ class NcmClient:
             post_url = "{0}/locations/{1}/".format(self.base_url, location_id)
 
             ncm = self.session.delete(post_url)
-            result = self.__return_handler(ncm.status_code, ncm.text, call_type)
+            result = self.__return_handler(ncm.status_code, ncm.text,
+                                           call_type)
             return result
         else:
             return "NO LOCATION FOUND"
@@ -1196,9 +1229,9 @@ class NcmClient:
 
     def get_net_device_metrics(self, **kwargs):
         """
-        This endpoint is supplied to allow easy access to the latest signal and
-          usage data reported by an account’s net_devices without querying the
-          historical raw sample tables, which are not optimized for a query
+        This endpoint is supplied to allow easy access to the latest signal
+          and usage data reported by an account’s net_devices without querying
+          the historical raw sample tables, which are not optimized for a query
           spanning many net_devices at once.
         :param kwargs: A set of zero or more allowed parameters
           in the allowed_params list.
@@ -1412,7 +1445,8 @@ class NcmClient:
         call_type = "Reboot Device"
         post_url = "{0}/reboot_activity/".format(self.base_url)
 
-        post_data = {"router": "{0}/routers/{1}/".format(self.base_url, str(router_id))}
+        post_data = {"router": "{0}/routers/{1}/".format(self.base_url,
+                                                         str(router_id))}
 
         ncm = self.session.post(post_url, data=json.dumps(post_data))
         result = self.__return_handler(ncm.status_code, ncm.text, call_type)
@@ -1427,7 +1461,8 @@ class NcmClient:
         call_type = "Reboot Group"
         post_url = "{0}/reboot_activity/".format(self.base_url)
 
-        post_data = {"group": "{0}/groups/{1}/".format(self.base_url, str(group_id))}
+        post_data = {"group": "{0}/groups/{1}/".format(self.base_url,
+                                                       str(group_id))}
 
         ncm = self.session.post(post_url, data=json.dumps(post_data))
         result = self.__return_handler(ncm.status_code, ncm.text, call_type)
@@ -1548,7 +1583,8 @@ class NcmClient:
         :return:
         """
         call_type = "Router Logs"
-        get_url = "{0}/router_logs/?router={1}".format(self.base_url, router_id)
+        get_url = "{0}/router_logs/?router={1}".format(self.base_url,
+                                                       router_id)
 
         allowed_params = [
             "created_at",
@@ -1585,7 +1621,8 @@ class NcmClient:
         start = (d - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%S")
 
         call_type = "Router Logs"
-        get_url = "{0}/router_logs/?router={1}".format(self.base_url, router_id)
+        get_url = "{0}/router_logs/?router={1}".format(self.base_url,
+                                                       router_id)
 
         params = {
             "created_at__lt": end,
@@ -1616,7 +1653,8 @@ class NcmClient:
         end = (d + timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%S")
 
         call_type = "Router Logs"
-        get_url = "{0}/router_logs/?router={1}".format(self.base_url, router_id)
+        get_url = "{0}/router_logs/?router={1}".format(self.base_url,
+                                                       router_id)
 
         params = {
             "created_at__lt": end,
@@ -1795,7 +1833,8 @@ class NcmClient:
         :return:
         """
         return self.rename_router_by_id(
-            self.get_router_by_name(existing_router_name)["id"], new_router_name
+            self.get_router_by_name(existing_router_name)["id"],
+            new_router_name
         )
 
     def assign_router_to_group(self, router_id, group_id):
@@ -1810,7 +1849,8 @@ class NcmClient:
         put_url = "{0}/routers/{1}/".format(self.base_url, str(router_id))
 
         put_data = {
-            "group": "https://www.cradlepointecm.com/api/v2/groups/{}/".format(group_id)
+            "group": "https://www.cradlepointecm.com/api/v2/groups/{}/"
+            .format(group_id)
         }
 
         ncm = self.session.put(put_url, data=json.dumps(put_data))
@@ -1829,7 +1869,8 @@ class NcmClient:
         put_url = "{0}/routers/{1}/".format(self.base_url, str(router_id))
 
         put_data = {
-            "account": "https://www.cradlepointecm.com/api/v2/accounts/{}/".format(
+            "account": "https://www.cradlepointecm.com/api/v2/accounts/{}/"
+            .format(
                 account_id
             )
         }
@@ -1857,9 +1898,11 @@ class NcmClient:
         :param router_name: Name of router to delete
         :return:
         """
-        return self.delete_router_by_id(self.get_router_by_name(router_name)["id"])
+        return self.delete_router_by_id(self.get_router_by_name(router_name)
+                                        ["id"])
 
-    def set_lan_ip_address(self, router_id, lan_ip, netmask=None, network_id=0):
+    def set_lan_ip_address(self, router_id, lan_ip, netmask=None,
+                           network_id=0):
         """
         This method sets the Primary LAN IP Address for a given router id.
         :param router_id: ID of router to update
@@ -1886,18 +1929,21 @@ class NcmClient:
         if netmask:
             payload = {
                 "configuration": [
-                    {"lan": {network_id: {"ip_address": lan_ip, "netmask": netmask}}},
+                    {"lan": {network_id: {"ip_address": lan_ip, "netmask":
+                                          netmask}}},
                     [],
                 ]
             }
 
         else:
             payload = {
-                "configuration": [{"lan": {network_id: {"ip_address": lan_ip}}}, []]
+                "configuration": [{"lan": {network_id: {"ip_address":
+                                                        lan_ip}}}, []]
             }
 
         ncm = self.session.patch(
-            "{0}/configuration_managers/{1}/".format(self.base_url, str(config_man_id)),
+            "{0}/configuration_managers/{1}/".format(self.base_url,
+                                                     str(config_man_id)),
             data=json.dumps(payload),
         )  # Patch indie config with new values
         result = self.__return_handler(ncm.status_code, ncm.text, call_type)

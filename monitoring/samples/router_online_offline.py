@@ -81,4 +81,4 @@ if __name__ == "__main__":
         ) as s:
             poll_for_state_changes(s)
     except Exception as x:
-        logger.exception("Unexpected exception")
+        logger.exception(f"Unexpected exception {x}")

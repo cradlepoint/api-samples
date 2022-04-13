@@ -41,7 +41,8 @@ def get(url, filt=None):
     """
     r = requests.get(url, headers=HEADERS)
     if r.status_code not in (200, 201):
-        print(f"Request failed with HTTP status {r.status_code}", file=sys.stderr)
+        print(f"Request failed with HTTP status {r.status_code}",
+              file=sys.stderr)
         print(r.text, file=sys.stderr)
         sys.exit(1)
     return r.json()
@@ -107,7 +108,8 @@ def get_locations(args):
     def _fetch(url):
         data = get(url)
         if start:
-            data["data"] = [x for x in data["data"] if x["updated_at"] >= start]
+            data["data"] = [x for x in data["data"] if x["updated_at"] >=
+                            start]
         locations.extend(data["data"])
         return data["meta"]["next"]
 
@@ -135,30 +137,36 @@ def get_all_data(args):
 if __name__ == "__main__":
 
     # Parse commandline options.
-    parser = argparse.ArgumentParser(description="Query api/v2/historical_locations")
+    parser = argparse.ArgumentParser(description="Query api/v2/ \
+                                     historical_locations")
     cmd = parser.add_subparsers(title="commands", dest="cmd")
 
     parser.add_argument(
         "--after",
-        help="Return data only after a date and time (YYYY-mm-DDTHH:MM:SS) [default is 24 hours ago]",
+        help="Return data only after a date and time (YYYY-mm-DDTHH:MM:SS)\
+            [default is 24 hours ago]",
     )
     parser.add_argument("--api-id", help="Override X_ECM_API_ID")
     parser.add_argument("--api-key", help="Override X_ECM_API_KEY")
     parser.add_argument(
         "--until",
-        help="Return data only before a date and time (YYYY-mm-DDTHH:MM:SS) [default is now]",
+        help="Return data only before a date and time (YYYY-mm-DDTHH:MM:SS) \
+            [default is now]",
     )
     parser.add_argument("--limit", default=25000)
     parser.add_argument(
         "--previous",
         type=int,
-        help="Return data starting this many hours before the --before option (overrides --after)",
+        help="Return data starting this many hours before the --before option \
+            (overrides --after)",
     )
     parser.add_argument(
-        "--server", default="https://www.cradlepointecm.com", help="Base URL of server"
+        "--server", default="https://www.cradlepointecm.com", help="Base URL \
+            of server"
     )
     parser.add_argument(
-        "--steps", type=int, help="If --walk, walk only this many steps.", default=0
+        "--steps", type=int, help="If --walk, walk only this many steps.",
+        default=0
     )
     parser.add_argument(
         "--units",

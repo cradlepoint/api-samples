@@ -37,7 +37,8 @@ class APISession(object):
             HTTPStatus.GATEWAY_TIMEOUT,
             HTTPStatus.SERVICE_UNAVAILABLE,
         ],
-        base_url=os.environ.get("CP_BASE_URL", "https://www.cradlepointecm.com/api/v2"),
+        base_url=os.environ.get("CP_BASE_URL",
+                                "https://www.cradlepointecm.com/api/v2"),
     ):
         """
         Constructor.  Sets up and opens request session.
@@ -48,9 +49,12 @@ class APISession(object):
         :param cp_api_key: API credentials. Required.
         :param cp_api_id: API credentials. Required.
         :param retries: number of retries on failure. Optional.
-        :param retry_backoff_factor: backoff time multiplier for retries. Optional.
-        :param retry_on: types of errors on which automatic retry will occur. Optional.
-        :param base_url: # base url for calls. Configurable for testing. Optional.
+        :param retry_backoff_factor: backoff time multiplier for retries.
+         Optional.
+        :param retry_on: types of errors on which automatic retry will occur.
+         Optional.
+        :param base_url: # base url for calls. Configurable for testing.
+         Optional.
         """
         self.base_url = base_url
         self.session = Session()
@@ -106,11 +110,13 @@ class APISession(object):
         else:
             yield response
 
-    def get(self, endpoint=None, url=None, batchsize=25, order_by=[], filter={}):
+    def get(self, endpoint=None, url=None, batchsize=25, order_by=[],
+            filter={}):
         """
         Execute a "GET" against the given endpoint.
 
-        :param endpoint: endpoint to call. Either this or url needs to be specified.
+        :param endpoint: endpoint to call. Either this or url needs to be
+         specified.
         :param url: full url to call.
         :param batchsize: page size for calls to server. Optional.
         :param order_by: sort column(s)

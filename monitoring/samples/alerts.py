@@ -27,7 +27,8 @@ def retrieve_all_alerts(
     Calls process_alert() for all alerts in a given time range.
 
     :param session: APISession object. Required.
-    :param start_ts: Starting timestamp for time window. Specify this or start_uuid.
+    :param start_ts: Starting timestamp for time window. Specify this or
+     start_uuid.
     :param start_uuid: Starting timeuuid for time window.
     :param router_ids: Optional list of router_ids to restrict query.
 
@@ -84,4 +85,4 @@ if __name__ == "__main__":
         with APISession(**get_credentials(), logger=logger) as s:
             poll_for_new_alerts(s)
     except Exception as x:
-        logger.exception("Unexpected exception")
+        logger.exception(f"Unexpected exception {x}")

@@ -42,7 +42,8 @@ def push_configs():
         with requests.Session() as s:
             # Set max retries to 3
             retries = Retry(
-                total=3, backoff_factor=0.2, status_forcelist=[500, 502, 503, 504]
+                total=3, backoff_factor=0.2,
+                status_forcelist=[500, 502, 503, 504]
             )
 
             s.mount("https://", HTTPAdapter(max_retries=retries))
@@ -66,7 +67,6 @@ def push_configs():
                 router_id = int(column[0])
                 gre_ip = column[1]
                 gre_ip2 = column[5]  # This is an ip for a second gre tunnel
-                gre_mask = column[2]
                 local_network_ip = column[3]
                 local_network_mask = column[4]
 
@@ -91,10 +91,12 @@ def push_configs():
                     ]["netmask"] = local_network_mask
 
                     # BGP config info
-                    indi_payload["configuration"][0]["routing"]["bgp"]["routers"]["0"][
+                    indi_payload["configuration"][0]["routing"]["bgp"]
+                    ["routers"]["0"][
                         "router_id"
                     ] = local_network_ip
-                    indi_payload["configuration"][0]["routing"]["bgp"]["routers"]["0"][
+                    indi_payload["configuration"][0]["routing"]["bgp"]
+                    ["routers"]["0"][
                         "networks"
                     ]["0"]["ip_network"] = (local_network_ip + "/27")
 
@@ -103,7 +105,8 @@ def push_configs():
 
                     # get configuration_managers id and save backup of config
                     cfg = s.get(
-                        "https://www.cradlepointecm.com/api/v2/configuration_managers/?router.id={}".format(
+                        "https://www.cradlepointecm.com/api/v2/ \
+                        configuration_managers/?router.id={}".format(
                             router_id
                         ),
                         headers=headers,
@@ -112,7 +115,8 @@ def push_configs():
                     # Check authorization
                     if cfg.status_code == 401:
                         raise requests.RequestException(
-                            "401 Unauthorized response. Invalid Credentials i.e. missing or invalid keys."
+                            "401 Unauthorized response. Invalid Credentials \
+                            i.e. missing or invalid keys."
                         )
 
                     # Get the configuration_managers id from the response
@@ -120,14 +124,16 @@ def push_configs():
 
                     # save cfg backup
                     with open(
-                        "./configs/config_backups/{}.json".format(router_id), "w"
+                        "./configs/config_backups/{}.json".format(router_id),
+                        "w"
                     ) as backup:
                         backup.write(str(cfg.json()))
                         print("backup created for {}".format(cfg_id))
 
                     # patch payload
                     patch = s.patch(
-                        "https://www.cradlepointecm.com/api/v2/configuration_managers/{}/".format(
+                        "https://www.cradlepointecm.com/api/v2/ \
+                        configuration_managers/{}/".format(
                             cfg_id
                         ),
                         headers=headers,
@@ -137,15 +143,17 @@ def push_configs():
                     # print result
                     patch_result = patch.status_code
                     print(
-                        "Config patch sent to router {}\nResponse = {}\n".format(
+                        "Config patch sent to router {}\nResponse = {}\n"
+                        .format(
                             router_id, patch_result
                         )
                     )
 
                     # Catch failed status codes and log them
-                    if patch_result is not 202:
+                    if patch_result != 202:
                         print(
-                            "Patch unsuccessful. Status code {}, Response: {}\n".format(
+                            "Patch unsuccessful. Status code {}, Response: \
+                                {}\n".format(
                                 patch_result, patch.text
                             )
                         )
@@ -154,14 +162,16 @@ def push_configs():
                 # catch index errors, probably from a failed GET
                 except IndexError as e:
                     print(
-                        "{} IndexError, probably from failed GET. Exception = {}\nGET Response = {}\n".format(
+                        "{} IndexError, probably from failed GET. Exception = \
+                            {}\nGET Response = {}\n".format(
                             router_id, e, cfg_id
                         )
                     )
 
                 # catch broad exceptions
                 except Exception as e:
-                    print("Error patching to {}\nException = {}\n".format(router_id, e))
+                    print("Error patching to {}\nException = {}\n"
+                          .format(router_id, e))
 
                 # write patch result to csv
                 finally:

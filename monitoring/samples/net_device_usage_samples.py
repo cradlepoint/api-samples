@@ -14,7 +14,7 @@ from monitoring.utils.credentials import get_credentials
 from monitoring.utils.logger import get_logger
 
 POLL_INTERVAL = 3600  # 1 hour; adjust to your needs
-ID_BATCH_LIMIT = 100  # we are allowed to request samples for at most 100 IDs at a time
+ID_BATCH_LIMIT = 100  # request samples for max 100 IDs at a time
 POLL_START_TIME = datetime.utcnow() - timedelta(hours=1)
 
 
@@ -69,4 +69,4 @@ if __name__ == "__main__":
             # poll them
             poll_for_new_samples(s, ids)
     except Exception as x:
-        logger.exception("Unexpected exception")
+        logger.exception(f"Unexpected exception {x}")

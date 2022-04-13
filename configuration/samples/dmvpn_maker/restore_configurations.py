@@ -1,4 +1,6 @@
-# Patches an "Undo" configuration that removes all settings that were patched by config_pusher.py
+"""Patches an "Undo" configuration that removes all settings that were
+patched by config_pusher.py
+"""
 
 import json
 import csv
@@ -26,7 +28,8 @@ def restore_configs():
         with requests.Session() as s:
             # Set max retries to 3
             retries = Retry(
-                total=3, backoff_factor=0.2, status_forcelist=[500, 502, 503, 504]
+                total=3, backoff_factor=0.2,
+                status_forcelist=[500, 502, 503, 504]
             )
 
             s.mount("https://", HTTPAdapter(max_retries=retries))
@@ -55,7 +58,8 @@ def restore_configs():
 
                     # get configuration_managers id
                     cfg_id = s.get(
-                        "https://www.cradlepointecm.com/api/v2/configuration_managers/?router.id={}".format(
+                        "https://www.cradlepointecm.com/api/v2/ \
+                        configuration_managers/?router.id={}".format(
                             router_id
                         ),
                         headers=headers,
@@ -64,7 +68,8 @@ def restore_configs():
 
                     # patch payload
                     patch = s.patch(
-                        "https://www.cradlepointecm.com/api/v2/configuration_managers/{}/".format(
+                        "https://www.cradlepointecm.com/api/v2/ \
+                        configuration_managers/{}/".format(
                             cfg_id
                         ),
                         headers=headers,
@@ -74,15 +79,17 @@ def restore_configs():
                     # print result
                     patch_result = patch.status_code
                     print(
-                        "Config patch sent to router {}\nResponse = {}\n".format(
+                        "Config patch sent to router {}\nResponse = {}\n"
+                        .format(
                             router_id, patch_result
                         )
                     )
 
                     # Catch failed status codes and log them
-                    if patch_result is not 202:
+                    if patch_result != 202:
                         print(
-                            "Patch unsuccessful. Status code {}, Response: {}\n".format(
+                            "Patch unsuccessful. Status code {}, Response: \
+                                {}\n".format(
                                 patch_result, patch.text
                             )
                         )
@@ -90,14 +97,16 @@ def restore_configs():
                 # catch index errors, probably from a failed GET
                 except IndexError as e:
                     print(
-                        "{} IndexError, probably from failed GET. Exception = {}\nGET Response = {}\n".format(
+                        "{} IndexError, probably from failed GET. Exception \
+                            = {}\nGET Response = {}\n".format(
                             router_id, e, cfg_id
                         )
                     )
 
                 # catch very broad exceptions
                 except Exception as e:
-                    print("Error patching to {}\nException = {}\n".format(router_id, e))
+                    print("Error patching to {}\nException = {}\n".format(
+                        router_id, e))
 
 
 if __name__ == "__main__":

@@ -30,7 +30,8 @@ def post(url, body):
     """
     r = requests.post(url, headers=headers, data=json.dumps(body))
     if r.status_code not in (200, 201):
-        print(f"Request failed with HTTP status {r.status_code}", file=sys.stderr)
+        print(f"Request failed with HTTP status {r.status_code}",
+              file=sys.stderr)
         print(r.text, file=sys.stderr)
         sys.exit(1)
     return json.loads(r.content.decode("utf-8"))
@@ -39,8 +40,8 @@ def post(url, body):
 """Create alert push destination rule"""
 url = f"{server}/alert_push_destinations/"
 body = {
-    "endpoint": {"url": "ExampleURL.com"},  # Paste your server URL below
-    "authentication": {"secret": "ExampleSecret"},  # Paste your server secret below
+    "endpoint": {"url": "ExampleURL.com"},  # Paste your server URL
+    "authentication": {"secret": "ExampleSecret"},  # Paste your server secret
     "name": "ExampleName",
 }
 dst_id = post(url, body).get("destination_config_id")
