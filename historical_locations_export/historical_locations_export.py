@@ -27,7 +27,7 @@ headers = {'X-ECM-API-ID': 'YOUR',
            'X-CP-API-KEY': 'HERE',
            'Content-Type': 'application/json'}
 
-top_line = ["router", "name", "accuracy", "carrier_id", "cinr",
+top_line = ["router", "name", "accuracy", "altitude", "carrier_id", "cinr",
             "created_at", "created_at_timeuuid", "dbm", "ecio",
             "latitude", "longitude", "mph", "net_device_name",
             "rfband", "rfband_5g", "rsrp", "rsrp_5g", "rsrq",
