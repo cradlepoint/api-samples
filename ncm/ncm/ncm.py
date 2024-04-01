@@ -572,6 +572,24 @@ class NcmClientv2(BaseNcmClient):
         result = self._return_handler(ncm.status_code, ncm.text, call_type)
         return result
 
+    def put_group_configuration(self, group_id, config_json):
+        """
+        This method puts a group configuration for associated group id.
+        :param group_id: ID of group to update
+        :param config_json: JSON of the "configuration" field of the
+          group config
+        :return:
+        """
+        call_type = 'Configuration Manager'
+
+        payload = config_json
+
+        ncm = self.session.put(
+            '{0}/groups/{1}/'.format(self.base_url, str(group_id)),
+            data=json.dumps(payload))  # put group config with new values
+        result = self.__return_handler(ncm.status_code, ncm.text, call_type)
+        return result
+
     def copy_router_configuration(self, src_router_id, dst_router_id):
         """
         Copies the Configuration Manager config of one router to another.
