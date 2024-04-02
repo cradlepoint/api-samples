@@ -1475,11 +1475,11 @@ class NcmClientv2(BaseNcmClient):
                           'device_type__in', 'fields', 'group', 'group__in',
                           'id', 'id__in', 'ipv4_address', 'ipv4_address__in',
                           'mac', 'mac__in', 'name', 'name__in',
-                          'reboot_required', 'reboot_required__in', 'state',
-                          'state__in', 'state_updated_at__lt',
-                          'state_updated_at__gt', 'updated_at__lt',
-                          'updated_at__gt', 'expand', 'order_by', 'limit',
-                          'offset']
+                          'reboot_required', 'reboot_required__in', 
+                          'serial_number','state', 'state__in', 
+                          'state_updated_at__lt', 'state_updated_at__gt', 
+                          'updated_at__lt', 'updated_at__gt', 'expand', 
+                          'order_by', 'limit', 'offset']
         params = self.__parse_kwargs(kwargs, allowed_params)
 
         return self.__get_json(get_url, call_type, params=params)
