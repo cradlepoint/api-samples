@@ -3831,12 +3831,7 @@ class NcmClientv3(BaseNcmClient):
         return self.__get_json(get_url, call_type, params=params)
 '''
 
-class NcmClient:
-    """
-    This NCM Client class provides functions for interacting with =
-    the Cradlepoint NCM API. Full documentation of the Cradlepoint API can be
-    found at: https://developer.cradlepoint.com
-    """
+class NcmClientv2v3:
 
     def __init__(self, 
               api_keys=None,
@@ -3888,3 +3883,23 @@ class NcmClient:
             if self.v2 and hasattr(self.v2, name):
                 return getattr(self.v2, name)
             raise
+
+
+class NcmClient:
+    """
+    This NCM Client class provides functions for interacting with =
+    the Cradlepoint NCM API. Full documentation of the Cradlepoint API can be
+    found at: https://developer.cradlepoint.com
+    """
+
+    def __new__(cls, api_keys=None, api_key=None, **kwargs):
+        api_keys = api_keys or {}
+        apiv3_key = api_keys.pop('token', None) or api_key
+        v2 = bool(api_keys)
+        v3 = bool(apiv3_key)
+        if v2 and v3:
+            return NcmClientv2v3(api_keys=api_keys, api_key=apiv3_key, **kwargs)
+        if v2 or not (v2 or v3):
+            return NcmClientv2(api_keys=api_keys, **kwargs)
+        else:
+            return NcmClientv3(api_key=apiv3_key, **kwargs)
