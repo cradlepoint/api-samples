@@ -2184,6 +2184,8 @@ class NcmClientv3(BaseNcmClient):
         """
         Checks for invalid parameters and missing API Keys, and handles "filter" fields
         """
+        if 'search' in kwargs:
+            return self.__parse_search_kwargs(kwargs, allowed_params)
 
         bad_params = {k: v for (k, v) in kwargs.items() if
                       k not in allowed_params if ("search" not in k and "filter" not in k and "sort" not in k)}
@@ -2294,13 +2296,7 @@ class NcmClientv3(BaseNcmClient):
                           'limit',
                           'sort']
 
-        if "search" not in kwargs.keys():
-            params = self.__parse_kwargs(kwargs, allowed_params)
-        else:
-            if kwargs['search']:
-                params = self.__parse_search_kwargs(kwargs, allowed_params)
-            else:
-                params = self.__parse_kwargs(kwargs, allowed_params)
+        params = self.__parse_kwargs(kwargs, allowed_params)
         return self.__get_json(get_url, call_type, params=params)
 
     def create_user(self, email, first_name, last_name, **kwargs):
@@ -2417,16 +2413,9 @@ class NcmClientv3(BaseNcmClient):
                           'fields',
                           'limit',
                           'sort']
-        if "search" not in kwargs.keys():
-            params = self.__parse_kwargs(kwargs, allowed_params)
-        else:
-            if kwargs['search']:
-                params = self.__parse_search_kwargs(kwargs, allowed_params)
-            else:
-                params = self.__parse_kwargs(kwargs, allowed_params)
-
-        results = self.__get_json(get_url, call_type, params=params)
-        return results
+        
+        params = self.__parse_kwargs(kwargs, allowed_params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_subscriptions(self, **kwargs):
         """
@@ -2459,13 +2448,68 @@ class NcmClientv3(BaseNcmClient):
                           'limit',
                           'sort']
 
-        if kwargs.get('search'):
-            params = self.__parse_search_kwargs(kwargs, allowed_params)
-        else:
-            params = self.__parse_kwargs(kwargs, allowed_params)
+        params = self.__parse_kwargs(kwargs, allowed_params)
+        return self.__get_json(get_url, call_type, params=params)
+    
+    def regrade(self, subscription_id, mac_or_serial_number=None):
+        """ 
+        Applies a subscription to an asset.
+        :param subscription_id: ID of the subscription to apply. (see https://developer.cradlepoint.com/ for list of subscriptions)
+        :param asset_id: ID of the asset to apply the subscription to. If not provided, the MAC address must be provided. Can also be a list
+        :param mac: MAC address of the asset to apply the subscription to. If not provided, the asset_id must be provided. Can also be a list.
+        """
 
-        results = self.__get_json(get_url, call_type, params=params)
-        return results
+        call_type = 'Subscription'
+        post_url = f'{self.base_url}/asset_endpoints/regrade'
+
+        payload = {
+            "atomic:operations": []
+        }
+        mac_or_serial_number = mac_or_serial_number if isinstance(mac_or_serial_number, list) else [mac_or_serial_number]
+        for smac in mac_or_serial_number:
+            data = {
+                "op": "add",
+                "data": {
+                    "type": "regrades",
+                    "attributes": {
+                        "action": "UPGRADE",
+                        "subscription_type": subscription_id
+                    }
+                }
+            }
+            if len(smac) == 17:
+                data['data']['attributes']['mac_address'] = smac.replace(':','')
+            elif len(smac) == 12:
+                data['data']['attributes']['mac_address'] = smac
+            else:
+                data['data']['attributes']['serial_number'] = smac
+            payload.append(data)
+
+        ncm = self.session.post(post_url, json=payload)
+        result = self._return_handler(ncm.status_code, ncm.json(), call_type)
+        return result
+
+    def get_regrades(self, **kwargs):
+        """
+        Returns regrade jobs with details.
+        :param kwargs: A set of zero or more allowed parameters
+          in the allowed_params list.
+        :return: A list of regrades with details.
+        """
+        call_type = 'Subscription'
+        get_url = f'{self.base_url}/asset_endpoints/regrade'
+
+        allowed_params = ["id", 
+                    "action_id", 
+                    "mac_address", 
+                    "created_at", 
+                    "action", 
+                    "subcription_type", 
+                    "status", 
+                    "error_code"]
+
+        params = self.__parse_kwargs(kwargs, allowed_params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_private_cellular_networks(self, **kwargs):
         """
@@ -2502,16 +2546,9 @@ class NcmClientv3(BaseNcmClient):
                           'fields',
                           'limit',
                           'sort']
-        if "search" not in kwargs.keys():
-            params = self.__parse_kwargs(kwargs, allowed_params)
-        else:
-            if kwargs['search']:
-                params = self.__parse_search_kwargs(kwargs, allowed_params)
-            else:
-                params = self.__parse_kwargs(kwargs, allowed_params)
-
-        results = self.__get_json(get_url, call_type, params=params)
-        return results
+        
+        params = self.__parse_kwargs(kwargs, allowed_params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_private_cellular_network(self, network_id, **kwargs):
         """
@@ -2534,16 +2571,9 @@ class NcmClientv3(BaseNcmClient):
                           'created_at',
                           'updated_at',
                           'fields']
-        if "search" not in kwargs.keys():
-            params = self.__parse_kwargs(kwargs, allowed_params)
-        else:
-            if kwargs['search']:
-                params = self.__parse_search_kwargs(kwargs, allowed_params)
-            else:
-                params = self.__parse_kwargs(kwargs, allowed_params)
 
-        results = self.__get_json(get_url, call_type, params=params)
-        return results
+        params = self.__parse_kwargs(kwargs, allowed_params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def update_private_cellular_network(self, id=None, name=None, **kwargs):
         """
@@ -2680,16 +2710,9 @@ class NcmClientv3(BaseNcmClient):
                           'fields',
                           'limit',
                           'sort']
-        if "search" not in kwargs.keys():
-            params = self.__parse_kwargs(kwargs, allowed_params)
-        else:
-            if kwargs['search']:
-                params = self.__parse_search_kwargs(kwargs, allowed_params)
-            else:
-                params = self.__parse_kwargs(kwargs, allowed_params)
 
-        results = self.__get_json(get_url, call_type, params=params)
-        return results
+        params = self.__parse_kwargs(kwargs, allowed_params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_private_cellular_core(self, core_id, **kwargs):
         """
@@ -2713,16 +2736,9 @@ class NcmClientv3(BaseNcmClient):
                           'url',
                           'fields',
                           'sort']
-        if "search" not in kwargs.keys():
-            params = self.__parse_kwargs(kwargs, allowed_params)
-        else:
-            if kwargs['search']:
-                params = self.__parse_search_kwargs(kwargs, allowed_params)
-            else:
-                params = self.__parse_kwargs(kwargs, allowed_params)
 
-        results = self.__get_json(get_url, call_type, params=params)
-        return results
+        params = self.__parse_kwargs(kwargs, allowed_params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_private_cellular_radios(self, **kwargs):
         """
@@ -2765,16 +2781,9 @@ class NcmClientv3(BaseNcmClient):
                           'fields',
                           'limit',
                           'sort']
-        if "search" not in kwargs.keys():
-            params = self.__parse_kwargs(kwargs, allowed_params)
-        else:
-            if kwargs['search']:
-                params = self.__parse_search_kwargs(kwargs, allowed_params)
-            else:
-                params = self.__parse_kwargs(kwargs, allowed_params)
 
-        results = self.__get_json(get_url, call_type, params=params)
-        return results
+        params = self.__parse_kwargs(kwargs, allowed_params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_private_cellular_radio(self, id, **kwargs):
         """
@@ -2818,16 +2827,9 @@ class NcmClientv3(BaseNcmClient):
                           'fields',
                           'limit',
                           'sort']
-        if "search" not in kwargs.keys():
-            params = self.__parse_kwargs(kwargs, allowed_params)
-        else:
-            if kwargs['search']:
-                params = self.__parse_search_kwargs(kwargs, allowed_params)
-            else:
-                params = self.__parse_kwargs(kwargs, allowed_params)
 
-        results = self.__get_json(get_url, call_type, params=params)
-        return results
+        params = self.__parse_kwargs(kwargs, allowed_params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def update_private_cellular_radio(self, id=None, name=None, **kwargs):
         """
@@ -2944,16 +2946,9 @@ class NcmClientv3(BaseNcmClient):
                           'fields',
                           'limit',
                           'sort']
-        if "search" not in kwargs.keys():
-            params = self.__parse_kwargs(kwargs, allowed_params)
-        else:
-            if kwargs['search']:
-                params = self.__parse_search_kwargs(kwargs, allowed_params)
-            else:
-                params = self.__parse_kwargs(kwargs, allowed_params)
 
-        results = self.__get_json(get_url, call_type, params=params)
-        return results
+        params = self.__parse_kwargs(kwargs, allowed_params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_private_cellular_radio_group(self, group_id, **kwargs):
         """
@@ -3132,16 +3127,9 @@ class NcmClientv3(BaseNcmClient):
                           'fields',
                           'limit',
                           'sort']
-        if "search" not in kwargs.keys():
-            params = self.__parse_kwargs(kwargs, allowed_params)
-        else:
-            if kwargs['search']:
-                params = self.__parse_search_kwargs(kwargs, allowed_params)
-            else:
-                params = self.__parse_kwargs(kwargs, allowed_params)
 
-        results = self.__get_json(get_url, call_type, params=params)
-        return results
+        params = self.__parse_kwargs(kwargs, allowed_params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_private_cellular_sim(self, id, **kwargs):
         """
@@ -3167,16 +3155,9 @@ class NcmClientv3(BaseNcmClient):
                           'fields',
                           'limit',
                           'sort']
-        if "search" not in kwargs.keys():
-            params = self.__parse_kwargs(kwargs, allowed_params)
-        else:
-            if kwargs['search']:
-                params = self.__parse_search_kwargs(kwargs, allowed_params)
-            else:
-                params = self.__parse_kwargs(kwargs, allowed_params)
 
-        results = self.__get_json(get_url, call_type, params=params)
-        return results
+        params = self.__parse_kwargs(kwargs, allowed_params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def update_private_cellular_sim(self, id=None, iccid=None, imsi=None, **kwargs):
         """
@@ -3259,16 +3240,9 @@ class NcmClientv3(BaseNcmClient):
                           'fields',
                           'limit',
                           'sort']
-        if "search" not in kwargs.keys():
-            params = self.__parse_kwargs(kwargs, allowed_params)
-        else:
-            if kwargs['search']:
-                params = self.__parse_search_kwargs(kwargs, allowed_params)
-            else:
-                params = self.__parse_kwargs(kwargs, allowed_params)
 
-        results = self.__get_json(get_url, call_type, params=params)
-        return results
+        params = self.__parse_kwargs(kwargs, allowed_params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_private_cellular_radio_status(self, status_id, **kwargs):
         """
@@ -3300,16 +3274,9 @@ class NcmClientv3(BaseNcmClient):
                           'fields',
                           'limit',
                           'sort']
-        if "search" not in kwargs.keys():
-            params = self.__parse_kwargs(kwargs, allowed_params)
-        else:
-            if kwargs['search']:
-                params = self.__parse_search_kwargs(kwargs, allowed_params)
-            else:
-                params = self.__parse_kwargs(kwargs, allowed_params)
 
-        results = self.__get_json(get_url, call_type, params=params)
-        return results
+        params = self.__parse_kwargs(kwargs, allowed_params)
+        return self.__get_json(get_url, call_type, params=params)
 
 
     def get_public_sim_mgmt_assets(self, **kwargs):
@@ -3332,16 +3299,9 @@ class NcmClientv3(BaseNcmClient):
                           'fields',
                           'limit',
                           'sort']
-        if "search" not in kwargs.keys():
-            params = self.__parse_kwargs(kwargs, allowed_params)
-        else:
-            if kwargs['search']:
-                params = self.__parse_search_kwargs(kwargs, allowed_params)
-            else:
-                params = self.__parse_kwargs(kwargs, allowed_params)
 
-        results = self.__get_json(get_url, call_type, params=params)
-        return results
+        params = self.__parse_kwargs(kwargs, allowed_params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def get_public_sim_mgmt_rate_plans(self, **kwargs):
         """
@@ -3359,16 +3319,9 @@ class NcmClientv3(BaseNcmClient):
                           'fields',
                           'limit',
                           'sort']
-        if "search" not in kwargs.keys():
-            params = self.__parse_kwargs(kwargs, allowed_params)
-        else:
-            if kwargs['search']:
-                params = self.__parse_search_kwargs(kwargs, allowed_params)
-            else:
-                params = self.__parse_kwargs(kwargs, allowed_params)
 
-        results = self.__get_json(get_url, call_type, params=params)
-        return results
+        params = self.__parse_kwargs(kwargs, allowed_params)
+        return self.__get_json(get_url, call_type, params=params)
 
 
     def get_exchange_sites(self, **kwargs):
@@ -3392,17 +3345,8 @@ class NcmClientv3(BaseNcmClient):
                         'limit',
                         'sort']
 
-        params = None
-        if "search" not in kwargs.keys():
-            params = self.__parse_kwargs(kwargs, allowed_params)
-        else:
-            if kwargs['search']:
-                params = self.__parse_search_kwargs(kwargs, allowed_params)
-            else:
-                params = self.__parse_kwargs(kwargs, allowed_params)
-
-        response = self.__get_json(get_url, call_type, params=params)
-        return response
+        params = self.__parse_kwargs(kwargs, allowed_params)
+        return self.__get_json(get_url, call_type, params=params)
 
     def create_exchange_site(self, name, exchange_network_id, router_id, local_domain=None, primary_dns=None, secondary_dns=None, lan_as_dns=False):
         """
@@ -3544,13 +3488,7 @@ class NcmClientv3(BaseNcmClient):
                           'sort']
 
         if kwargs:
-            if "search" not in kwargs.keys():
-                params = self.__parse_kwargs(kwargs, allowed_params)
-            else:
-                if kwargs['search']:
-                    params = self.__parse_search_kwargs(kwargs, allowed_params)
-                else:
-                    params = self.__parse_kwargs(kwargs, allowed_params)
+            params = self.__parse_kwargs(kwargs, allowed_params)
 
         if exchange_site:
             params['filter[exchange_site]'] = exchange_site
