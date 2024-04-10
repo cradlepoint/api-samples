@@ -43,7 +43,8 @@ Tips:
 
     It also has native support for handling any number of "__in" filters
     beyond Cradlepoint's limit of 100. The script automatically chunks
-    the list into groups of 100 and combines the results into a single array.
+    the list into groups of 100 and combines the results into a single array
+
 """
 
 from requests import Session

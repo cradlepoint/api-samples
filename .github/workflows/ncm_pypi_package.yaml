@@ -1,0 +1,37 @@
+name: bump version
+
+on:
+  push:
+    paths:
+      - "ncm/**"
+
+jobs:
+  bump_version:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install wheel twine build bump2version
+          git config --global user.email "github_action@example.com"
+          git config --global user.name "Github Action"
+      - name: Bump version
+        run: |
+          cd ncm && bump2version patch
+      - name: Push changes
+        run: |
+          git push
+      - name: Build package
+        run: cd ncm && python -m build --sdist --wheel
+      - name: Upload to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          cd ncm && twine upload dist/*
