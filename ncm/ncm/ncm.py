@@ -43,7 +43,8 @@ Tips:
 
     It also has native support for handling any number of "__in" filters
     beyond Cradlepoint's limit of 100. The script automatically chunks
-    the list into groups of 100 and combines the results into a single array.
+    the list into groups of 100 and combines the results into a single array
+
 """
 
 from requests import Session
@@ -2451,16 +2452,16 @@ class NcmClientv3(BaseNcmClient):
         params = self.__parse_kwargs(kwargs, allowed_params)
         return self.__get_json(get_url, call_type, params=params)
     
-    def regrade(self, subscription_id, mac_or_serial_number=None):
+    def regrade(self, subscription_id, mac_or_serial_number, action="UPGRADE"):
         """ 
         Applies a subscription to an asset.
-        :param subscription_id: ID of the subscription to apply. (see https://developer.cradlepoint.com/ for list of subscriptions)
-        :param asset_id: ID of the asset to apply the subscription to. If not provided, the MAC address must be provided. Can also be a list
-        :param mac: MAC address of the asset to apply the subscription to. If not provided, the asset_id must be provided. Can also be a list.
+        :param subscription_id: ID of the subscription to apply. See https://developer.cradlepoint.com/ for list of subscriptions.
+        :param mac_or_serial_number: MAC address or serial number of the asset to apply the subscription to. Can also be a list.
+        :param action: Action to take. Default is "UPGRADE". Can also be "DOWNGRADE".
         """
 
         call_type = 'Subscription'
-        post_url = f'{self.base_url}/asset_endpoints/regrade'
+        post_url = f'{self.base_url}/asset_endpoints/regrades'
 
         payload = {
             "atomic:operations": []
@@ -2472,7 +2473,7 @@ class NcmClientv3(BaseNcmClient):
                 "data": {
                     "type": "regrades",
                     "attributes": {
-                        "action": "UPGRADE",
+                        "action": action,
                         "subscription_type": subscription_id
                     }
                 }
@@ -2483,7 +2484,7 @@ class NcmClientv3(BaseNcmClient):
                 data['data']['attributes']['mac_address'] = smac
             else:
                 data['data']['attributes']['serial_number'] = smac
-            payload.append(data)
+            payload["atomic:operations"].append(data)
 
         ncm = self.session.post(post_url, json=payload)
         result = self._return_handler(ncm.status_code, ncm.json(), call_type)
@@ -2497,7 +2498,7 @@ class NcmClientv3(BaseNcmClient):
         :return: A list of regrades with details.
         """
         call_type = 'Subscription'
-        get_url = f'{self.base_url}/asset_endpoints/regrade'
+        get_url = f'{self.base_url}/asset_endpoints/regrades'
 
         allowed_params = ["id", 
                     "action_id", 
