@@ -2,6 +2,8 @@ name: bump version
 
 on:
   push:
+    branches:
+      - master
     paths:
       - "ncm/**"
 
