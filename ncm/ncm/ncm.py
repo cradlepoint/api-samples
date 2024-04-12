@@ -156,6 +156,7 @@ class NcmClientv2(BaseNcmClient):
                  retry_backoff_factor=2,
                  retry_on=None,
                  base_url=None):
+        self.v2 = self # for backwards compatibility
         base_url = base_url or os.environ.get("CP_BASE_URL", "https://www.cradlepointecm.com/api/v2")
         super().__init__(log_events=log_events, logger=logger, retries=retries, retry_backoff_factor=retry_backoff_factor, retry_on=retry_on, base_url=base_url)
         if api_keys:
@@ -2122,6 +2123,7 @@ class NcmClientv3(BaseNcmClient):
         :param base_url: # base url for calls. Configurable for testing.
           Optional.
         """
+        self.v3 = self # For backwards compatibility
         base_url = base_url or os.environ.get("CP_BASE_URL_V3", "https://api.cradlepointecm.com/api/v3")
         super().__init__(log_events, logger, retries, retry_backoff_factor, retry_on, base_url)
         if api_key:
