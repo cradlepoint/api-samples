@@ -2093,6 +2093,30 @@ class NcmClientv2(BaseNcmClient):
         result = self._return_handler(ncm.status_code, ncm.text, call_type)
         return result
 
+    def set_router_fields(self, router_id: int, name: str = None, description: str = None, asset_id: str = None, custom1: str = None, custom2: str = None):
+        """
+        This method sets multiple fields for a router.
+        :param router_id: ID of router to update
+        :param name: Name/System ID to set
+        :param description: Description string to set
+        :param asset_id: Asset ID string to set
+        :param custom1: Custom1 field to set
+        :param custom2: Custom2 field to set
+        :return:
+        """
+        call_type = 'Router Fields'
+
+        put_url = '{0}/routers/{1}/'.format(self.base_url, str(router_id))
+
+        put_data = {}
+        for k,v in (('name', name), ('description', description), ('asset_id', asset_id), ('custom1', custom1), ('custom2', custom2)):
+            if v is not None:
+                put_data[k] = v
+
+        ncm = self.session.put(put_url, data=json.dumps(put_data))
+        result = self._return_handler(ncm.status_code, ncm.json(), call_type)
+        return result
+
 class NcmClientv3(BaseNcmClient):
     """
     This NCM Client class provides functions for interacting with =
