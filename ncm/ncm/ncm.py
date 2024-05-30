@@ -2478,11 +2478,11 @@ class NcmClientv3(BaseNcmClient):
         params = self.__parse_kwargs(kwargs, allowed_params)
         return self.__get_json(get_url, call_type, params=params)
     
-    def regrade(self, subscription_id, mac_or_serial_number, action="UPGRADE"):
+    def regrade(self, subscription_id, mac, action="UPGRADE"):
         """ 
         Applies a subscription to an asset.
         :param subscription_id: ID of the subscription to apply. See https://developer.cradlepoint.com/ for list of subscriptions.
-        :param mac_or_serial_number: MAC address or serial number of the asset to apply the subscription to. Can also be a list.
+        :param mac: MAC address of the asset to apply the subscription to. Can also be a list.
         :param action: Action to take. Default is "UPGRADE". Can also be "DOWNGRADE".
         """
 
@@ -2492,24 +2492,19 @@ class NcmClientv3(BaseNcmClient):
         payload = {
             "atomic:operations": []
         }
-        mac_or_serial_number = mac_or_serial_number if isinstance(mac_or_serial_number, list) else [mac_or_serial_number]
-        for smac in mac_or_serial_number:
+        mac = mac if isinstance(mac, list) else [mac]
+        for smac in mac:
             data = {
                 "op": "add",
                 "data": {
                     "type": "regrades",
                     "attributes": {
                         "action": action,
-                        "subscription_type": subscription_id
+                        "subscription_type": subscription_id,
+                        "mac_address": smac.replace(':','') if len(smac) == 17 else smac
                     }
                 }
             }
-            if len(smac) == 17:
-                data['data']['attributes']['mac_address'] = smac.replace(':','')
-            elif len(smac) == 12:
-                data['data']['attributes']['mac_address'] = smac
-            else:
-                data['data']['attributes']['serial_number'] = smac
             payload["atomic:operations"].append(data)
 
         ncm = self.session.post(post_url, json=payload)
@@ -3858,7 +3853,7 @@ class NcmClient:
     """
 
     def __new__(cls, api_keys=None, api_key=None, **kwargs):
-        api_keys = api_keys or {}
+        api_keys = {**api_keys} or {}
         apiv3_key = api_keys.pop('token', None) or api_key
         v2 = bool(api_keys)
         v3 = bool(apiv3_key)
