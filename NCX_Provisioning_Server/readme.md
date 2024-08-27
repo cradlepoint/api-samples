@@ -1,15 +1,11 @@
 
-Application Name
+NCX_Provisioning_Server
 ================
-NCX_Provisioning_Server.py
+v0.1.0
 
+![image](https://github.com/user-attachments/assets/b001c679-2be5-4310-a638-f49e21cfd0cf)
 
-Application Version
-===================
-0.1.0
-
-
-Usage
+Setup
 =====================
 Computer with Python 3.8 or newer and PIP  
 Download and unzip the app.  
@@ -32,7 +28,7 @@ Edit the column header names if necessary.
 Then run the application:  
 **python NCX_Provisioning_Server.py**
 
-Application Purpose
+Usage
 ===================
 This app runs a webserver on port 8000.  
 Browse to http://localhost:8000  
