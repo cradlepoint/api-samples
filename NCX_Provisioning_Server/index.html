@@ -1,0 +1,156 @@
+<head>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"></script>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootswatch/4.5.2/darkly/bootstrap.min.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Cradlepoint Setup</h1>
+        <button id="add" class="btn btn-primary mb-2" data-toggle="modal" data-target="#entry-form">Add</button>
+        <table id="data-table" class="table">
+            <tr>
+                <th>Serial Number or MAC</th>
+                <th>Name</th>
+                <th> </th>
+            </tr>
+        </table>
+        <button id="submit" class="btn btn-success">Submit</button>
+        <button id="status" class="btn btn-secondary">Check Status</button>
+    </div>
+
+    <div id="entry-form" class="modal fade" tabindex="-1" role="document">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Entry</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <label for="serial_number_or_mac">Serial Number or MAC:</label>
+                    <input type="text" id="serial_number_or_mac" name="serial_number_or_mac" maxlength="20" class="form-control">
+                    <label for="name">Name:</label>
+                    <input type="text" id="name" name="name" required class="form-control">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" id="form-submit" class="btn btn-primary">Add Entry</button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="result-modal" class="modal fade" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Result</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body" id="result-body">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+<script>
+    var entries = [];
+    // Disable the submit button initially
+    $('#submit').prop('disabled', true);
+
+    $('#form-submit').click(function() {
+        var entry = {
+            serial_number_or_mac: $('#serial_number_or_mac').val(),
+            name: $('#name').val()
+        };
+        entries.push(entry);
+        var row = '<tr><td>' + entry.serial_number_or_mac + '</td><td>' + entry.name + '</td><td><button class="btn btn-danger delete">Delete</button></td></tr>';
+        $('#data-table').append(row);
+        $('#entry-form').modal('hide');
+
+        // Enable the submit button if there is at least one entry
+        if (entries.length > 0) {
+            $('#submit').prop('disabled', false);
+        }
+    });
+
+    $('#data-table').on('click', '.delete', function() {
+        var index = $(this).closest('tr').index();
+        entries.splice(index - 1, 1);
+        $(this).closest('tr').remove();
+
+        // Disable the submit button if there are no entries
+        if (entries.length === 0) {
+            $('#submit').prop('disabled', true);
+        }
+    });
+
+    $('#submit').click(function() {
+        var formData = new FormData();
+        for (var i = 0; i < entries.length; i++) {
+            for (var key in entries[i]) {
+                formData.append(key + '[' + i + ']', entries[i][key]);
+            }
+        }
+
+        $.ajax({
+            url: '/submit',
+            method: 'POST',
+            data: formData,
+            contentType: false,
+            processData: false,
+            success: function(response) {
+                // Show the modal immediately
+                $('#result-modal').modal('show');
+                $('#result-body').html('<span style="color:green;">Success:</span><br>' + response);
+
+                // Start polling the /status endpoint
+                var statusInterval = setInterval(function() {
+                    $.ajax({
+                        url: '/status',
+                        method: 'GET',
+                        success: function(response) {
+                            // Parse the response as a JSON object
+                            var jsonObject = JSON.parse(response);
+
+                            // Create the HTML
+                            var html = '';
+                            for (var key in jsonObject) {
+                                html += '<h5>' + key + '</h5>';
+                                for (var i = 0; i < jsonObject[key].length; i++) {
+                                    html += '<p style="margin-left: 20px;">' + jsonObject[key][i] + '</p>';
+                                }
+                            }
+
+                            // Display the HTML in the result-body element
+                            $('#result-body').html(html);
+
+                            // Check if the last entry is "Done"
+                            if (jsonObject["system"] && jsonObject["system"][jsonObject["system"].length - 1] === 'Done') {
+                                clearInterval(statusInterval);
+                            }
+                        },
+                        error: function(jqXHR, textStatus, errorThrown) {
+                            $('#result-body').append('<span style="color:red;">Error:</span><br>' + jqXHR.responseText);
+                            clearInterval(statusInterval);
+                        }
+                    });
+                }, 2000); // Poll every 2 seconds
+            },
+            error: function(jqXHR, textStatus, errorThrown) {
+                $('#result-body').html('<span style="color:red;">Error:</span><br>' + jqXHR.responseText);
+                $('#result-modal').modal('show');
+            }
+        });
+    });
+
+    $('#status').click(function() {
+        $('#result-modal').modal('show');
+    });
+</script>
