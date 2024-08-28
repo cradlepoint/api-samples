@@ -1,43 +1,60 @@
-
-NCX_Provisioning_Server
-================
-v0.1.0
+# NCX Provisioning Server
+**Version:** v0.1.0
 
 ![image](https://github.com/user-attachments/assets/b001c679-2be5-4310-a638-f49e21cfd0cf)
 
-Setup
-=====================
-Computer with Python 3.8 or newer and PIP  
-Download and unzip the app.  
-From a command prompt in the app folder, type:  
-**pip install -r requirements.txt**  
+## Setup
 
-Create routers.csv with columns for serial_number, mac, and lan_subnet.  
-An example has been provided.  
+### Requirements:
+- A computer with Python 3.8 or newer
+- PIP (Python package manager)
 
-Edit NCX_Provisioning_Server.py and enter your info at the top:
-> NCM API Keys  
-> Subscriptions to be added  
-> Production Group ID  
-> NCX Network ID  
-> CSV Filename (routers.csv)  
-> LAN UIDs (PrimaryLAN is provided)  
+### Steps:
+1. **Download and Unzip the Application:**
+   - Obtain the app and extract the files to your preferred directory.
 
-Edit the column header names if necessary.
+2. **Install Dependencies:**
+   - Open a command prompt in the app’s directory.
+   - Run the following command to install the required Python packages:
+     ```sh
+     pip install -r requirements.txt
+     ```
 
-Then run the application:  
-**python NCX_Provisioning_Server.py**
+3. **Create the `routers.csv` File:**
+   - This file should include columns for `serial_number`, `mac`, and `lan_subnet`.
+   - An example file is provided in the app package for reference.
 
-Usage
-===================
-This app runs a webserver on port 8000.  
-Browse to http://localhost:8000  
-Click Add, then enter router MAC or Serial Number and Name.  
-When ready to provision routers, click submit.    
+4. **Configure the Application:**
+   - Open `NCX_Provisioning_Server.py` in a text editor.
+   - Modify the following variables at the top of the file with your specific details:
+     - **NCM API Keys**
+     - **Subscriptions to be added**
+     - **Production Group ID**
+     - **NCX Network ID**
+     - **CSV Filename** (e.g., `routers.csv`)
+     - **LAN UIDs** (PrimaryLAN is provided by default)
 
-The app will apply the specified licenses,   
-move the router to the specified group,  
-configure the router name and LAN subnet,  
-create an NCX Site for the router,  
-and create an NCX Resource for the LAN subnet.  
+   - If needed, update the column header names in `routers.csv` to match your data.
 
+5. **Run the Application:**
+   - Execute the application by running:
+     ```sh
+     python NCX_Provisioning_Server.py
+     ```
+
+## Usage
+
+1. The application runs a web server on port **8000**.
+2. To access the interface, open a web browser and go to: [http://localhost:8000](http://localhost:8000).
+3. **Adding Routers:**
+   - Click the **Add** button.
+   - Enter the router's MAC address or Serial Number along with its Name.
+4. **Provisioning Routers:**
+   - When you are ready, click **Submit** to start provisioning.
+
+### The application will:
+- Apply the specified licenses.
+- Move the router to the specified group.
+- Configure the router’s name and LAN subnet.
+- Create an NCX Site for the router.
+- Create an NCX Resource for the LAN subnet.
