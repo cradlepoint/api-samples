@@ -44,8 +44,8 @@
 
 ## Usage
 
-1. The application runs a web server on port **8000**.
-2. To access the interface, open a web browser and go to: [http://localhost:8000](http://localhost:8000).
+1. The application runs a web server on port **8888**.
+2. To access the interface, open a web browser and go to: [http://localhost:8888](http://localhost:8888).
 3. **Adding Routers:**
    - Click the **Add** button.
    - Enter the router's MAC address or Serial Number along with its Name.
