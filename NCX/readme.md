@@ -1,5 +1,5 @@
 # NCX Scripts
-### Python scripts for automating provisioning of NetCloud Exchange
+Python scripts for automating provisioning of NetCloud Exchange.
 
 ### Order of Operations:
 - Apply NCX_subscriptions
@@ -8,10 +8,10 @@
 
 ## Scripts
 
-1. **NCX_resources_**
+1. **NCX_resources**
    - Creates NCX IP Subnet Resources on site for all LANs for all routers in specified NCM group.
 
-2. **NCX_sites_**
+2. **NCX_sites**
    - Creates NCX Sites for all routers in specified NCM group.
    
 3. **NCX_subscriptions**
