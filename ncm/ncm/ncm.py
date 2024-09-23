@@ -1,6 +1,7 @@
 """
 Cradlepoint NCM API class
 Created by: Nathan Wiens
+Updated by: Jon Gaudu
 
 Overview:
     The purpose of this class is to make it easier for users to interact with
@@ -3345,64 +3346,161 @@ class NcmClientv3(BaseNcmClient):
         params = self.__parse_kwargs(kwargs, allowed_params)
         return self.__get_json(get_url, call_type, params=params)
 
-
-    def get_exchange_sites(self, **kwargs):
+    def get_exchange_sites(self, site_id: str = None, exchange_network_id: str = None, name: str = None, **kwargs) -> list:
         """
-        Returns exchange sites.
-        :param kwargs: A set of zero or more allowed parameters
-        in the allowed_params list.
-        :return: A list of exchange sites or a single site if site_id is provided.
+        Returns information about exchange sites.
+        
+        :param site_id: ID of a specific exchange site to retrieve. Optional.
+        :type site_id: str
+        :param exchange_network_id: ID of the exchange network to filter sites by. Optional.
+        :type exchange_network_id: str
+        :param name: Name of the site to filter by. Optional.
+        :type name: str
+        :param kwargs: Optional parameters such as limit, sort, fields.
+            - limit: Maximum number of sites to return.
+            - sort: Field to sort the results by. Can be prefixed with '-' for descending order.
+            Valid sort fields: name, updated_at
+            - fields: List of fields to include in the response.
+            Valid fields: name, created_at, updated_at, editable, lan_as_dns, 
+                            local_domain, primary_dns, secondary_dns, tags
+        :return: A list of exchange sites, a single site if site_id is provided, or an error message if no sites are found.
+        :raises TypeError: If the type of any parameter is incorrect.
+        :raises ValueError: If an invalid parameter or value is provided.
         """
         call_type = 'Exchange Sites'
         get_url = f'{self.base_url}/beta/exchange_sites'
 
-        if 'site_id' in kwargs:
-            get_url += f'/{kwargs["site_id"]}'
+        allowed_params = {
+            'limit': int,
+            'sort': str,
+            'fields': list
+        }
+
+        valid_sort_fields = ['name', 'updated_at']
+        valid_fields = ['name', 'created_at', 'updated_at', 'editable', 'lan_as_dns', 
+                        'local_domain', 'primary_dns', 'secondary_dns', 'tags']
+
+        params = {}
+
+        if exchange_network_id:
+            if not isinstance(exchange_network_id, str):
+                raise TypeError("exchange_network_id must be a string")
+            params['filter[exchange_network]'] = exchange_network_id
+
+        if name:
+            if not isinstance(name, str):
+                raise TypeError("name must be a string")
+            params['filter[name]'] = name
+
+        # Type checking and validation for parameters
+        for key, value in kwargs.items():
+            if key in allowed_params:
+                if not isinstance(value, allowed_params[key]):
+                    raise TypeError(f"{key} must be of type {allowed_params[key].__name__}")
+                
+                if key == 'sort':
+                    sort_field = value.lstrip('-')
+                    if sort_field not in valid_sort_fields:
+                        raise ValueError(f"Invalid sort field: {sort_field}")
+                
+                elif key == 'fields':
+                    for field in value:
+                        if field not in valid_fields:
+                            raise ValueError(f"Invalid field: {field}")
+                    params[key] = ','.join(value)
+                else:
+                    params[key] = value
+            
+            elif key not in ['search', 'filter']:
+                raise ValueError(f"Invalid parameter: {key}")
+
+        if site_id:
+            if not isinstance(site_id, str):
+                raise TypeError("site_id must be a string")
+            get_url += f'/{site_id}'
             response = self.__get_json(get_url, call_type)
+            
+            if response.startswith('ERROR'):
+                return [f"No site found with site_id: {site_id}"]
             return response
 
-        allowed_params = ['exchange_network',
-                        'name',
-                        'fields',
-                        'limit',
-                        'sort']
+        params.update(self.__parse_kwargs(kwargs, allowed_params.keys()))
+        
+        response = self.__get_json(get_url, call_type, params=params)
 
-        params = self.__parse_kwargs(kwargs, allowed_params)
-        return self.__get_json(get_url, call_type, params=params)
-
-    def create_exchange_site(self, name, exchange_network_id, router_id, local_domain=None, primary_dns=None, secondary_dns=None, lan_as_dns=False):
+        if not response:
+            if name:
+                return [f"No site found with name: {name}"]
+            if exchange_network_id:
+                return [f"No sites found for exchange_network_id: {exchange_network_id}"]
+            
+        return response
+    
+    def create_exchange_site(self, name: str, exchange_network_id: str, router_id: str, **kwargs) -> dict:
         """
         Creates an exchange site.
+
         :param name: Name of the exchange site.
         :type name: str
-        :param primary_dns: Primary DNS of the exchange site.
-        :type primary_dns: str
-        :param secondary_dns: Secondary DNS of the exchange site.
-        :type secondary_dns: str
-        :param lan_as_dns: Whether LAN is used as DNS.
-        :type lan_as_dns: bool
-        :param local_domain: Local domain of the exchange site.
-        :type local_domain: str
         :param exchange_network_id: ID of the exchange network.
         :type exchange_network_id: str
         :param router_id: ID of the endpoint.
         :type router_id: str
-        :return: The response from the POST request.
+        :param kwargs: Optional parameters such as primary_dns, secondary_dns, lan_as_dns, local_domain, tags.
+            - primary_dns: Primary DNS of the exchange site.
+            - secondary_dns: Secondary DNS of the exchange site.
+            - lan_as_dns: Whether LAN is used as DNS. Defaults to False.
+            - local_domain: Local domain of the exchange site.
+            - tags: List of tags for the exchange site.
+        :return: The created exchange site data if successful, error message otherwise.
+        :raises TypeError: If the type of any parameter is incorrect.
+        :raises ValueError: If required parameters are missing or if an invalid parameter or value is provided.
         """
         call_type = 'Create Exchange Site'
 
+        # Type checking for required parameters
+        if not isinstance(name, str):
+            raise TypeError("name must be a string")
+        if not isinstance(exchange_network_id, str):
+            raise TypeError("exchange_network_id must be a string")
+        if not isinstance(router_id, str):
+            raise TypeError("router_id must be a string")
+
         post_url = f'{self.base_url}/beta/exchange_sites'
+
+        allowed_params = {
+            'primary_dns': str,
+            'secondary_dns': str,
+            'lan_as_dns': bool,
+            'local_domain': str,
+            'tags': list
+        }
+
+        attributes = {
+            'name': name,
+            'lan_as_dns': False  # Default value
+        }
+
+        # Process optional parameters
+        for key, value in kwargs.items():
+            if key in allowed_params:
+                if not isinstance(value, allowed_params[key]):
+                    raise TypeError(f"{key} must be of type {allowed_params[key].__name__}")
+                if key == 'tags':
+                    if not all(isinstance(tag, str) for tag in value):
+                        raise TypeError("All tags must be strings")
+                attributes[key] = value
+            else:
+                raise ValueError(f"Invalid parameter: {key}")
+
+        # Check if lan_as_dns is True and primary_dns is provided
+        if attributes.get('lan_as_dns', False) and 'primary_dns' not in attributes:
+            raise ValueError("primary_dns is required when lan_as_dns is True")
 
         data = {
             "data": {
                 "type": "exchange_user_managed_sites",
-                "attributes": {
-                    "name": name,
-                    "primary_dns": primary_dns,
-                    "secondary_dns": secondary_dns,
-                    "lan_as_dns": lan_as_dns,
-                    "local_domain": local_domain
-                },
+                "attributes": attributes,
                 "relationships": {
                     "exchange_network": {
                         "data": {
@@ -3428,30 +3526,86 @@ class NcmClientv3(BaseNcmClient):
             return ncm.json()['data']
         else:
             return result
-
-    def update_exchange_site(self, site_id, **kwargs):
+        
+    def update_exchange_site(self, site_id: str = None, name: str = None, **kwargs) -> dict:
         """
         Updates an exchange site.
-        :param site_id: ID of the exchange site to update.
-        :type site_id: str
-        :param kwargs: Keyword arguments for the attributes and relationships of the exchange site.
-        :return: The response from the PUT request.
+
+        :param site_id: ID of the exchange site to update. Optional if name is provided.
+        :type site_id: str, optional
+        :param name: Name of the exchange site to update or the new name if site_id is provided.
+        :type name: str, optional
+        :param kwargs: Optional parameters to update. Can include:
+            - primary_dns: New primary DNS for the exchange site.
+            - secondary_dns: New secondary DNS for the exchange site.
+            - lan_as_dns: Whether LAN should be used as DNS.
+            - local_domain: New local domain for the exchange site.
+            - tags: New list of tags for the exchange site.
+        :return: The updated exchange site data if successful, error message otherwise.
+        :raises TypeError: If the type of any parameter is incorrect.
+        :raises ValueError: If neither site_id nor name is provided, or if an invalid parameter is provided.
+        :raises LookupError: If no site is found when searching by id or name.
         """
         call_type = 'Update Exchange Site'
+
+        if (site_id is None or site_id == '') and (name is None or name == ''):
+            raise ValueError("Either site_id or name must be provided and cannot be blank")
+
+        allowed_params = {
+            'primary_dns': str,
+            'secondary_dns': str,
+            'lan_as_dns': bool,
+            'local_domain': str,
+            'tags': list
+        }
+
+        # Get current site data 
+        if site_id:
+            if not isinstance(site_id, str):
+                raise TypeError("site_id must be a string")
+            current_site = self.get_exchange_sites(site_id=site_id)
+            if not current_site:
+                raise LookupError(f"No site found with id: {site_id}")
+            current_site = current_site[0]
+            update_name = name is not None
+        elif name:
+            if not isinstance(name, str):
+                raise TypeError("name must be a string")
+            current_site = self.get_exchange_sites(name=name)
+            if not current_site:
+                raise LookupError(f"No site found with name: {name}")
+            current_site = current_site[0]
+            site_id = current_site['id']
+            update_name = False
+
         put_url = f'{self.base_url}/beta/exchange_sites/{site_id}'
 
-        allowed_params = ['name', 'primary_dns', 'secondary_dns', 'lan_as_dns', 'local_domain']
-
-        current_site = self.get_exchange_sites(site_id=site_id)[0]
+        attributes = current_site['attributes']
         exchange_network_id = current_site['relationships']['exchange_network']['data']['id']
         router_id = current_site['relationships']['endpoints']['data'][0]['id']
-        attributes = current_site['attributes']
 
-        for key, value in kwargs.items():
-            if key in allowed_params:
-                attributes['key'] = value
+        # Update name if site_id was provided and name is different
+        if update_name and name != attributes['name']:
+            attributes['name'] = name
 
-        ncm = self.session.put(put_url, data=json.dumps({
+        # Update attributes with new values
+        for key, expected_type in allowed_params.items():
+            if key in kwargs:
+                value = kwargs[key]
+                if key == 'tags':
+                    if not isinstance(value, list):
+                        raise TypeError("tags must be a list")
+                    if not all(isinstance(tag, str) for tag in value):
+                        raise TypeError("All tags must be strings")
+                elif not isinstance(value, expected_type):
+                    raise TypeError(f"{key} must be of type {expected_type.__name__}")
+                attributes[key] = value
+
+        # Check if lan_as_dns is True and primary_dns is provided
+        if attributes.get('lan_as_dns', False) and 'primary_dns' not in attributes:
+            raise ValueError("primary_dns is required when lan_as_dns is True")
+
+        data = {
             "data": {
                 "type": "exchange_user_managed_sites",
                 "id": site_id,
@@ -3471,83 +3625,278 @@ class NcmClientv3(BaseNcmClient):
                     }
                 }
             }
-        }))
+        }
 
+        ncm = self.session.put(put_url, data=json.dumps(data))
         result = self._return_handler(ncm.status_code, ncm.json(), call_type)
-        return result
-
-    def delete_exchange_site(self, site_id):
+        if ncm.status_code == 200:
+            return ncm.json()['data']
+        else:
+            return result
+    
+    def delete_exchange_site(self, site_id: str = None, site_name: str = None) -> dict:
         """
-        Deletes an exchange site.
-        :param site_id: ID of the exchange site to delete.
-        :type site_id: str
+        Deletes an exchange site and its associated resources.
+
+        :param site_id: ID of the exchange site to delete. Optional if site_name is provided.
+        :type site_id: str, optional
+        :param site_name: Name of the exchange site to delete. Optional if site_id is provided.
+        :type site_name: str, optional
         :return: The response from the DELETE request.
+        :raises TypeError: If the type of any parameter is incorrect.
+        :raises ValueError: If neither site_id nor site_name is provided.
         """
         call_type = 'Delete Exchange Site'
-        delete_url = f'{self.base_url}/beta/exchange_sites{site_id}'
+
+        if not site_id and not site_name:
+            raise ValueError("Either site_id or site_name must be provided")
+
+        if site_name and not isinstance(site_name, str):
+            raise TypeError("site_name must be a string")
+        if site_id and not isinstance(site_id, str):
+            raise TypeError("site_id must be a string")
+
+        # Delete associated resources
+        if site_id:
+            resource_deletion_results = self.delete_exchange_resource(site_id=site_id)
+        else:
+            resource_deletion_results = self.delete_exchange_resource(site_name=site_name)
+
+        # Delete the exchange site
+        if site_id:
+            delete_url = f'{self.base_url}/beta/exchange_sites/{site_id}'
+        else:
+            site_id = self.get_exchange_sites(name=site_name)[0]["id"]
+            delete_url = f'{self.base_url}/beta/exchange_sites/{site_id}'
 
         ncm = self.session.delete(delete_url)
-        result = self._return_handler(ncm.status_code, ncm, call_type)
-        return result
+        
+        if ncm.status_code == 204:
+            site_deletion_result = "deleted"
+        else:
+            site_deletion_result = "error"
 
-    def get_exchange_resources(self, exchange_network=None, exchange_site=None, **kwargs):
+        return {
+            "site_deletion_result": site_deletion_result,
+            "resource_deletion_results": resource_deletion_results
+        }
+    
+    def get_exchange_resources(self, site_id: str = None, exchange_network_id: str = None, resource_id: str = None, site_name: str = None, **kwargs) -> list:
         """
-        Returns exchange sites.
-        :param kwargs: A set of zero or more allowed parameters
-        in the allowed_params list.
-        :return: A list of exchange sites or a single site if site_id is provided.
+        Returns information about exchange resources.
+        
+        :param site_id: ID of the exchange site to filter resources by. Optional.
+        :type site_id: str
+        :param exchange_network_id: ID of the exchange network to filter resources by. Optional.
+        :type exchange_network_id: str
+        :param resource_id: ID of a specific exchange resource to retrieve. Optional.
+        :type resource_id: str
+        :param site_name: Name of the exchange site to filter resources by. Optional.
+        :type site_name: str
+        :param kwargs: Optional parameters such as name, limit, sort, fields, resource_type.
+            - name: Name of the resource to filter by.
+            - limit: Maximum number of resources to return.
+            - sort: Field to sort the results by. Can be prefixed with '-' for descending order.
+            - fields: List of fields to include in the response.
+            - resource_type: Type of resource to filter by (exchange_fqdn_resources, exchange_wildcard_fqdn_resources, or exchange_ipsubnet_resources).
+        :return: A list of exchange resources or a single resource if resource_id is provided.
+        :raises TypeError: If the type of any parameter is incorrect.
+        :raises ValueError: If an invalid parameter or value is provided.
+        :raises LookupError: If no site is found when searching by site_name.
         """
         call_type = 'Exchange Resources'
-        get_url = f'{self.base_url}/beta/exchange_resources'
+
+        if resource_id:
+            if not isinstance(resource_id, str):
+                raise TypeError("resource_id must be a string")
+            get_url = f"{self.base_url}/beta/exchange_resources/{resource_id}"
+        else:
+            get_url = f"{self.base_url}/beta/exchange_resources"
 
         params = {}
+        if site_name:
+            if not isinstance(site_name, str):
+                raise TypeError("site_name must be a string")
+            sites = self.get_exchange_sites(name=site_name)
+            if not sites:
+                raise LookupError(f"No site found with name: {site_name}")
+            site_id = sites[0]['id']
 
-        allowed_params = ['exchange_network',
-                          'name',
-                          'id',
-                          'fields',
-                          'limit',
-                          'sort']
+        if site_id:
+            if not isinstance(site_id, str):
+                raise TypeError("site_id must be a string")
+            params['filter[exchange_site]'] = site_id
+        elif exchange_network_id:
+            if not isinstance(exchange_network_id, str):
+                raise TypeError("exchange_network_id must be a string")
+            params['filter[exchange_network]'] = exchange_network_id
 
-        if kwargs:
-            params = self.__parse_kwargs(kwargs, allowed_params)
+        allowed_params = {
+            'name': str,
+            'limit': int,
+            'sort': str,
+            'fields': list,
+            'resource_type': str
+        }
 
-        if exchange_site:
-            params['filter[exchange_site]'] = exchange_site
-        elif exchange_network:
-            params['filter[exchange_network]'] = exchange_network
+        valid_sort_fields = ['name', 'created_at', 'updated_at', 'protocols', 'tags', 'domain', 'ip', 'static_prime_ip', 'port_ranges']
+        valid_fields = ['name', 'created_at', 'updated_at', 'protocols', 'tags', 'domain', 'ip', 'static_prime_ip', 'port_ranges']
+        valid_types = ['exchange_fqdn_resources', 'exchange_wildcard_fqdn_resources', 'exchange_ipsubnet_resources']
 
-        response = self.__get_json(get_url, call_type, params=params)
-        return response
+        for key, value in kwargs.items():
+            if key in allowed_params:
+                if not isinstance(value, allowed_params[key]):
+                    raise TypeError(f"{key} must be of type {allowed_params[key].__name__}")
+                
+                if key == 'sort':
+                    if value.lstrip('-') not in valid_sort_fields:
+                        raise ValueError(f"Invalid sort field: {value}")
+                
+                elif key == 'fields':
+                    for field in value:
+                        if field not in valid_fields:
+                            raise ValueError(f"Invalid field: {field}")
+                    params[key] = ','.join(value)
+                
+                elif key == 'resource_type':
+                    if value not in valid_types:
+                        raise ValueError(f"Invalid resource type: {value}. Valid types are: {', '.join(valid_types)}")
+                    params['filter[type]'] = value
+                
+                else:
+                    params[key] = value
+            
+            elif key not in ['search', 'filter']:
+                raise ValueError(f"Invalid parameter: {key}")
+            else:
+                params[key] = value
 
-    def create_exchange_resource(self, site_id, resource_name, resource_type, **kwargs):
+        response = self.session.get(get_url, params=params)
+
+        if response.status_code == 200:
+            data = response.json()['data']
+            return data if isinstance(data, list) else [data]
+        else:
+            return f"ERROR: {response.status_code}: {response.text}"
+        
+    def create_exchange_resource(self, resource_name: str, resource_type: str, site_id: str = None, site_name: str = None, **kwargs) -> dict:
         """
-        Creates an exchange site.
-        :param site_id: NCX Site ID to add the resource to.
-        :type site_id: str
-        :param resource_name: Name for the new resource
-        :type resource_type: str
-        :param resource_type: exchange_fqdn_resources, exchange_wildcard_fqdn_resources, or exchange_ipsubnet_resources
-        :type resource_type: str
+        Creates an exchange resource.
 
-        :return: The response from the POST request.
+        :param resource_name: Name for the new resource.
+        :type resource_name: str
+        :param resource_type: Type of resource to create. Must be one of:
+            'exchange_fqdn_resources', 'exchange_wildcard_fqdn_resources', or 'exchange_ipsubnet_resources'.
+        :type resource_type: str
+        :param site_id: NCX Site ID to add the resource to. Optional if site_name is provided.
+        :type site_id: str
+        :param site_name: Name of the NCX Site to add the resource to. Optional if site_id is provided.
+        :type site_name: str
+        :param kwargs: Optional parameters for the resource. Can include:
+            - protocols: List of protocols (e.g., ['TCP'], ['UDP'], ['TCP', 'UDP'], or ['ICMP']).
+            - tags: List of tags for the resource.
+            - domain: Domain name for FQDN or wildcard FQDN resources. Required for these types.
+              For wildcard FQDN, must start with '*.'.
+            - ip: IP address for IP subnet resources. Required for this type.
+            - static_prime_ip: Static prime IP for the resource.
+            - port_ranges: List of port ranges. Each range can be an int, a string (e.g., '80' or '8000-8080').
+              Will be converted to a list of dicts with 'lower_limit' and 'upper_limit'.
+              Not allowed when protocol is ICMP or None.
+        :return: The created exchange resource data if successful, error message otherwise.
+        :raises TypeError: If the type of any parameter is incorrect.
+        :raises ValueError: If required parameters are missing, if an invalid resource type is provided,
+                            if an invalid parameter or value is provided, or if port ranges are provided
+                            with ICMP protocol or no protocol.
+        :raises LookupError: If no site is found when searching by site_name.
         """
         call_type = 'Create Exchange Site Resource'
 
-        post_url = f'{self.base_url}/beta/exchange_resources'
-        allowed_params = ['name',
-                          'protocols',
-                          'tags',
-                          'domain',
-                          'ip',
-                          'static_prime_ip',
-                          'port_ranges',
-                          'fields',
-                          'limit',
-                          'sort']
+        # Type checking for required parameters
+        if not isinstance(resource_name, str):
+            raise TypeError("resource_name must be a string")
+        if not isinstance(resource_type, str):
+            raise TypeError("resource_type must be a string")
 
-        attributes = {key: value for key, value in kwargs.items() if key in allowed_params}
-        attributes['name'] = resource_name
+        # Validate and get site_id
+        if site_id is None and site_name is None:
+            raise ValueError("Either site_id or site_name must be provided")
+        
+        if site_name:
+            if not isinstance(site_name, str):
+                raise TypeError("site_name must be a string")
+            sites = self.get_exchange_sites(name=site_name)
+            if not sites:
+                raise LookupError(f"No site found with name: {site_name}")
+            site_id = sites[0]['id']
+        elif not isinstance(site_id, str):
+            raise TypeError("site_id must be a string")
+
+        valid_resource_types = ['exchange_fqdn_resources', 'exchange_wildcard_fqdn_resources', 'exchange_ipsubnet_resources']
+        if resource_type not in valid_resource_types:
+            raise ValueError(f"Invalid resource_type. Must be one of: {', '.join(valid_resource_types)}")
+
+        post_url = f'{self.base_url}/beta/exchange_resources'
+
+        allowed_params = {
+            'protocols': (list, type(None)),
+            'tags': list,
+            'domain': str,
+            'ip': str,
+            'static_prime_ip': str,
+            'port_ranges': (list, type(None))
+        }
+
+        attributes = {'name': resource_name}
+
+        # Validate required parameters based on resource_type
+        if resource_type == 'exchange_ipsubnet_resources':
+            if 'ip' not in kwargs:
+                raise ValueError("'ip' is required for IP subnet resources")
+            attributes['ip'] = kwargs['ip']
+        elif resource_type in ['exchange_fqdn_resources', 'exchange_wildcard_fqdn_resources']:
+            if 'domain' not in kwargs:
+                raise ValueError("'domain' is required for FQDN and wildcard FQDN resources")
+            domain = kwargs['domain']
+            if resource_type == 'exchange_wildcard_fqdn_resources' and not domain.startswith('*.'):
+                raise ValueError("Domain for wildcard FQDN resources must start with '*.'")
+            attributes['domain'] = domain
+
+        # Process optional parameters
+        for key, value in kwargs.items():
+            if key in allowed_params and key not in attributes:
+                if not isinstance(value, allowed_params[key]):
+                    raise TypeError(f"{key} must be of type {allowed_params[key].__name__}")
+                if key == 'tags':
+                    if not all(isinstance(tag, str) for tag in value):
+                        raise TypeError("All tags must be strings")
+                if key == 'protocols':
+                    valid_protocols = [['TCP'], ['UDP'], ['TCP', 'UDP'], ['ICMP'], None]
+                    if value not in valid_protocols:
+                        raise ValueError(f"Invalid protocols. Must be one of: {valid_protocols}")
+                    attributes[key] = value
+                if key == 'port_ranges':
+                    # Check if protocols are set and not ICMP or None
+                    if 'protocols' not in attributes or attributes['protocols'] in [['ICMP'], None]:
+                        raise ValueError("Port ranges cannot be specified when protocol is ICMP or None")
+                    
+                    parsed_ranges = []
+                    for range_str in value:
+                        if isinstance(range_str, int):
+                            parsed_ranges.append({'lower_limit': range_str, 'upper_limit': range_str})
+                        elif isinstance(range_str, str):
+                            if '-' in range_str:
+                                lower, upper = map(int, range_str.split('-'))
+                                if lower > upper:
+                                    raise ValueError(f"Invalid port range: {range_str}. Lower limit must be less than or equal to upper limit.")
+                                parsed_ranges.append({'lower_limit': lower, 'upper_limit': upper})
+                            else:
+                                port = int(range_str)
+                                parsed_ranges.append({'lower_limit': port, 'upper_limit': port})
+                        else:
+                            raise ValueError(f"Invalid port range format: {range_str}")
+                    attributes[key] = parsed_ranges
+                else:
+                    attributes[key] = value
 
         data = {
             "data": {
@@ -3570,70 +3919,172 @@ class NcmClientv3(BaseNcmClient):
             return ncm.json()['data']
         else:
             return result
-
-    def update_exchange_resource(self, resource_id, exchange_network=None, exchange_site=None, **kwargs):
+    
+    def update_exchange_resource(self, resource_id: str, **kwargs) -> dict: #site_id: str = None, site_name: str = None,
         """
-        Updates an exchange site.
+        Updates an exchange resource.
+
         :param resource_id: ID of the exchange resource to update.
         :type resource_id: str
-        :param kwargs: Keyword arguments for the attributes and relationships of the exchange site.
-        :return: The response from the PUT request.
+        :param site_id: NCX Site ID of the resource. Optional if site_name is provided.
+        :type site_id: str
+        :param site_name: Name of the NCX Site of the resource. Optional if site_id is provided.
+        :type site_name: str
+        :param kwargs: Optional parameters to update. Can include:
+            - name: New name for the resource.
+            - protocols: List of protocols (e.g., ['TCP'], ['UDP'], ['TCP', 'UDP'], or ['ICMP']).
+            - tags: List of tags for the resource.
+            - domain: Domain name for FQDN or wildcard FQDN resources.
+            - ip: IP address for IP subnet resources.
+            - static_prime_ip: Static prime IP for the resource.
+            - port_ranges: List of port ranges. Each range can be an int, a string (e.g., '80' or '8000-8080').
+              Will be converted to a list of dicts with 'lower_limit' and 'upper_limit'.
+              Not allowed when protocol is ICMP or None.
+        :return: The updated exchange resource data if successful, error message otherwise.
+        :raises TypeError: If the type of any parameter is incorrect.
+        :raises ValueError: If an invalid parameter or value is provided,
+                            or if port ranges are provided with ICMP protocol or no protocol.
+        :raises LookupError: If no site is found when searching by site_name.
         """
-        call_type = 'Update Exchange Site'
+        call_type = 'Update Exchange Resource'
+
+        if not isinstance(resource_id, str):
+            raise TypeError("resource_id must be a string")
+
+        # Raise an error if resource_type is provided
+        if 'resource_type' in kwargs:
+            raise ValueError("resource_type cannot be updated after resource creation")
+
+        # Get current resource data
+        current_resource = self.get_exchange_resources(resource_id=resource_id)[0]
+        resource_type = current_resource['type']
+        site_id = current_resource['relationships']['exchange_site']['data']['id']
+
         put_url = f'{self.base_url}/beta/exchange_resources/{resource_id}'
 
-        allowed_params = ['name',
-                          'protocols',
-                          'tags',
-                          'domain',
-                          'ip',
-                          'static_prime_ip',
-                          'port_ranges']
+        allowed_params = {
+            'name': str,
+            'protocols': (list, type(None)),
+            'tags': list,
+            'domain': str,
+            'ip': str,
+            'static_prime_ip': str,
+            'port_ranges': (list, type(None))
+        }
 
-        if exchange_site:
-            current_resource = self.get_exchange_resources(exchange_site=exchange_site, id=resource_id)[0]
-        elif exchange_network:
-            current_resource = self.get_exchange_resources(exchange_network=exchange_network, id=resource_id)[0]
-
-        exchange_site_id = current_resource['relationships']['exchange_site']['data']['id']
         attributes = current_resource['attributes']
 
+        # Process optional parameters
         for key, value in kwargs.items():
             if key in allowed_params:
-                attributes['key'] = value
+                if not isinstance(value, allowed_params[key]):
+                    raise TypeError(f"{key} must be of type {allowed_params[key].__name__}")
+                if key == 'tags':
+                    if not all(isinstance(tag, str) for tag in value):
+                        raise TypeError("All tags must be strings")
+                if key == 'protocols':
+                    valid_protocols = [['TCP'], ['UDP'], ['TCP', 'UDP'], ['ICMP'], None]
+                    if value not in valid_protocols:
+                        raise ValueError(f"Invalid protocols. Must be one of: {valid_protocols}")
+                    # if protocols is set to ICMP or None, port_ranges must be None
+                    if value in [['ICMP'], None]:
+                        attributes['port_ranges'] = None
+                if key == 'port_ranges':
+                    # Check if protocols are set and not ICMP or None
+                    if 'protocols' not in attributes or attributes['protocols'] in [['ICMP'], None]:
+                        raise ValueError("Port ranges cannot be specified when protocol is ICMP or None")
+                    
+                    parsed_ranges = []
+                    for range_str in value:
+                        if isinstance(range_str, int):
+                            parsed_ranges.append({'lower_limit': range_str, 'upper_limit': range_str})
+                        elif isinstance(range_str, str):
+                            if '-' in range_str:
+                                lower, upper = map(int, range_str.split('-'))
+                                if lower > upper:
+                                    raise ValueError(f"Invalid port range: {range_str}. Lower limit must be less than or equal to upper limit.")
+                                parsed_ranges.append({'lower_limit': lower, 'upper_limit': upper})
+                            else:
+                                port = int(range_str)
+                                parsed_ranges.append({'lower_limit': port, 'upper_limit': port})
+                        else:
+                            raise ValueError(f"Invalid port range format: {range_str}")
+                    value = parsed_ranges
+                attributes[key] = value
 
-        ncm = self.session.put(put_url, data=json.dumps({
+        data = {
             "data": {
-                "type": current_resource['type'],
+                "type": resource_type,
                 "id": resource_id,
                 "attributes": attributes,
                 "relationships": {
                     "exchange_site": {
                         "data": {
                             "type": "exchange_sites",
-                            "id": exchange_site_id
+                            "id": site_id
                         }
                     }
                 }
             }
-        }))
+        }
 
+        ncm = self.session.put(put_url, data=json.dumps(data))
         result = self._return_handler(ncm.status_code, ncm.json(), call_type)
-        return result
-
-    def delete_exchange_resource(self, resource_id):
+        if ncm.status_code == 200:
+            return ncm.json()['data']
+        else:
+            return result
+        
+    def delete_exchange_resource(self, resource_id: str = None, site_name: str = None, site_id: str = None) -> list:
         """
-        Deletes an exchange resource.
-        :param resource_id: ID of the exchange resource to delete.
-        :type resource_id: str
+        Deletes exchange resources.
+
+        :param resource_id: ID of the exchange resource to delete. Optional if site_name or site_id is provided.
+        :type resource_id: str, optional
+        :param site_name: Name of the exchange site to filter resources by. Optional if resource_id or site_id is provided.
+        :type site_name: str, optional
+        :param site_id: ID of the exchange site to filter resources by. Optional if resource_id or site_name is provided.
+        :type site_id: str, optional
         :return: The response from the DELETE request.
+        :raises TypeError: If the type of any parameter is incorrect.
+        :raises ValueError: If none of resource_id, site_name, or site_id is provided.
+        :raises LookupError: If no site is found when searching by site_name.
         """
-        call_type = 'Delete Exchange Site'
-        delete_url = f'{self.base_url}/beta/exchange_resources{resource_id}'
+        call_type = 'Delete Exchange Resource'
 
-        ncm = self.session.delete(delete_url)
-        result = self._return_handler(ncm.status_code, ncm, call_type)
-        return result
+        if not resource_id and not site_name and not site_id:
+            raise ValueError("Either resource_id, site_name, or site_id must be provided")
+
+        resource_ids = []
+
+        if resource_id:
+            if not isinstance(resource_id, str):
+                raise TypeError("resource_id must be a string")
+            resource_ids.append(resource_id)
+        else:
+            if site_name:
+                if not isinstance(site_name, str):
+                    raise TypeError("site_name must be a string")
+                sites = self.get_exchange_sites(name=site_name)
+                if not sites:
+                    raise LookupError(f"No site found with name: {site_name}")
+                site_id = sites[0]['id']
+            elif site_id and not isinstance(site_id, str):
+                raise TypeError("site_id must be a string")
+
+            resources = self.get_exchange_resources(site_id=site_id)
+            resource_ids = [resource['id'] for resource in resources]
+
+        results = []
+        for rid in resource_ids:
+            delete_url = f'{self.base_url}/beta/exchange_resources/{rid}'
+            ncm = self.session.delete(delete_url)
+            if ncm.status_code == 204:
+                results.append({'resource_id': rid, 'status': 'deleted'})
+            else:
+                results.append({'resource_id': rid, 'status': 'error'})
+
+        return results
 
 '''
     def get_group_modem_upgrade_jobs(self, **kwargs):
