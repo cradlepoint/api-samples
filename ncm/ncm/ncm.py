@@ -1159,7 +1159,7 @@ class NcmClientv2(BaseNcmClient):
                           'connection_state__in', 'fields', 'id', 'id__in',
                           'is_asset', 'ipv4_address', 'ipv4_address__in',
                           'mode', 'mode__in', 'router', 'router__in',
-                          'expand', 'limit', 'offset']
+                          'expand', 'limit', 'offset', 'updated_at__gt', 'updated_at__lt']
         params = self.__parse_kwargs(kwargs, allowed_params)
 
         return self.__get_json(get_url, call_type, params=params)
