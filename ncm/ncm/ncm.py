@@ -51,6 +51,7 @@ Tips:
 from requests import Session
 from requests.adapters import HTTPAdapter
 from http import HTTPStatus
+from urllib.parse import urlencode
 from urllib3.util.retry import Retry
 from datetime import datetime, timedelta
 import sys
@@ -220,8 +221,11 @@ class NcmClientv2(BaseNcmClient):
                         chunk_str = ','.join(map(str, chunk))
                         params.update({key: chunk_str})
                         url = get_url
+                        if params is not None:
+                            query_string = urlencode(params)
+                            url = f'{url}?{query_string}'
                         while url and (len(results) < limit):
-                            ncm = self.session.get(url, params=params)
+                            ncm = self.session.get(url)
                             if not (200 <= ncm.status_code < 300):
                                 break
                             self._return_handler(ncm.status_code,
@@ -233,8 +237,11 @@ class NcmClientv2(BaseNcmClient):
 
         if __in_keys == 0:
             url = get_url
+            if params is not None:
+                query_string = urlencode(params)
+                url = f'{url}?{query_string}'
             while url and (len(results) < limit):
-                ncm = self.session.get(url, params=params)
+                ncm = self.session.get(url)
                 if not (200 <= ncm.status_code < 300):
                     break
                 self._return_handler(ncm.status_code, ncm.json()['data'],
