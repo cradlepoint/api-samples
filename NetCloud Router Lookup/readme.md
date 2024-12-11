@@ -66,7 +66,7 @@ This Flask web application allows users to input a MAC address or serial number 
 
 1. Run the Flask application:
     ```bash
-    flask run
+    python3 router_lookup.py
     ```
 
 2. Open your web browser and go to `http://127.0.0.1:8000`.
