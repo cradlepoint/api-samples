@@ -1,6 +1,6 @@
-# README.md
+# NetCloud Router Lookup
 
-## Flask Web App for Router Lookup
+## Flask Web App for Looking Up Routers Across Multiple Accounts
 
 This Flask web application allows users to input a MAC address or serial number of a router and looks it up across multiple NetCloud accounts. The application then returns the account name that the router belongs to.
 
