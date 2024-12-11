@@ -37,7 +37,7 @@ This Flask web application allows users to input a MAC address or serial number 
 
 ### Configuration
 
-1. Update the `named_keys` section of router_lookup.py with your NetCloud Accounts' APIv2 Keys.
+1. Update the `named_keys` section of router_lookup.py with your NetCloud Accounts' names and APIv2 Keys.
     ```python
     # Dictionary of named keys
     named_keys = {
