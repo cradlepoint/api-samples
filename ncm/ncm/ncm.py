@@ -4086,6 +4086,90 @@ class NcmClientv3(BaseNcmClient):
 
         return results
 
+    def get_account_authorizations(self, **kwargs):
+        """
+        Get account authorizations
+        
+        Args:
+            **kwargs: Optional parameters for filtering, sorting, and pagination
+                     Supported parameters include:
+                     - fields: Comma-separated list of fields to return
+                     - user: Filter by user
+                     - sort: Field to sort by
+                     - limit: Number of records to return
+                     - search: Search term to filter results
+        
+        Returns:
+            List of account authorization objects
+        """
+        get_url = f'{self.base_url}/beta/account_authorizations'
+        call_type = 'Account Authorizations'
+        allowed_params = ['fields', 'user', 'sort', 'limit']
+        params = self.__parse_kwargs(kwargs, allowed_params)
+        
+        return self.__get_json(get_url, call_type, params=params)
+
+    def put_account_authorizations(self, authorization_id: str, account_authorization: dict):
+        """
+        Update an account authorization role
+        
+        Args:
+            authorization_id: ID of the authorization to update
+            account_authorization: Account authorization object
+        
+        Returns:
+            Server response
+        """
+        put_url = f'{self.base_url}/beta/account_authorizations/{authorization_id}'
+        call_type = 'Account Authorization'
+        ncm = self.session.put(put_url, json=account_authorization)
+        return self._return_handler(ncm.status_code, ncm.json(), call_type)
+
+    def update_user_role(self, email: str, new_role: str) -> dict:
+        """
+        Updates the role of a user in NCM.
+        
+        Args:
+            email (str): Email address of the user
+            new_role (str): New role to assign to the user
+            
+        Returns:
+            dict: Response from the API containing the updated authorization
+        """
+        try:
+            # Find user
+            users = self.get_users(email=email)
+            if not users:
+                raise ValueError(f"User not found: {email}")
+            
+            user_id = users[0]['id']
+
+            # Get account authorizations
+            auths = self.get_account_authorizations(user=user_id)
+            if not auths:
+                raise ValueError(f"No account authorization found for: {email}")
+
+            account_auth_data = auths[0]
+            account_auth_id = account_auth_data['id']
+
+            # Update authorization
+            account_auth = {
+                "data": {
+                    **account_auth_data,
+                    "attributes": {
+                        **account_auth_data["attributes"],
+                        "role": new_role
+                    }
+                }
+            }
+            call_type = 'Update User Role'
+            response = self.put_account_authorizations(account_auth_id, account_auth)
+            return response
+            
+        except Exception as e:
+            self.log('error', f"Error updating role for {email}: {str(e)}")
+            raise
+        
 '''
     def get_group_modem_upgrade_jobs(self, **kwargs):
         """
