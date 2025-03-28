@@ -1,13 +1,14 @@
-# This script creates and updates users in NCM API v3
+# This script creates and updates users in NCM API v3 using the NCM library (pip install ncm)
 # It reads a CSV file with user details and updates the users in NCM
-# The CSV file should have the following columns named on row 1:
+# The CSV file should be in the same folder and must have the following columns named on row 1:
 # first name, last name, email, role
-# Install the ncm library using "pip install ncm"
+# Possible values for role are: no_access, read_only_user, full_access_user, administrator
 
 import csv
 from ncm import ncm
 
 token = "Put your NCM API v3 token here"
+csv_filename = "users.csv"
 
 # Initialize the NCM client
 ncm = ncm.NcmClientv3(api_key=token)
@@ -31,7 +32,7 @@ def create_and_update_user(first_name, last_name, email, role):
         print(f"Error processing {email}: {str(e)}")
 
 # Read and process CSV file
-with open('users.csv', 'r') as file:
+with open(csv_filename, 'r') as file:
     csv_reader = csv.DictReader(file)
     for row in csv_reader:
         create_and_update_user(
