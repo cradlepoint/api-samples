@@ -56,6 +56,7 @@ from datetime import datetime, timedelta
 import sys
 import os
 import json
+from typing import Union
 
 
 def __is_json(test_json):
@@ -1047,7 +1048,7 @@ class NcmClientv2(BaseNcmClient):
     def get_net_device_metrics(self, **kwargs):
         """
         This endpoint is supplied to allow easy access to the latest signal and
-          usage data reported by an account’s net_devices without querying the
+          usage data reported by an account's net_devices without querying the
           historical raw sample tables, which are not optimized for a query
           spanning many net_devices at once.
         :param kwargs: A set of zero or more allowed parameters
@@ -1066,7 +1067,7 @@ class NcmClientv2(BaseNcmClient):
     def get_net_devices_metrics_for_wan(self, **kwargs):
         """
         This endpoint is supplied to allow easy access to the latest signal and
-          usage data reported by an account’s net_devices without querying the
+          usage data reported by an account's net_devices without querying the
           historical raw sample tables, which are not optimized for a query
           spanning many net_devices at once. Returns data only for
           WAN interfaces.
@@ -1083,7 +1084,7 @@ class NcmClientv2(BaseNcmClient):
     def get_net_devices_metrics_for_mdm(self, **kwargs):
         """
         This endpoint is supplied to allow easy access to the latest signal and
-          usage data reported by an account’s net_devices without querying the
+          usage data reported by an account's net_devices without querying the
           historical raw sample tables, which are not optimized for a query
           spanning many net_devices at once. Returns data only for
           modem interfaces.
@@ -1100,7 +1101,7 @@ class NcmClientv2(BaseNcmClient):
     def get_net_device_signal_samples(self, **kwargs):
         """
         This endpoint is supplied to allow easy access to the latest signal and
-          usage data reported by an account’s net_devices without querying the
+          usage data reported by an account's net_devices without querying the
           historical raw sample tables, which are not optimized for a query
           spanning many net_devices at once.
         :param kwargs: A set of zero or more allowed parameters
@@ -1553,8 +1554,7 @@ class NcmClientv2(BaseNcmClient):
         :return:
         """
         return self.rename_router_by_id(
-            self.get_router_by_name(existing_router_name)['id'],
-            new_router_name)
+            self.get_router_by_name(existing_router_name)['id'], new_router_name)
 
     def assign_router_to_group(self, router_id, group_id):
         """
@@ -2095,10 +2095,11 @@ class NcmClientv2(BaseNcmClient):
         return result
     
 
-    def set_ncm_api_keys(self, router_id: int, x_ecm_id: str, x_ecm_api_key: str, x_cp_api_id: str, x_cp_api_key: str, bearer_token: str=''):
+    def set_ncm_api_keys_by_router(self, router_id=None, router_name=None, x_ecm_id: str = None, x_ecm_api_key: str = None, x_cp_api_id: str = None, x_cp_api_key: str = None, bearer_token: str = ''):
         """
         This method sets NCM API keys using the router's certificate management configuration
-        :param router_id: ID of router to update
+        :param router_id: ID of router to update (optional if router_name is provided)
+        :param router_name: Name of router to update (optional if router_id is provided)
         :param x_ecm_id: ECM ID
         :param x_ecm_api_key: ECM API Key
         :param x_cp_api_id: CP API ID
@@ -2107,6 +2108,15 @@ class NcmClientv2(BaseNcmClient):
         :return:
         """
         call_type = 'Set NCM API Keys'
+
+        if not router_id and not router_name:
+            raise Exception("Either router_id or router_name must be provided")
+        
+        if router_name and not router_id:
+            try:
+                router_id = self.get_router_by_name(router_name)['id']
+            except Exception as e:
+                raise Exception(f"Router with name '{router_name}' not found: {str(e)}")
 
         response = self.session.get(
             '{0}/configuration_managers/?router.id={1}&fields=id,configuration'.format(
@@ -2161,6 +2171,71 @@ class NcmClientv2(BaseNcmClient):
         result = self._return_handler(ncm.status_code, ncm.text, call_type)
         return result
 
+    def set_ncm_api_keys_by_group(self, group_id=None, group_name=None, x_ecm_id: str = None, x_ecm_api_key: str = None, x_cp_api_id: str = None, x_cp_api_key: str = None, bearer_token: str = ''):
+        """
+        This method sets NCM API keys using the group's certificate management configuration
+        :param group_id: ID of group to update (optional if group_name is provided)
+        :param group_name: Name of group to update (optional if group_id is provided)
+        :param x_ecm_id: ECM ID
+        :param x_ecm_api_key: ECM API Key
+        :param x_cp_api_id: CP API ID
+        :param x_cp_api_key: CP API Key
+        :param bearer_token: Bearer Token
+        :return:
+        """
+        call_type = 'Set NCM API Keys'
+
+        if not group_id and not group_name:
+            raise Exception("Either group_id or group_name must be provided")
+        
+        if group_name and not group_id:
+            try:
+                group_id = self.get_group_by_name(group_name)['id']
+            except Exception as e:
+                raise Exception(f"Group with name '{group_name}' not found: {str(e)}")
+
+        payload = {
+            "configuration": [
+                {
+                    "certmgmt": {
+                        "certs": {
+                            "00000000-abcd-1234-abcd-123456789000": {
+                                "_id_": "00000000-abcd-1234-abcd-123456789000",
+                                "key": x_ecm_id,
+                                "name": "X-ECM-API-ID",
+                            },
+                            "00000001-abcd-1234-abcd-123456789000": {
+                                "_id_": "00000001-abcd-1234-abcd-123456789000",
+                                "key": x_ecm_api_key,
+                                "name": "X-ECM-API-KEY",
+                            },
+                            "00000002-abcd-1234-abcd-123456789000": {
+                                "_id_": "00000002-abcd-1234-abcd-123456789000",
+                                "key": x_cp_api_id,
+                                "name": "X-CP-API-ID",
+                            },
+                            "00000003-abcd-1234-abcd-123456789000": {
+                                "_id_": "00000003-abcd-1234-abcd-123456789000",
+                                "key": x_cp_api_key,
+                                "name": "X-CP-API-KEY",
+                            },
+                            "00000004-abcd-1234-abcd-123456789000": {
+                                "_id_": "00000004-abcd-1234-abcd-123456789000",
+                                "key": bearer_token,
+                                "name": "Bearer Token",
+                            }
+                        }
+                    }
+                },
+                []
+            ]
+        }
+
+        ncm = self.session.patch(
+            '{0}/groups/{1}/'.format(self.base_url, str(group_id)),
+            data=json.dumps(payload))  # Patch group config with new values
+        result = self._return_handler(ncm.status_code, ncm.text, call_type)
+        return result
 
     def set_router_fields(self, router_id: int, name: str = None, description: str = None, asset_id: str = None, custom1: str = None, custom2: str = None):
         """
