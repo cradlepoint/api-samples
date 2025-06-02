@@ -2093,6 +2093,74 @@ class NcmClientv2(BaseNcmClient):
             data=json.dumps(payload))  # Patch indie config with new values
         result = self._return_handler(ncm.status_code, ncm.text, call_type)
         return result
+    
+
+    def set_ncm_api_keys(self, router_id: int, x_ecm_id: str, x_ecm_api_key: str, x_cp_api_id: str, x_cp_api_key: str, bearer_token: str=''):
+        """
+        This method sets NCM API keys using the router's certificate management configuration
+        :param router_id: ID of router to update
+        :param x_ecm_id: ECM ID
+        :param x_ecm_api_key: ECM API Key
+        :param x_cp_api_id: CP API ID
+        :param x_cp_api_key: CP API Key
+        :param bearer_token: Bearer Token
+        :return:
+        """
+        call_type = 'Set NCM API Keys'
+
+        response = self.session.get(
+            '{0}/configuration_managers/?router.id={1}&fields=id,configuration'.format(
+                self.base_url,
+                str(router_id)))  # Get Configuration Managers ID
+        response = json.loads(response.content.decode(
+            "utf-8"))  # Decode the response and make it a dictionary
+        config_man_id = response['data'][0][
+            'id']  # get the Configuration Managers ID from response
+
+        payload = {
+            "configuration": [
+                {
+                    "certmgmt": {
+                        "certs": {
+                            "00000000-abcd-1234-abcd-123456789000": {
+                                "_id_": "00000000-abcd-1234-abcd-123456789000",
+                                "key": x_ecm_id,
+                                "name": "X-ECM-API-ID",
+                            },
+                            "00000001-abcd-1234-abcd-123456789000": {
+                                "_id_": "00000001-abcd-1234-abcd-123456789000",
+                                "key": x_ecm_api_key,
+                                "name": "X-ECM-API-KEY",
+                            },
+                            "00000002-abcd-1234-abcd-123456789000": {
+                                "_id_": "00000002-abcd-1234-abcd-123456789000",
+                                "key": x_cp_api_id,
+                                "name": "X-CP-API-ID",
+                            },
+                            "00000003-abcd-1234-abcd-123456789000": {
+                                "_id_": "00000003-abcd-1234-abcd-123456789000",
+                                "key": x_cp_api_key,
+                                "name": "X-CP-API-KEY",
+                            },
+                            "00000004-abcd-1234-abcd-123456789000": {
+                                "_id_": "00000004-abcd-1234-abcd-123456789000",
+                                "key": bearer_token,
+                                "name": "Bearer Token",
+                            }
+                        }
+                    }
+                },
+                []
+            ]
+        }
+
+        ncm = self.session.patch(
+            '{0}/configuration_managers/{1}/'.format(self.base_url,
+                                                        str(config_man_id)),
+            data=json.dumps(payload))  # Patch indie config with new values
+        result = self._return_handler(ncm.status_code, ncm.text, call_type)
+        return result
+
 
     def set_router_fields(self, router_id: int, name: str = None, description: str = None, asset_id: str = None, custom1: str = None, custom2: str = None):
         """
@@ -3831,7 +3899,7 @@ class NcmClientv3(BaseNcmClient):
         elif not isinstance(site_id, str):
             raise TypeError("site_id must be a string")
 
-        valid_resource_types = ['exchange_fqdn_resources', 'exchange_wildcard_fqdn_resources', 'exchange_ipsubnet_resources']
+        valid_resource_types = ['exchange_fqdn_resources', 'exchange_wildcard_fqdn_resources', 'exchange_ipsubnet_resources', 'exchange_http_resources', 'exchange_https_resources']
         if resource_type not in valid_resource_types:
             raise ValueError(f"Invalid resource_type. Must be one of: {', '.join(valid_resource_types)}")
 
