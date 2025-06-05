@@ -2095,7 +2095,7 @@ class NcmClientv2(BaseNcmClient):
         return result
     
 
-    def set_ncm_api_keys_by_router(self, router_id=None, router_name=None, x_ecm_id: str = None, x_ecm_api_key: str = None, x_cp_api_id: str = None, x_cp_api_key: str = None, bearer_token: str = ''):
+    def set_ncm_api_keys_by_router(self, router_id=None, router_name=None, x_ecm_api_id: str = None, x_ecm_api_key: str = None, x_cp_api_id: str = None, x_cp_api_key: str = None, bearer_token: str = ''):
         """
         This method sets NCM API keys using the router's certificate management configuration
         :param router_id: ID of router to update (optional if router_name is provided)
@@ -2177,7 +2177,7 @@ class NcmClientv2(BaseNcmClient):
         result = self._return_handler(ncm.status_code, ncm.text, call_type)
         return result
 
-    def set_ncm_api_keys_by_group(self, group_id=None, group_name=None, x_ecm_id: str = None, x_ecm_api_key: str = None, x_cp_api_id: str = None, x_cp_api_key: str = None, bearer_token: str = ''):
+    def set_ncm_api_keys_by_group(self, group_id=None, group_name=None, x_ecm_api_id: str = None, x_ecm_api_key: str = None, x_cp_api_id: str = None, x_cp_api_key: str = None, bearer_token: str = ''):
         """
         This method sets NCM API keys using the group's certificate management configuration
         :param group_id: ID of group to update (optional if group_name is provided)
