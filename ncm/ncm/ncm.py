@@ -2135,7 +2135,7 @@ class NcmClientv2(BaseNcmClient):
                         "certs": {
                             "00000000-abcd-1234-abcd-123456789000": {
                                 "_id_": "00000000-abcd-1234-abcd-123456789000",
-                                "key": x_ecm_id,
+                                "key": x_ecm_api_id,
                                 "name": "X-ECM-API-ID",
                                 "x509": x509
                             },
@@ -2208,7 +2208,7 @@ class NcmClientv2(BaseNcmClient):
                         "certs": {
                             "00000000-abcd-1234-abcd-123456789000": {
                                 "_id_": "00000000-abcd-1234-abcd-123456789000",
-                                "key": x_ecm_id,
+                                "key": x_ecm_api_id,
                                 "name": "X-ECM-API-ID",
                                 "x509": x509
                             },
