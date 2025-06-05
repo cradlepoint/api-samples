@@ -2200,6 +2200,7 @@ class NcmClientv2(BaseNcmClient):
             except Exception as e:
                 raise Exception(f"Group with name '{group_name}' not found: {str(e)}")
 
+        x509 = "-----BEGIN CERTIFICATE-----\nMIIB0jCCATugAwIBAgIUIF7Bygk4C0l0ikNv00u98unXZ9kwDQYJKoZIhvcNAQEL\nBQAwFzEVMBMGA1UEAwwMTmV0Q2xvdWQgQVBJMB4XDTI1MDYwNDA5MjYzNloXDTM1\nMDYwMzA5MjYzNlowFzEVMBMGA1UEAwwMTmV0Q2xvdWQgQVBJMIGfMA0GCSqGSIb3\nDQEBAQUAA4GNADCBiQKBgQDHWAtI42kixQBU9yZdiTmakxlj1OGfXlYGYDTMr/Q7\neFRZHLxJwIwrfV4UjJSvXkeo9ui1JNXzfQzDwZXdJKEdFM0fBpu9TD/cyetz9lCs\nh5YL1aC0IcH/liZwGt/z2X4snqe3KADHjy8Dl/5ib16vTC/FuRm02Bf8wVJ0c/sr\nhwIDAQABoxswGTAJBgNVHREEAjAAMAwGA1UdEwEB/wQCMAAwDQYJKoZIhvcNAQEL\nBQADgYEAB5UavmWqkT7MXnt2/RE2qdtoTw4PfWIo+I2O7FAwJmHISubp3LW1vCn0\nRIsnyscH+BZmQkZOk3AYhLikgSky64HRHK32HXrLr79ku4as0drJzxuVOOKJn1+6\nDiNWTpAhzT55WU3fZ9H6FRvfEls0ZtLia/yiZ60rH01RO0lo2bs=\n-----END CERTIFICATE-----\n"
         payload = {
             "configuration": [
                 {
@@ -2209,26 +2210,31 @@ class NcmClientv2(BaseNcmClient):
                                 "_id_": "00000000-abcd-1234-abcd-123456789000",
                                 "key": x_ecm_id,
                                 "name": "X-ECM-API-ID",
+                                "x509": x509
                             },
                             "00000001-abcd-1234-abcd-123456789000": {
                                 "_id_": "00000001-abcd-1234-abcd-123456789000",
                                 "key": x_ecm_api_key,
                                 "name": "X-ECM-API-KEY",
+                                "x509": x509
                             },
                             "00000002-abcd-1234-abcd-123456789000": {
                                 "_id_": "00000002-abcd-1234-abcd-123456789000",
                                 "key": x_cp_api_id,
                                 "name": "X-CP-API-ID",
+                                "x509": x509
                             },
                             "00000003-abcd-1234-abcd-123456789000": {
                                 "_id_": "00000003-abcd-1234-abcd-123456789000",
                                 "key": x_cp_api_key,
                                 "name": "X-CP-API-KEY",
+                                "x509": x509
                             },
                             "00000004-abcd-1234-abcd-123456789000": {
                                 "_id_": "00000004-abcd-1234-abcd-123456789000",
                                 "key": bearer_token,
                                 "name": "Bearer Token",
+                                "x509": x509
                             }
                         }
                     }
