@@ -2683,7 +2683,7 @@ class NcmClientv3(BaseNcmClient):
                     "data": {
                         "type": "regrades",
                         "attributes": {
-                            "mac_address": mac_address.replace(':', '') if len(mac_address) == 17 else mac_address,
+                            "mac_address": mac_address.replace(':', ''),
                             "action": "UNLICENSE"
                         }
                     }
