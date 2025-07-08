@@ -2667,28 +2667,34 @@ class NcmClientv3(BaseNcmClient):
         result = self._return_handler(ncm.status_code, ncm.json(), call_type)
         return result
 
-    def unlicense_device(self, mac_address):
+    def unlicense_devices(self, mac_addresses):
         """
-        Unlicenses a device by MAC address.
-        :param mac_address: MAC address of the device to unlicense
+        Unlicenses a device by MAC address using the NCM API v3.
+        :param mac_addresses: MAC address of the device to unlicense (can be a single MAC address or a list of MAC addresses)
         :return: Result of the unlicense operation
         """
         call_type = 'Unlicense Device'
         post_url = f'{self.base_url}/asset_endpoints/regrades'
 
-        payload = {
-            "atomic:operations": [
-                {
-                    "op": "add",
-                    "data": {
-                        "type": "regrades",
-                        "attributes": {
-                            "mac_address": mac_address.replace(':', ''),
-                            "action": "UNLICENSE"
-                        }
+        # Convert single MAC address to list for consistent processing
+        mac_addresses = [mac_addresses] if isinstance(mac_addresses, str) else mac_addresses
+
+        # Create atomic operations for each MAC address
+        operations = []
+        for mac in mac_addresses:
+            operations.append({
+                "op": "add",
+                "data": {
+                    "type": "regrades",
+                    "attributes": {
+                        "mac_address": mac.replace(':', ''),
+                        "action": "UNLICENSE"
                     }
                 }
-            ]
+            })
+
+        payload = {
+            "atomic:operations": operations
         }
 
         headers = {
