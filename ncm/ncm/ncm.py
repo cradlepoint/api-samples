@@ -2667,6 +2667,40 @@ class NcmClientv3(BaseNcmClient):
         result = self._return_handler(ncm.status_code, ncm.json(), call_type)
         return result
 
+    def unlicense_device(self, mac_address):
+        """
+        Unlicenses a device by MAC address.
+        :param mac_address: MAC address of the device to unlicense
+        :return: Result of the unlicense operation
+        """
+        call_type = 'Unlicense Device'
+        post_url = f'{self.base_url}/asset_endpoints/regrades'
+
+        payload = {
+            "atomic:operations": [
+                {
+                    "op": "add",
+                    "data": {
+                        "type": "regrades",
+                        "attributes": {
+                            "mac_address": mac_address.replace(':', '') if len(mac_address) == 17 else mac_address,
+                            "action": "UNLICENSE"
+                        }
+                    }
+                }
+            ]
+        }
+
+        headers = {
+            'Content-Type': 'application/vnd.api+json;ext="https://jsonapi.org/ext/atomic"',
+            'Accept': 'application/vnd.api+json;ext="https://jsonapi.org/ext/atomic"'
+        }
+
+        response = self.session.post(post_url, json=payload, headers=headers)
+        
+        result = self._return_handler(response.status_code, response.json(), call_type)
+        return result
+        
     def get_regrades(self, **kwargs):
         """
         Returns regrade jobs with details.
