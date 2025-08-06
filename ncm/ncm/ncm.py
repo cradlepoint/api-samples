@@ -594,6 +594,46 @@ class NcmClientv2(BaseNcmClient):
         result = self.__return_handler(ncm.status_code, ncm.text, call_type)
         return result
 
+    def patch_group(self, group_id, **kwargs):
+        """
+        This method patches (updates) specific fields of a group.
+        Only the provided fields will be updated.
+        
+        :param group_id: ID of the group to update
+        :param kwargs: Group fields to update. Supported fields:
+            - account: url - Account that a group belongs to
+            - configuration: json - Configuration for the group  
+            - name: string - Name of the group
+            - product: url - Product type for the group
+            - target_firmware: url - Firmware version for the group
+        :return: API response
+        """
+        call_type = 'Group Update'
+        
+        # Define the allowed writable fields based on the API documentation
+        allowed_fields = {
+            'account', 'configuration', 'name', 'product', 'target_firmware'
+        }
+        
+        # Filter kwargs to only include allowed fields
+        payload = {}
+        for field, value in kwargs.items():
+            if field in allowed_fields:
+                payload[field] = value
+            else:
+                if self.log_events:
+                    print(f"Warning: Field '{field}' is not a supported writable field and will be ignored.")
+        
+        if not payload:
+            raise ValueError("No valid writable fields provided. Supported fields: {}".format(', '.join(sorted(allowed_fields))))
+        
+        ncm = self.session.patch(
+            '{0}/groups/{1}/'.format(self.base_url, str(group_id)),
+            data=json.dumps(payload))
+        
+        result = self._return_handler(ncm.status_code, ncm.text, call_type)
+        return result
+
     def copy_router_configuration(self, src_router_id, dst_router_id):
         """
         Copies the Configuration Manager config of one router to another.
