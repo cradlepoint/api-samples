@@ -4405,7 +4405,6 @@ class NcmClientv3(BaseNcmClient):
             self.log('error', f"Error updating role for {email}: {str(e)}")
             raise
         
-'''
     def get_group_modem_upgrade_jobs(self, **kwargs):
         """
         Returns users with details.
@@ -4559,7 +4558,97 @@ class NcmClientv3(BaseNcmClient):
             else:
                 params = self.__parse_kwargs(kwargs, allowed_params)
         return self.__get_json(get_url, call_type, params=params)
-'''
+
+    def create_modem_upgrade(self, group_id: int, carrier: str, modem_type_name: str, operation: str, overwrite: bool = False, connection_states: list = None, **kwargs) -> dict:
+        """
+        Creates a new modem upgrade job.
+
+        :param group_id: ID of the group to target for the modem upgrade.
+        :type group_id: int
+        :param carrier: Targeted carrier (e.g., "att").
+        :type carrier: str
+        :param modem_type_name: Module name associated with module_id (e.g., "LP4").
+        :type modem_type_name: str
+        :param operation: Operation type [preview|upgrade|cancel].
+        :type operation: str
+        :param overwrite: Overwrite modem firmware if on the same version already. Defaults to False.
+        :type overwrite: bool
+        :param connection_states: The targeted net devices connection state. Optional.
+        :type connection_states: list, optional
+        :param kwargs: Additional optional parameters to include in the request.
+        :return: The created modem upgrade job data if successful, error message otherwise.
+        :raises TypeError: If the type of any parameter is incorrect.
+        :raises ValueError: If required parameters are missing or if an invalid parameter or value is provided.
+        """
+        call_type = 'Create Modem Upgrade'
+
+        # Type checking for required parameters
+        if not isinstance(group_id, int):
+            raise TypeError("group_id must be an integer")
+        if not isinstance(carrier, str):
+            raise TypeError("carrier must be a string")
+        if not isinstance(modem_type_name, str):
+            raise TypeError("modem_type_name must be a string")
+        if not isinstance(operation, str):
+            raise TypeError("operation must be a string")
+        if not isinstance(overwrite, bool):
+            raise TypeError("overwrite must be a boolean")
+
+        # Validate operation value
+        valid_operations = ["preview", "upgrade", "cancel"]
+        if operation not in valid_operations:
+            raise ValueError(f"operation must be one of: {valid_operations}")
+
+        # Validate carrier and modem_type_name are not empty
+        if not carrier.strip():
+            raise ValueError("carrier cannot be empty")
+        if not modem_type_name.strip():
+            raise ValueError("modem_type_name cannot be empty")
+
+        post_url = f'{self.base_url}/beta/modem_upgrades'
+
+        # Build attributes dictionary with required fields
+        attributes = {
+            'carrier': carrier,
+            'modem_type_name': modem_type_name,
+            'operation': operation,
+            'overwrite': overwrite
+        }
+
+        # Add connection_states if provided
+        if connection_states is not None:
+            if not isinstance(connection_states, list):
+                raise TypeError("connection_states must be a list")
+            if not all(isinstance(state, str) for state in connection_states):
+                raise TypeError("All connection_states must be strings")
+            attributes['connection_states'] = connection_states
+
+        # Add any additional parameters from kwargs directly to attributes
+        for key, value in kwargs.items():
+            attributes[key] = value
+
+        data = {
+            "data": {
+                "type": "modem_upgrades",
+                "attributes": attributes,
+                "relationships": {
+                    "group": {
+                        "data": {
+                            "type": "groups",
+                            "id": group_id
+                        }
+                    }
+                }
+            }
+        }
+
+        ncm = self.session.post(post_url, data=json.dumps(data))
+        result = self._return_handler(ncm.status_code, ncm.json(), call_type)
+        if ncm.status_code == 201:
+            return ncm.json()['data']
+        else:
+            return result
+
 
 class NcmClientv2v3:
 
