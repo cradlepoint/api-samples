@@ -1,50 +1,100 @@
 """
-Cradlepoint NCM API class
-Created by: Nathan Wiens
-Updated by: Jon Gaudu
+Ericsson Enterprise Wireless Solutions - Cradlepoint NCM API module
+Maintained by: Alex Terrell, Jon Gaudu
 
 Overview:
-    The purpose of this class is to make it easier for users to interact with
-    the Cradlepoint NCM API. Within this class is a set of functions that
-    closely matches the available API calls. Full documentation of the
-    Cradlepoint NCM API is available at https://developer.cradlepoint.com.
+    This module provides easy access to the Cradlepoint NCM API with support
+    for both v2 and v3 APIs. It includes a singleton pattern for simple usage
+    and module-level function access for convenience.
 
 Requirements:
-    A set of Cradlepoint NCM API Keys is required to make API calls.
-    While the class can be instantiated without supplying API keys,
-    any subsequent calls will fail unless the keys are set via the
-    set_api_keys() method.
+    Cradlepoint NCM API Keys are required to make API calls.
+    - For v2 API: X-CP-API-ID, X-CP-API-KEY, X-ECM-API-ID, X-ECM-API-KEY
+    - For v3 API: Bearer token
 
-Usage:
-    Instantiating the class:
+Usage Options:
+
+    1. Zero-Configuration Usage (Recommended):
         import ncm
+        
+        # Set these environment variables once:
+        # export X_CP_API_ID="b89a24a3"
+        # export X_CP_API_KEY="4b1d77fe271241b1cfafab993ef0891d"
+        # export X_ECM_API_ID="c71b3e68-33f5-4e69-9853-14989700f204"
+        # export X_ECM_API_KEY="f1ca6cd41f326c00e23322795c063068274caa30"
+        # export NCM_API_TOKEN="your-bearer-token"  # For v3 API
+        
+        # Then just use it - no setup required!
+        accounts = ncm.get_accounts()
+        devices = ncm.get_devices()
+        routers = ncm.get_routers()
+        
+    2. Explicit Configuration (Alternative):
+        import ncm
+        
+        # Option A: Set up API keys explicitly
         api_keys = {
            'X-CP-API-ID': 'b89a24a3',
            'X-CP-API-KEY': '4b1d77fe271241b1cfafab993ef0891d',
            'X-ECM-API-ID': 'c71b3e68-33f5-4e69-9853-14989700f204',
            'X-ECM-API-KEY': 'f1ca6cd41f326c00e23322795c063068274caa30'
         }
-        n = ncm.NcmClient(api_keys=api_keys)
+        ncm.set_api_keys(api_keys)
+        
+        # Option B: Manual environment variable loading
+        ncm.set_api_keys()  # Manually loads from environment
 
-    Example API call:
-        n.get_accounts()
+    3. Traditional Class Instantiation:
+        import ncm
+        api_keys = {...}  # Same as above
+        client = ncm.NcmClient(api_keys=api_keys)
+        accounts = client.get_accounts()
 
-Tips:
-    This python class includes a few optimizations to make it easier to
-    work with the API. The default record limit is set at 500 instead of
-    the Cradlepoint default of 20, which reduces the number of API calls
-    required to return large sets of data.
+    4. Mixed v2/v3 API Usage:
+        import ncm
+        api_keys = {
+           'X-CP-API-ID': 'b89a24a3',
+           'X-CP-API-KEY': '4b1d77fe271241b1cfafab993ef0891d',
+           'X-ECM-API-ID': 'c71b3e68-33f5-4e69-9853-14989700f204',
+           'X-ECM-API-KEY': 'f1ca6cd41f326c00e23322795c063068274caa30',
+           'token': 'your-v3-bearer-token'  # For v3 API
+        }
+        client = ncm.NcmClient(api_keys=api_keys)
+        # Methods will automatically route to the appropriate API version
 
-    This can be modified by specifying a "limit parameter":
-       n.get_accounts(limit=10)
+    5. Backward Compatibility (Legacy Scripts):
+        from ncm import ncm  # Old import pattern still works!
+        
+        api_keys = {
+            'X-ECM-API-ID': os.environ.get("X_ECM_API_ID"),
+            'X-ECM-API-KEY': os.environ.get("X_ECM_API_KEY"),
+            'X-CP-API-ID': os.environ.get("X_CP_API_ID"),
+            'X-CP-API-KEY': os.environ.get("X_CP_API_KEY"),
+            'Authorization': f'Bearer {os.environ.get("TOKEN")}'
+        }
+        
+        # All existing patterns work unchanged:
+        ncm_client = ncm.NcmClientv3(api_key=token, log_events=True)
+        ncm_client.set_api_keys(api_keys)  # Instance method still works
+        
+        # New convenience pattern also available:
+        ncm.set_api_keys(api_keys)  # Module-level method
+        routers = ncm.get_routers()  # Direct method access
 
-    You can also return the full list of records in a single array without
-    the need for paging by passing limit='all':
-       n.get_accounts(limit='all')
+Features:
+    - Zero-configuration usage with automatic environment variable loading
+    - Singleton pattern for easy module-level access
+    - Automatic API version routing (v3 prioritized over v2)
+    - Module-level function access (ncm.method_name())
+    - Automatic initialization on import if environment variables are set
+    - Full backward compatibility with existing scripts
+    - Support for both import patterns: "import ncm" and "from ncm import ncm"
+    - Optimized pagination (default limit 500 vs API default 20)
+    - Support for limit='all' to get all records without paging
+    - Automatic chunking of "__in" filters beyond 100 item limit
 
-    It also has native support for handling any number of "__in" filters
-    beyond Cradlepoint's limit of 100. The script automatically chunks
-    the list into groups of 100 and combines the results into a single array
+Full documentation of the Cradlepoint NCM API is available at:
+https://developer.cradlepoint.com
 
 """
 
@@ -56,7 +106,7 @@ from datetime import datetime, timedelta
 import sys
 import os
 import json
-from typing import Union
+from typing import Union, Optional, Dict, Any
 
 
 def __is_json(test_json):
@@ -2313,6 +2363,84 @@ class NcmClientv2(BaseNcmClient):
         result = self._return_handler(ncm.status_code, ncm.json(), call_type)
         return result
 
+    def get_router_appdata(self, router_id_or_name: Union[int, str], **kwargs) -> list:
+        """
+        Get appdata from router configuration.
+        Retrieves the system/sdk/appdata from the router's configuration.
+        
+        :param router_id_or_name: ID (int) or name (str) of the router to get appdata from
+        :type router_id_or_name: Union[int, str]
+        :param kwargs: Additional parameters for the API call
+        :return: List of appdata items with _id_, name, and value fields
+        :rtype: list
+        """
+        try:
+            # Get router with configuration_manager expanded
+            if isinstance(router_id_or_name, int):
+                router = self.get_router_by_id(router_id_or_name, expand='configuration_manager', **kwargs)
+            else:
+                # Check for multiple routers with the same name
+                routers_with_name = self.get_routers(name=router_id_or_name, **kwargs)
+                if len(routers_with_name) > 1:
+                    print(f"Warning: Found {len(routers_with_name)} routers with name '{router_id_or_name}'. Using the first one (ID: {routers_with_name[0].get('id')})")
+                    print(f"All routers with this name: {[r.get('id') for r in routers_with_name]}")
+                elif len(routers_with_name) == 0:
+                    raise ValueError(f"No router found with name '{router_id_or_name}'")
+                
+                router = self.get_router_by_name(router_id_or_name, expand='configuration_manager', **kwargs)
+            
+            # Navigate to system/sdk/appdata through configuration_manager, always use item 0
+            config_manager = router.get('configuration_manager', {})
+            configuration = config_manager.get('configuration', [])
+            
+            if configuration and len(configuration) > 0:
+                first_config = configuration[0]  # Always use item 0
+                appdata_dict = (first_config
+                               .get('system', {})
+                               .get('sdk', {})
+                               .get('appdata', {}))
+                
+                # Convert dict to list of appdata items
+                if isinstance(appdata_dict, dict):
+                    return list(appdata_dict.values())
+                else:
+                    return []
+            else:
+                return []
+            
+        except Exception as e:
+            print(f"Error getting appdata for router {router_id_or_name}: {e}")
+            return []
+
+    def get_router_appdata_value(self, router_id_or_name: Union[int, str], name: str, **kwargs) -> Optional[str]:
+        """
+        Get a specific appdata value by name from router configuration.
+        Searches the system/sdk/appdata array for an item with the specified name.
+        
+        :param router_id_or_name: ID (int) or name (str) of the router to get appdata from
+        :type router_id_or_name: Union[int, str]
+        :param name: Name of the appdata item to retrieve
+        :type name: str
+        :param kwargs: Additional parameters for the API call
+        :return: Value of the appdata item, or None if not found
+        :rtype: Optional[str]
+        """
+        try:
+            # Get appdata array (this will handle the duplicate name checking)
+            sdk_data = self.get_router_appdata(router_id_or_name, **kwargs)
+            
+            # Search for item with matching name using method chaining
+            for item in sdk_data:
+                if item.get('name') == name:
+                    return item.get('value')
+            
+            # Return None if not found
+            return None
+            
+        except Exception as e:
+            print(f"Error getting appdata value '{name}' for router {router_id_or_name}: {e}")
+            return None
+
 class NcmClientv3(BaseNcmClient):
     """
     This NCM Client class provides functions for interacting with =
@@ -4405,252 +4533,257 @@ class NcmClientv3(BaseNcmClient):
             self.log('error', f"Error updating role for {email}: {str(e)}")
             raise
         
-    def get_group_modem_upgrade_jobs(self, **kwargs):
-        """
-        Returns users with details.
-        :param kwargs: A set of zero or more allowed parameters
-          in the allowed_params list.
-        :return: A list of users with details.
-        """
-        call_type = 'Group Modem Upgrades'
-        get_url = f'{self.base_url}/beta/group_modem_upgrade_jobs'
+    # def get_group_modem_upgrade_jobs(self, **kwargs):
+    #     """
+    #     Returns users with details.
+    #     :param kwargs: A set of zero or more allowed parameters
+    #       in the allowed_params list.
+    #     :return: A list of users with details.
+    #     """
+    #     call_type = 'Group Modem Upgrades'
+    #     get_url = f'{self.base_url}/beta/group_modem_upgrade_jobs'
 
-        allowed_params = ['id',
-                          'group_id',
-                          'module_id',
-                          'carrier_id',
-                          'overwrite',
-                          'active_only',
-                          'upgrade_only',
-                          'batch_size',
-                          'created_at',
-                          'created_at__lt',
-                          'created_at__lte',
-                          'created_at__gt',
-                          'created_at__gte',
-                          'created_at__ne',
-                          'updated_at',
-                          'updated_at__lt',
-                          'updated_at__lte',
-                          'updated_at__gt',
-                          'updated_at__gte',
-                          'updated_at__ne',
-                          'available_version',
-                          'modem_count',
-                          'success_count',
-                          'failed_count',
-                          'statuscarrier_name',
-                          'module_name',
-                          'type',
-                          'fields',
-                          'limit',
-                          'sort']
+    #     allowed_params = ['id',
+    #                       'group_id',
+    #                       'module_id',
+    #                       'carrier_id',
+    #                       'overwrite',
+    #                       'active_only',
+    #                       'upgrade_only',
+    #                       'batch_size',
+    #                       'created_at',
+    #                       'created_at__lt',
+    #                       'created_at__lte',
+    #                       'created_at__gt',
+    #                       'created_at__gte',
+    #                       'created_at__ne',
+    #                       'updated_at',
+    #                       'updated_at__lt',
+    #                       'updated_at__lte',
+    #                       'updated_at__gt',
+    #                       'updated_at__gte',
+    #                       'updated_at__ne',
+    #                       'available_version',
+    #                       'modem_count',
+    #                       'success_count',
+    #                       'failed_count',
+    #                       'statuscarrier_name',
+    #                       'module_name',
+    #                       'type',
+    #                       'fields',
+    #                       'limit',
+    #                       'sort']
 
-        if "search" not in kwargs.keys():
-            params = self.__parse_kwargs(kwargs, allowed_params)
-        else:
-            if kwargs['search']:
-                params = self.__parse_search_kwargs(kwargs, allowed_params)
-            else:
-                params = self.__parse_kwargs(kwargs, allowed_params)
-        return self.__get_json(get_url, call_type, params=params)
+    #     if "search" not in kwargs.keys():
+    #         params = self.__parse_kwargs(kwargs, allowed_params)
+    #     else:
+    #         if kwargs['search']:
+    #             params = self.__parse_search_kwargs(kwargs, allowed_params)
+    #         else:
+    #             params = self.__parse_kwargs(kwargs, allowed_params)
+    #     return self.__get_json(get_url, call_type, params=params)
 
-    def get_group_modem_upgrade_job(self, job_id, **kwargs):
-        """
-        Returns users with details.
-        :param job_id: The ID of the job
-        :param kwargs: A set of zero or more allowed parameters
-          in the allowed_params list.
-        :return: A list of users with details.
-        """
-        call_type = 'Group Modem Upgrades'
-        get_url = f'{self.base_url}/beta/group_modem_upgrade_jobs/{job_id}'
+    # def get_group_modem_upgrade_job(self, job_id, **kwargs):
+    #     """
+    #     Returns users with details.
+    #     :param job_id: The ID of the job
+    #     :param kwargs: A set of zero or more allowed parameters
+    #       in the allowed_params list.
+    #     :return: A list of users with details.
+    #     """
+    #     call_type = 'Group Modem Upgrades'
+    #     get_url = f'{self.base_url}/beta/group_modem_upgrade_jobs/{job_id}'
 
-        allowed_params = ['id',
-                          'group_id',
-                          'module_id',
-                          'carrier_id',
-                          'overwrite',
-                          'active_only',
-                          'upgrade_only',
-                          'batch_size',
-                          'created_at',
-                          'updated_at',
-                          'available_version',
-                          'modem_count',
-                          'success_count',
-                          'failed_count',
-                          'statuscarrier_name',
-                          'module_name',
-                          'type',
-                          'fields',
-                          'limit',
-                          'sort']
+    #     allowed_params = ['id',
+    #                       'group_id',
+    #                       'module_id',
+    #                       'carrier_id',
+    #                       'overwrite',
+    #                       'active_only',
+    #                       'upgrade_only',
+    #                       'batch_size',
+    #                       'created_at',
+    #                       'updated_at',
+    #                       'available_version',
+    #                       'modem_count',
+    #                       'success_count',
+    #                       'failed_count',
+    #                       'statuscarrier_name',
+    #                       'module_name',
+    #                       'type',
+    #                       'fields',
+    #                       'limit',
+    #                       'sort']
 
-        if "search" not in kwargs.keys():
-            params = self.__parse_kwargs(kwargs, allowed_params)
-        else:
-            if kwargs['search']:
-                params = self.__parse_search_kwargs(kwargs, allowed_params)
-            else:
-                params = self.__parse_kwargs(kwargs, allowed_params)
-        return self.__get_json(get_url, call_type, params=params)
+    #     if "search" not in kwargs.keys():
+    #         params = self.__parse_kwargs(kwargs, allowed_params)
+    #     else:
+    #         if kwargs['search']:
+    #             params = self.__parse_search_kwargs(kwargs, allowed_params)
+    #         else:
+    #             params = self.__parse_kwargs(kwargs, allowed_params)
+    #     return self.__get_json(get_url, call_type, params=params)
 
-    def get_group_modem_upgrade_summary(self, **kwargs):
-        """
-        Returns users with details.
-        :param kwargs: A set of zero or more allowed parameters
-          in the allowed_params list.
-        :return: A list of users with details.
-        """
-        call_type = 'Group Modem Upgrades'
-        get_url = f'{self.base_url}/beta/group_modem_upgrade_jobs'
+    # def get_group_modem_upgrade_summary(self, **kwargs):
+    #     """
+    #     Returns users with details.
+    #     :param kwargs: A set of zero or more allowed parameters
+    #       in the allowed_params list.
+    #     :return: A list of users with details.
+    #     """
+    #     call_type = 'Group Modem Upgrades'
+    #     get_url = f'{self.base_url}/beta/group_modem_upgrade_jobs'
 
-        allowed_params = ['group_id',
-                          'module_id',
-                          'module_name',
-                          'upgradable_modems',
-                          'up_to_date_modems',
-                          'summary_data',
-                          'type',
-                          'fields',
-                          'limit',
-                          'sort']
+    #     allowed_params = ['group_id',
+    #                       'module_id',
+    #                       'module_name',
+    #                       'upgradable_modems',
+    #                       'up_to_date_modems',
+    #                       'summary_data',
+    #                       'type',
+    #                       'fields',
+    #                       'limit',
+    #                       'sort']
 
-        if "search" not in kwargs.keys():
-            params = self.__parse_kwargs(kwargs, allowed_params)
-        else:
-            if kwargs['search']:
-                params = self.__parse_search_kwargs(kwargs, allowed_params)
-            else:
-                params = self.__parse_kwargs(kwargs, allowed_params)
-        return self.__get_json(get_url, call_type, params=params)
+    #     if "search" not in kwargs.keys():
+    #         params = self.__parse_kwargs(kwargs, allowed_params)
+    #     else:
+    #         if kwargs['search']:
+    #             params = self.__parse_search_kwargs(kwargs, allowed_params)
+    #         else:
+    #             params = self.__parse_kwargs(kwargs, allowed_params)
+    #     return self.__get_json(get_url, call_type, params=params)
 
-    def get_group_modem_upgrade_device_summary(self, **kwargs):
-        """
-        Returns users with details.
-        :param kwargs: A set of zero or more allowed parameters
-          in the allowed_params list.
-        :return: A list of users with details.
-        """
-        call_type = 'Group Modem Upgrades'
-        get_url = f'{self.base_url}/beta/group_modem_upgrade_jobs'
+    # def get_group_modem_upgrade_device_summary(self, **kwargs):
+    #     """
+    #     Returns users with details.
+    #     :param kwargs: A set of zero or more allowed parameters
+    #       in the allowed_params list.
+    #     :return: A list of users with details.
+    #     """
+    #     call_type = 'Group Modem Upgrades'
+    #     get_url = f'{self.base_url}/beta/group_modem_upgrade_jobs'
 
-        allowed_params = ['group_id',
-                          'module_id',
-                          'carrier_id',
-                          'overwrite',
-                          'active_only',
-                          'upgrade_only',
-                          'router_name',
-                          'net_device_name',
-                          'current_version',
-                          'type',
-                          'fields',
-                          'limit',
-                          'sort']
+    #     allowed_params = ['group_id',
+    #                       'module_id',
+    #                       'carrier_id',
+    #                       'overwrite',
+    #                       'active_only',
+    #                       'upgrade_only',
+    #                       'router_name',
+    #                       'net_device_name',
+    #                       'current_version',
+    #                       'type',
+    #                       'fields',
+    #                       'limit',
+    #                       'sort']
 
-        if "search" not in kwargs.keys():
-            params = self.__parse_kwargs(kwargs, allowed_params)
-        else:
-            if kwargs['search']:
-                params = self.__parse_search_kwargs(kwargs, allowed_params)
-            else:
-                params = self.__parse_kwargs(kwargs, allowed_params)
-        return self.__get_json(get_url, call_type, params=params)
+    #     if "search" not in kwargs.keys():
+    #         params = self.__parse_kwargs(kwargs, allowed_params)
+    #     else:
+    #         if kwargs['search']:
+    #             params = self.__parse_search_kwargs(kwargs, allowed_params)
+    #         else:
+    #             params = self.__parse_kwargs(kwargs, allowed_params)
+    #     return self.__get_json(get_url, call_type, params=params)
 
-    def create_modem_upgrade(self, group_id: int, carrier: str, modem_type_name: str, operation: str, overwrite: bool = False, connection_states: list = None, **kwargs) -> dict:
-        """
-        Creates a new modem upgrade job.
+    # def create_modem_upgrade(self, group_id: int, carrier: str, modem_type_name: str, operation: str, overwrite: bool = False, connection_states: list = None, **kwargs) -> dict:
+    #     """
+    #     Creates a new modem upgrade job.
 
-        :param group_id: ID of the group to target for the modem upgrade.
-        :type group_id: int
-        :param carrier: Targeted carrier (e.g., "att").
-        :type carrier: str
-        :param modem_type_name: Module name associated with module_id (e.g., "LP4").
-        :type modem_type_name: str
-        :param operation: Operation type [preview|upgrade|cancel].
-        :type operation: str
-        :param overwrite: Overwrite modem firmware if on the same version already. Defaults to False.
-        :type overwrite: bool
-        :param connection_states: The targeted net devices connection state. Optional.
-        :type connection_states: list, optional
-        :param kwargs: Additional optional parameters to include in the request.
-        :return: The created modem upgrade job data if successful, error message otherwise.
-        :raises TypeError: If the type of any parameter is incorrect.
-        :raises ValueError: If required parameters are missing or if an invalid parameter or value is provided.
-        """
-        call_type = 'Create Modem Upgrade'
+    #     :param group_id: ID of the group to target for the modem upgrade.
+    #     :type group_id: int
+    #     :param carrier: Targeted carrier (e.g., "att").
+    #     :type carrier: str
+    #     :param modem_type_name: Module name associated with module_id (e.g., "LP4").
+    #     :type modem_type_name: str
+    #     :param operation: Operation type [preview|upgrade|cancel].
+    #     :type operation: str
+    #     :param overwrite: Overwrite modem firmware if on the same version already. Defaults to False.
+    #     :type overwrite: bool
+    #     :param connection_states: The targeted net devices connection state. Optional.
+    #     :type connection_states: list, optional
+    #     :param kwargs: Additional optional parameters to include in the request.
+    #     :return: The created modem upgrade job data if successful, error message otherwise.
+    #     :raises TypeError: If the type of any parameter is incorrect.
+    #     :raises ValueError: If required parameters are missing or if an invalid parameter or value is provided.
+    #     """
+    #     call_type = 'Create Modem Upgrade'
 
-        # Type checking for required parameters
-        if not isinstance(group_id, int):
-            raise TypeError("group_id must be an integer")
-        if not isinstance(carrier, str):
-            raise TypeError("carrier must be a string")
-        if not isinstance(modem_type_name, str):
-            raise TypeError("modem_type_name must be a string")
-        if not isinstance(operation, str):
-            raise TypeError("operation must be a string")
-        if not isinstance(overwrite, bool):
-            raise TypeError("overwrite must be a boolean")
+    #     # Type checking for required parameters
+    #     if not isinstance(group_id, int):
+    #         raise TypeError("group_id must be an integer")
+    #     if not isinstance(carrier, str):
+    #         raise TypeError("carrier must be a string")
+    #     if not isinstance(modem_type_name, str):
+    #         raise TypeError("modem_type_name must be a string")
+    #     if not isinstance(operation, str):
+    #         raise TypeError("operation must be a string")
+    #     if not isinstance(overwrite, bool):
+    #         raise TypeError("overwrite must be a boolean")
 
-        # Validate operation value
-        valid_operations = ["preview", "upgrade", "cancel"]
-        if operation not in valid_operations:
-            raise ValueError(f"operation must be one of: {valid_operations}")
+    #     # Validate operation value
+    #     valid_operations = ["preview", "upgrade", "cancel"]
+    #     if operation not in valid_operations:
+    #         raise ValueError(f"operation must be one of: {valid_operations}")
 
-        # Validate carrier and modem_type_name are not empty
-        if not carrier.strip():
-            raise ValueError("carrier cannot be empty")
-        if not modem_type_name.strip():
-            raise ValueError("modem_type_name cannot be empty")
+    #     # Validate carrier and modem_type_name are not empty
+    #     if not carrier.strip():
+    #         raise ValueError("carrier cannot be empty")
+    #     if not modem_type_name.strip():
+    #         raise ValueError("modem_type_name cannot be empty")
 
-        post_url = f'{self.base_url}/beta/modem_upgrades'
+    #     post_url = f'{self.base_url}/beta/modem_upgrades'
 
-        # Build attributes dictionary with required fields
-        attributes = {
-            'carrier': carrier,
-            'modem_type_name': modem_type_name,
-            'operation': operation,
-            'overwrite': overwrite
-        }
+    #     # Build attributes dictionary with required fields
+    #     attributes = {
+    #         'carrier': carrier,
+    #         'modem_type_name': modem_type_name,
+    #         'operation': operation,
+    #         'overwrite': overwrite
+    #     }
 
-        # Add connection_states if provided
-        if connection_states is not None:
-            if not isinstance(connection_states, list):
-                raise TypeError("connection_states must be a list")
-            if not all(isinstance(state, str) for state in connection_states):
-                raise TypeError("All connection_states must be strings")
-            attributes['connection_states'] = connection_states
+    #     # Add connection_states if provided
+    #     if connection_states is not None:
+    #         if not isinstance(connection_states, list):
+    #             raise TypeError("connection_states must be a list")
+    #         if not all(isinstance(state, str) for state in connection_states):
+    #             raise TypeError("All connection_states must be strings")
+    #         attributes['connection_states'] = connection_states
 
-        # Add any additional parameters from kwargs directly to attributes
-        for key, value in kwargs.items():
-            attributes[key] = value
+    #     # Add any additional parameters from kwargs directly to attributes
+    #     for key, value in kwargs.items():
+    #         attributes[key] = value
 
-        data = {
-            "data": {
-                "type": "modem_upgrades",
-                "attributes": attributes,
-                "relationships": {
-                    "group": {
-                        "data": {
-                            "type": "groups",
-                            "id": group_id
-                        }
-                    }
-                }
-            }
-        }
+    #     data = {
+    #         "data": {
+    #             "type": "modem_upgrades",
+    #             "attributes": attributes,
+    #             "relationships": {
+    #                 "group": {
+    #                     "data": {
+    #                         "type": "groups",
+    #                         "id": group_id
+    #                     }
+    #                 }
+    #             }
+    #         }
+    #     }
 
-        ncm = self.session.post(post_url, data=json.dumps(data))
-        result = self._return_handler(ncm.status_code, ncm.json(), call_type)
-        if ncm.status_code == 201:
-            return ncm.json()['data']
-        else:
-            return result
+    #     ncm = self.session.post(post_url, data=json.dumps(data))
+    #     result = self._return_handler(ncm.status_code, ncm.json(), call_type)
+    #     if ncm.status_code == 201:
+    #         return ncm.json()['data']
+    #     else:
+    #         return result
+
 
 
 class NcmClientv2v3:
+    """
+    Unified NCM client that provides access to both v2 and v3 APIs.
+    Uses composition instead of inheritance for better maintainability.
+    """
 
     def __init__(self, 
               api_keys=None,
@@ -4672,36 +4805,129 @@ class NcmClientv2v3:
         """
         api_keys = api_keys or {}
         apiv3_key = api_keys.pop('token', None) or api_key
-        self.v2 = None
-        self.v3 = None
+        
+        # Initialize clients using composition
+        self._v2_client = None
+        self._v3_client = None
+        
         if api_keys:
-            self.v2 = NcmClientv2(api_keys=api_keys, 
-                                  log_events=log_events,
-                                  logger=logger,
-                                  retries=retries, 
-                                  retry_backoff_factor=retry_backoff_factor, 
-                                  retry_on=retry_on, 
-                                  base_url=base_url)
+            self._v2_client = NcmClientv2(api_keys=api_keys, 
+                                        log_events=log_events,
+                                        logger=logger,
+                                        retries=retries, 
+                                        retry_backoff_factor=retry_backoff_factor, 
+                                        retry_on=retry_on, 
+                                        base_url=base_url)
+        
         if apiv3_key:
             base_url = base_url_v3 if api_keys else base_url
-            self.v3 = NcmClientv3(api_key=apiv3_key, 
-                                  log_events=log_events, 
-                                  logger=logger,
-                                  retries=retries, 
-                                  retry_backoff_factor=retry_backoff_factor, 
-                                  retry_on=retry_on, 
-                                  base_url=base_url)
+            self._v3_client = NcmClientv3(api_key=apiv3_key, 
+                                        log_events=log_events, 
+                                        logger=logger,
+                                        retries=retries, 
+                                        retry_backoff_factor=retry_backoff_factor, 
+                                        retry_on=retry_on, 
+                                        base_url=base_url)
         
-    def __getattribute__(self, name):
-        try:
-            return super().__getattribute__(name)
-        except AttributeError:
-            # Prioritize v3 over v2
-            if self.v3 and hasattr(self.v3, name):
-                return getattr(self.v3, name)
-            if self.v2 and hasattr(self.v2, name):
-                return getattr(self.v2, name)
-            raise
+        # For backwards compatibility
+        self.v2 = self._v2_client
+        self.v3 = self._v3_client
+        
+    def __getattr__(self, name: str) -> Any:
+        """
+        Delegate method calls to the appropriate client.
+        Prioritizes v2 for router-related methods (since router IDs are v2-specific),
+        otherwise prioritizes v3 over v2 for method resolution.
+        
+        :param name: Name of the attribute to get
+        :type name: str
+        :return: The requested attribute
+        :raises AttributeError: If the attribute doesn't exist in either client
+        """
+        # Router-related methods should use v2 since router IDs are v2-specific
+        router_methods = [
+            'get_router_appdata', 'get_router_appdata_value',
+            'get_router_by_id', 'get_router_by_name', 'get_routers',
+            'get_router_alerts', 'get_router_logs', 'get_router_state_samples',
+            'get_router_stream_usage_samples', 'get_routers_for_account',
+            'get_routers_for_group', 'rename_router_by_id', 'rename_router_by_name',
+            'assign_router_to_group', 'remove_router_from_group', 'assign_router_to_account',
+            'delete_router_by_id', 'delete_router_by_name', 'reboot_device',
+            'set_lan_ip_address', 'set_custom1', 'set_custom2', 'set_admin_password',
+            'set_router_name', 'set_router_description', 'set_router_asset_id',
+            'set_ethernet_wan_ip', 'add_custom_apn', 'set_ncm_api_keys_by_router',
+            'set_router_fields', 'copy_router_configuration', 'resume_updates_for_router',
+            'get_net_devices_for_router', 'get_net_devices_for_router_by_mode',
+            'get_historical_locations', 'get_historical_locations_for_date',
+            'create_location', 'delete_location_for_router', 'create_speed_test_mdm'
+        ]
+        
+        # For router-related methods, try v2 first
+        if name in router_methods:
+            if self._v2_client and hasattr(self._v2_client, name):
+                return getattr(self._v2_client, name)
+            if self._v3_client and hasattr(self._v3_client, name):
+                return getattr(self._v3_client, name)
+        else:
+            # For other methods, try v3 first, then v2
+            if self._v3_client and hasattr(self._v3_client, name):
+                return getattr(self._v3_client, name)
+            if self._v2_client and hasattr(self._v2_client, name):
+                return getattr(self._v2_client, name)
+        
+        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
+    
+    def __dir__(self) -> list:
+        """
+        Return a list of available attributes and methods.
+        Combines methods from both v2 and v3 clients.
+        
+        :return: List of available attribute names
+        :rtype: list
+        """
+        attrs = set(super().__dir__())
+        if self._v2_client:
+            attrs.update(dir(self._v2_client))
+        if self._v3_client:
+            attrs.update(dir(self._v3_client))
+        return sorted(attrs)
+    
+    def get_available_methods(self) -> list:
+        """
+        Get a list of all available methods from both clients.
+        Useful for introspection and debugging.
+        
+        :return: List of available method names
+        :rtype: list
+        """
+        methods = set()
+        if self._v2_client:
+            v2_methods = [method for method in dir(self._v2_client) 
+                         if not method.startswith('_') and callable(getattr(self._v2_client, method))]
+            methods.update(v2_methods)
+        if self._v3_client:
+            v3_methods = [method for method in dir(self._v3_client) 
+                         if not method.startswith('_') and callable(getattr(self._v3_client, method))]
+            methods.update(v3_methods)
+        return sorted(methods)
+    
+    def has_v2_client(self) -> bool:
+        """
+        Check if v2 client is available.
+        
+        :return: True if v2 client is available
+        :rtype: bool
+        """
+        return self._v2_client is not None
+    
+    def has_v3_client(self) -> bool:
+        """
+        Check if v3 client is available.
+        
+        :return: True if v3 client is available
+        :rtype: bool
+        """
+        return self._v3_client is not None
 
 
 class NcmClient:
@@ -4712,7 +4938,7 @@ class NcmClient:
     """
 
     def __new__(cls, api_keys=None, api_key=None, **kwargs):
-        api_keys = {**api_keys} or {}
+        api_keys = {**(api_keys or {})}
         apiv3_key = api_keys.pop('token', None) or api_key
         v2 = bool(api_keys)
         v3 = bool(apiv3_key)
@@ -4722,3 +4948,301 @@ class NcmClient:
             return NcmClientv2(api_keys=api_keys, **kwargs)
         else:
             return NcmClientv3(api_key=apiv3_key, **kwargs)
+
+
+# Singleton instance for easy module-level access
+_ncm_instance = None
+
+
+def _load_api_keys_from_env() -> tuple[Optional[Dict[str, str]], Optional[str]]:
+    """
+    Load API keys from environment variables if available.
+    
+    :return: Tuple of (v2_api_keys_dict, v3_api_key_string)
+    :rtype: tuple
+    """
+    print("🔍 NCM: Checking for API keys in environment variables...")
+    
+    # Load v2 API keys from environment
+    v2_keys = {}
+    env_v2_keys = {
+        'X-CP-API-ID': os.environ.get('X_CP_API_ID'),
+        'X-CP-API-KEY': os.environ.get('X_CP_API_KEY'),
+        'X-ECM-API-ID': os.environ.get('X_ECM_API_ID'),
+        'X-ECM-API-KEY': os.environ.get('X_ECM_API_KEY')
+    }
+    
+    # Only include keys that are actually set
+    for key, value in env_v2_keys.items():
+        if value:
+            v2_keys[key] = value
+            print(f"✅ NCM: Found {key} in environment")
+        else:
+            print(f"❌ NCM: {key} not found in environment")
+    
+    # Load v3 API key from environment
+    v3_key = os.environ.get('NCM_API_TOKEN') or os.environ.get('TOKEN')
+    if v3_key:
+        print("✅ NCM: Found v3 API token in environment")
+    else:
+        print("❌ NCM: No v3 API token found in environment")
+    
+    # Return None for empty dictionaries/keys
+    v2_result = v2_keys if v2_keys else None
+    v3_result = v3_key if v3_key else None
+    
+    if v2_result or v3_result:
+        print(f"🚀 NCM: Auto-initializing with {'v2' if v2_result else ''}{' and ' if v2_result and v3_result else ''}{'v3' if v3_result else ''} API keys")
+    else:
+        print("⚠️  NCM: No API keys found in environment variables")
+    
+    return v2_result, v3_result
+
+
+def get_ncm_instance(api_keys: Optional[Dict[str, str]] = None, 
+                    api_key: Optional[str] = None, 
+                    **kwargs: Any) -> Union['NcmClientv2', 'NcmClientv3', 'NcmClientv2v3']:
+    """
+    Get or create the singleton NCM instance.
+    Automatically loads API keys from environment variables if not provided.
+    
+    Environment variables:
+        - X_CP_API_ID: CP API ID for v2 API
+        - X_CP_API_KEY: CP API Key for v2 API  
+        - X_ECM_API_ID: ECM API ID for v2 API
+        - X_ECM_API_KEY: ECM API Key for v2 API
+        - NCM_API_TOKEN or TOKEN: Bearer token for v3 API
+    
+    :param api_keys: Dictionary of API credentials (apiv2). Optional.
+    :type api_keys: dict
+    :param api_key: API key for apiv3. Optional.
+    :type api_key: str
+    :param kwargs: Additional arguments passed to NcmClient
+    :return: NCM client instance
+    :rtype: NcmClientv2, NcmClientv3, or NcmClientv2v3
+    """
+    global _ncm_instance
+    if _ncm_instance is None:
+        # Load from environment if not provided
+        if not api_keys and not api_key:
+            env_v2_keys, env_v3_key = _load_api_keys_from_env()
+            api_keys = env_v2_keys
+            api_key = env_v3_key
+        
+        _ncm_instance = NcmClient(api_keys=api_keys, api_key=api_key, **kwargs)
+    return _ncm_instance
+
+
+def set_api_keys(api_keys: Optional[Dict[str, str]] = None, 
+                api_key: Optional[str] = None, 
+                **kwargs: Any) -> Union['NcmClientv2', 'NcmClientv3', 'NcmClientv2v3']:
+    """
+    Set API keys for the singleton NCM instance.
+    This is a convenience function that creates or updates the singleton instance.
+    This function is backward compatible and doesn't interfere with existing 
+    instance.set_api_keys() methods.
+    Automatically loads API keys from environment variables if not provided.
+    
+    Environment variables:
+        - X_CP_API_ID: CP API ID for v2 API
+        - X_CP_API_KEY: CP API Key for v2 API  
+        - X_ECM_API_ID: ECM API ID for v2 API
+        - X_ECM_API_KEY: ECM API Key for v2 API
+        - NCM_API_TOKEN or TOKEN: Bearer token for v3 API
+    
+    :param api_keys: Dictionary of API credentials (apiv2). Optional.
+    :type api_keys: dict
+    :param api_key: API key for apiv3. Optional.
+    :type api_key: str
+    :param kwargs: Additional arguments passed to NcmClient
+    :return: NCM client instance
+    :rtype: NcmClientv2, NcmClientv3, or NcmClientv2v3
+    """
+    global _ncm_instance
+    
+    print("🔧 NCM: set_api_keys() called")
+    
+    # Load from environment if not provided
+    if not api_keys and not api_key:
+        print("🔍 NCM: No explicit keys provided, loading from environment...")
+        env_v2_keys, env_v3_key = _load_api_keys_from_env()
+        api_keys = env_v2_keys
+        api_key = env_v3_key
+    else:
+        print("🔑 NCM: Using explicitly provided API keys")
+    
+    # Create a new instance with the provided keys
+    # This uses the existing NcmClient logic which handles key validation
+    print("🔧 NCM: Creating new NCM client instance...")
+    _ncm_instance = NcmClient(api_keys=api_keys, api_key=api_key, **kwargs)
+    print(f"✅ NCM: Client created successfully! Type: {type(_ncm_instance).__name__}")
+    return _ncm_instance
+
+
+def set_ncm_instance(instance: Union['NcmClientv2', 'NcmClientv3', 'NcmClientv2v3']) -> None:
+    """
+    Set the singleton NCM instance (useful for testing or custom configuration).
+    
+    :param instance: NCM client instance to use as singleton
+    :type instance: NcmClientv2, NcmClientv3, or NcmClientv2v3
+    """
+    global _ncm_instance
+    _ncm_instance = instance
+
+
+def reset_ncm_instance() -> None:
+    """
+    Reset the singleton NCM instance to None.
+    """
+    global _ncm_instance
+    _ncm_instance = None
+
+
+# Module-level function factory for direct method access
+def _create_module_method(method_name: str) -> Any:
+    """
+    Create a module-level function that delegates to the singleton instance.
+    
+    :param method_name: Name of the method to create module-level access for
+    :type method_name: str
+    :return: Function that delegates to the singleton instance method
+    :rtype: function
+    """
+    def module_method(*args: Any, **kwargs: Any) -> Any:
+        instance = get_ncm_instance()
+        if not hasattr(instance, method_name):
+            raise AttributeError(f"NCM client has no method '{method_name}'")
+        return getattr(instance, method_name)(*args, **kwargs)
+    
+    module_method.__name__ = method_name
+    module_method.__doc__ = f"Module-level access to {method_name} method"
+    return module_method
+
+
+# Auto-generate module-level functions for common methods
+def _setup_module_methods() -> None:
+    """
+    Set up module-level functions for all public methods of NCM clients.
+    This allows users to call ncm.method_name() directly.
+    """
+    # Get a temporary instance to discover available methods
+    temp_instance = NcmClient()
+    
+    # Get all methods from both v2 and v3 clients
+    v2_methods = set(dir(NcmClientv2)) - set(dir(BaseNcmClient))
+    v3_methods = set(dir(NcmClientv3)) - set(dir(BaseNcmClient))
+    all_methods = v2_methods.union(v3_methods)
+    
+    # Filter out private methods and special methods
+    public_methods = [method for method in all_methods 
+                     if not method.startswith('_') and callable(getattr(temp_instance, method, None))]
+    
+    # Create module-level functions
+    for method_name in public_methods:
+        if not hasattr(sys.modules[__name__], method_name):
+            setattr(sys.modules[__name__], method_name, _create_module_method(method_name))
+
+
+# Initialize module-level methods
+_setup_module_methods()
+
+# Auto-initialize with environment variables if available
+def _auto_init_from_env() -> None:
+    """
+    Automatically initialize the singleton instance with environment variables if available.
+    This happens on module import to provide zero-configuration usage.
+    """
+    global _ncm_instance
+    if _ncm_instance is None:
+        print("🔄 NCM: Auto-initializing on module import...")
+        env_v2_keys, env_v3_key = _load_api_keys_from_env()
+        if env_v2_keys or env_v3_key:
+            print("🔧 NCM: Creating NCM client instance...")
+            _ncm_instance = NcmClient(api_keys=env_v2_keys, api_key=env_v3_key)
+            print(f"✅ NCM: Auto-initialization complete! Client type: {type(_ncm_instance).__name__}")
+        else:
+            print("ℹ️  NCM: No environment variables found, using lazy initialization")
+    else:
+        print("ℹ️  NCM: Instance already exists, skipping auto-initialization")
+
+# Auto-initialize on module import
+_auto_init_from_env()
+
+
+# Backward compatibility: Create a submodule-like structure
+class _NcmModule:
+    """
+    Backward compatibility class that provides the old import structure.
+    Allows scripts to use: from ncm import ncm
+    """
+    
+    # Expose all the main classes
+    NcmClient = NcmClient
+    NcmClientv2 = NcmClientv2
+    NcmClientv3 = NcmClientv3
+    NcmClientv2v3 = NcmClientv2v3
+    BaseNcmClient = BaseNcmClient
+    
+    # Expose utility functions as static methods to avoid self parameter issues
+    @staticmethod
+    def get_ncm_instance(api_keys: Optional[Dict[str, str]] = None, 
+                        api_key: Optional[str] = None, 
+                        **kwargs: Any) -> Union['NcmClientv2', 'NcmClientv3', 'NcmClientv2v3']:
+        """Module-level get_ncm_instance function for backward compatibility."""
+        return globals()['get_ncm_instance'](api_keys, api_key, **kwargs)
+    
+    @staticmethod
+    def set_ncm_instance(instance: Union['NcmClientv2', 'NcmClientv3', 'NcmClientv2v3']) -> None:
+        """Module-level set_ncm_instance function for backward compatibility."""
+        return globals()['set_ncm_instance'](instance)
+    
+    # Expose reset_ncm_instance as a static method to avoid self parameter issues
+    @staticmethod
+    def reset_ncm_instance() -> None:
+        """Module-level reset_ncm_instance function for backward compatibility."""
+        return globals()['reset_ncm_instance']()
+    
+    # Expose set_api_keys as a static method to avoid self parameter issues
+    @staticmethod
+    def set_api_keys(api_keys: Optional[Dict[str, str]] = None, 
+                    api_key: Optional[str] = None, 
+                    **kwargs: Any) -> Union['NcmClientv2', 'NcmClientv3', 'NcmClientv2v3']:
+        """
+        Module-level set_api_keys function for backward compatibility.
+        
+        :param api_keys: Dictionary of API credentials (apiv2). Optional.
+        :type api_keys: dict
+        :param api_key: API key for apiv3. Optional.
+        :type api_key: str
+        :param kwargs: Additional arguments passed to NcmClient
+        :return: NCM client instance
+        :rtype: NcmClientv2, NcmClientv3, or NcmClientv2v3
+        """
+        return globals()['set_api_keys'](api_keys, api_key, **kwargs)
+    
+    # Expose all module-level methods
+    def __getattr__(self, name: str) -> Any:
+        """
+        Delegate to module-level functions.
+        
+        :param name: Name of the attribute to get
+        :type name: str
+        :return: The requested attribute
+        :raises AttributeError: If the attribute doesn't exist
+        """
+        if hasattr(sys.modules[__name__], name):
+            return getattr(sys.modules[__name__], name)
+        raise AttributeError(f"module 'ncm.ncm' has no attribute '{name}'")
+    
+    def __dir__(self) -> list:
+        """
+        Return available attributes.
+        
+        :return: List of available attribute names
+        :rtype: list
+        """
+        return sorted(set(dir(sys.modules[__name__])))
+
+
+# Create the backward compatibility object
+ncm = _NcmModule()
