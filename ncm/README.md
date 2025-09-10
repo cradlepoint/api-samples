@@ -4,6 +4,10 @@
 
 This module provides easy access to the Cradlepoint NCM API with support for both v2 and v3 APIs. It includes a singleton pattern for simple usage and module-level function access for convenience.
 
+## Installation
+
+> pip install -U ncm  
+
 ## Requirements
 
 Cradlepoint NCM API Keys are required to make API calls:
