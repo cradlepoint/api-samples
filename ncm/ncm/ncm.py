@@ -106,6 +106,7 @@ from datetime import datetime, timedelta
 import sys
 import os
 import json
+import uuid
 from typing import Union, Optional, Dict, Any
 
 
@@ -2333,6 +2334,120 @@ class NcmClientv2(BaseNcmClient):
                                 "_id_": "00000004-abcd-1234-abcd-123456789000",
                                 "key": bearer_token,
                                 "name": "Bearer Token",
+                                "x509": x509
+                            }
+                        }
+                    }
+                },
+                []
+            ]
+        }
+
+        ncm = self.session.patch(
+            '{0}/groups/{1}/'.format(self.base_url, str(group_id)),
+            data=json.dumps(payload))  # Patch group config with new values
+        result = self._return_handler(ncm.status_code, ncm.text, call_type)
+        return result
+
+    def set_encrypted_value_by_router(self, router_id=None, router_name=None, name: str = None, key: str = None):
+        """
+        This method sets an encrypted value using the router's certificate management configuration
+        :param router_id: ID of router to update (optional if router_name is provided)
+        :param router_name: Name of router to update (optional if router_id is provided)
+        :param name: Name of the encrypted value
+        :param key: Key value to encrypt
+        :return:
+        """
+        call_type = 'Set Encrypted Value'
+
+        if not router_id and not router_name:
+            raise Exception("Either router_id or router_name must be provided")
+        
+        if not name or not key:
+            raise Exception("Both name and key parameters must be provided")
+        
+        if router_name and not router_id:
+            try:
+                router_id = self.get_router_by_name(router_name)['id']
+            except Exception as e:
+                raise Exception(f"Router with name '{router_name}' not found: {str(e)}")
+
+        response = self.session.get(
+            '{0}/configuration_managers/?router.id={1}&fields=id,configuration'.format(
+                self.base_url,
+                str(router_id)))  # Get Configuration Managers ID
+        response = json.loads(response.content.decode(
+            "utf-8"))  # Decode the response and make it a dictionary
+        config_man_id = response['data'][0][
+            'id']  # get the Configuration Managers ID from response
+
+        x509 = "-----BEGIN CERTIFICATE-----\nMIIB0jCCATugAwIBAgIUIF7Bygk4C0l0ikNv00u98unXZ9kwDQYJKoZIhvcNAQEL\nBQAwFzEVMBMGA1UEAwwMTmV0Q2xvdWQgQVBJMB4XDTI1MDYwNDA5MjYzNloXDTM1\nMDYwMzA5MjYzNlowFzEVMBMGA1UEAwwMTmV0Q2xvdWQgQVBJMIGfMA0GCSqGSIb3\nDQEBAQUAA4GNADCBiQKBgQDHWAtI42kixQBU9yZdiTmakxlj1OGfXlYGYDTMr/Q7\neFRZHLxJwIwrfV4UjJSvXkeo9ui1JNXzfQzDwZXdJKEdFM0fBpu9TD/cyetz9lCs\nh5YL1aC0IcH/liZwGt/z2X4snqe3KADHjy8Dl/5ib16vTC/FuRm02Bf8wVJ0c/sr\nhwIDAQABoxswGTAJBgNVHREEAjAAMAwGA1UdEwEB/wQCMAAwDQYJKoZIhvcNAQEL\nBQADgYEAB5UavmWqkT7MXnt2/RE2qdtoTw4PfWIo+I2O7FAwJmHISubp3LW1vCn0\nRIsnyscH+BZmQkZOk3AYhLikgSky64HRHK32HXrLr79ku4as0drJzxuVOOKJn1+6\nDiNWTpAhzT55WU3fZ9H6FRvfEls0ZtLia/yiZ60rH01RO0lo2bs=\n-----END CERTIFICATE-----\n"
+        
+        # Generate a unique ID for the certificate
+        cert_id = str(uuid.uuid4())
+        
+        payload = {
+            "configuration": [
+                {
+                    "certmgmt": {
+                        "certs": {
+                            cert_id: {
+                                "_id_": cert_id,
+                                "key": key,
+                                "name": name,
+                                "x509": x509
+                            }
+                        }
+                    }
+                },
+                []
+            ]
+        }
+
+        ncm = self.session.patch(
+            '{0}/configuration_managers/{1}/'.format(self.base_url,
+                                                        str(config_man_id)),
+            data=json.dumps(payload))  # Patch indie config with new values
+        result = self._return_handler(ncm.status_code, ncm.text, call_type)
+        return result
+
+    def set_encrypted_value_by_group(self, group_id=None, group_name=None, name: str = None, key: str = None):
+        """
+        This method sets an encrypted value using the group's certificate management configuration
+        :param group_id: ID of group to update (optional if group_name is provided)
+        :param group_name: Name of group to update (optional if group_id is provided)
+        :param name: Name of the encrypted value
+        :param key: Key value to encrypt
+        :return:
+        """
+        call_type = 'Set Encrypted Value'
+
+        if not group_id and not group_name:
+            raise Exception("Either group_id or group_name must be provided")
+        
+        if not name or not key:
+            raise Exception("Both name and key parameters must be provided")
+        
+        if group_name and not group_id:
+            try:
+                group_id = self.get_group_by_name(group_name)['id']
+            except Exception as e:
+                raise Exception(f"Group with name '{group_name}' not found: {str(e)}")
+
+        x509 = "-----BEGIN CERTIFICATE-----\nMIIB0jCCATugAwIBAgIUIF7Bygk4C0l0ikNv00u98unXZ9kwDQYJKoZIhvcNAQEL\nBQAwFzEVMBMGA1UEAwwMTmV0Q2xvdWQgQVBJMB4XDTI1MDYwNDA5MjYzNloXDTM1\nMDYwMzA5MjYzNlowFzEVMBMGA1UEAwwMTmV0Q2xvdWQgQVBJMIGfMA0GCSqGSIb3\nDQEBAQUAA4GNADCBiQKBgQDHWAtI42kixQBU9yZdiTmakxlj1OGfXlYGYDTMr/Q7\neFRZHLxJwIwrfV4UjJSvXkeo9ui1JNXzfQzDwZXdJKEdFM0fBpu9TD/cyetz9lCs\nh5YL1aC0IcH/liZwGt/z2X4snqe3KADHjy8Dl/5ib16vTC/FuRm02Bf8wVJ0c/sr\nhwIDAQABoxswGTAJBgNVHREEAjAAMAwGA1UdEwEB/wQCMAAwDQYJKoZIhvcNAQEL\nBQADgYEAB5UavmWqkT7MXnt2/RE2qdtoTw4PfWIo+I2O7FAwJmHISubp3LW1vCn0\nRIsnyscH+BZmQkZOk3AYhLikgSky64HRHK32HXrLr79ku4as0drJzxuVOOKJn1+6\nDiNWTpAhzT55WU3fZ9H6FRvfEls0ZtLia/yiZ60rH01RO0lo2bs=\n-----END CERTIFICATE-----\n"
+        
+        # Generate a unique ID for the certificate
+        cert_id = str(uuid.uuid4())
+        
+        payload = {
+            "configuration": [
+                {
+                    "certmgmt": {
+                        "certs": {
+                            cert_id: {
+                                "_id_": cert_id,
+                                "key": key,
+                                "name": name,
                                 "x509": x509
                             }
                         }
