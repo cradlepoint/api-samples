@@ -5374,3 +5374,16 @@ class _NcmModule:
 
 # Create the backward compatibility object
 ncm = _NcmModule()
+
+# Expose module-level functions for direct access
+__all__ = [
+    'NcmClient', 'NcmClientv2', 'NcmClientv3', 'NcmClientv2v3', 'BaseNcmClient',
+    'get_ncm_instance', 'set_api_keys', 'set_ncm_instance', 'reset_ncm_instance',
+    'ncm'
+]
+
+# Make module-level functions available at module level
+set_api_keys = set_api_keys
+get_ncm_instance = get_ncm_instance
+set_ncm_instance = set_ncm_instance
+reset_ncm_instance = reset_ncm_instance
