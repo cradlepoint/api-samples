@@ -5089,8 +5089,6 @@ def _load_api_keys_from_env() -> tuple[Optional[Dict[str, str]], Optional[str]]:
     :return: Tuple of (v2_api_keys_dict, v3_api_key_string)
     :rtype: tuple
     """
-    print("🔍 NCM: Checking for API keys in environment variables...")
-    
     # Load v2 API keys from environment
     v2_keys = {}
     env_v2_keys = {
@@ -5104,35 +5102,21 @@ def _load_api_keys_from_env() -> tuple[Optional[Dict[str, str]], Optional[str]]:
     for key, value in env_v2_keys.items():
         if value:
             v2_keys[key] = value
-            print(f"✅ NCM: Found {key} in environment")
-        else:
-            print(f"❌ NCM: {key} not found in environment")
     
     # Load v3 API key from environment
     v3_key = os.environ.get('NCM_API_TOKEN') or os.environ.get('TOKEN')
-    if v3_key:
-        print("✅ NCM: Found v3 API token in environment")
-    else:
-        print("❌ NCM: No v3 API token found in environment")
     
     # Return None for empty dictionaries/keys
     v2_result = v2_keys if v2_keys else None
     v3_result = v3_key if v3_key else None
     
-    if v2_result or v3_result:
-        print(f"🚀 NCM: Auto-initializing with {'v2' if v2_result else ''}{' and ' if v2_result and v3_result else ''}{'v3' if v3_result else ''} API keys")
-    else:
-        print("⚠️  NCM: No API keys found in environment variables")
-    
     return v2_result, v3_result
 
 
-def get_ncm_instance(api_keys: Optional[Dict[str, str]] = None, 
-                    api_key: Optional[str] = None, 
-                    **kwargs: Any) -> Union['NcmClientv2', 'NcmClientv3', 'NcmClientv2v3']:
+def get_ncm_instance() -> Union['NcmClientv2', 'NcmClientv3', 'NcmClientv2v3']:
     """
-    Get or create the singleton NCM instance.
-    Automatically loads API keys from environment variables if not provided.
+    Get the singleton NCM instance.
+    Raises an error if no instance has been created yet.
     
     Environment variables:
         - X_CP_API_ID: CP API ID for v2 API
@@ -5151,13 +5135,7 @@ def get_ncm_instance(api_keys: Optional[Dict[str, str]] = None,
     """
     global _ncm_instance
     if _ncm_instance is None:
-        # Load from environment if not provided
-        if not api_keys and not api_key:
-            env_v2_keys, env_v3_key = _load_api_keys_from_env()
-            api_keys = env_v2_keys
-            api_key = env_v3_key
-        
-        _ncm_instance = NcmClient(api_keys=api_keys, api_key=api_key, **kwargs)
+        raise RuntimeError("No NCM instance has been created yet. Call ncm.set_api_keys() first.")
     return _ncm_instance
 
 
@@ -5188,22 +5166,15 @@ def set_api_keys(api_keys: Optional[Dict[str, str]] = None,
     """
     global _ncm_instance
     
-    print("🔧 NCM: set_api_keys() called")
-    
     # Load from environment if not provided
     if not api_keys and not api_key:
-        print("🔍 NCM: No explicit keys provided, loading from environment...")
         env_v2_keys, env_v3_key = _load_api_keys_from_env()
         api_keys = env_v2_keys
         api_key = env_v3_key
-    else:
-        print("🔑 NCM: Using explicitly provided API keys")
     
     # Create a new instance with the provided keys
     # This uses the existing NcmClient logic which handles key validation
-    print("🔧 NCM: Creating new NCM client instance...")
     _ncm_instance = NcmClient(api_keys=api_keys, api_key=api_key, **kwargs)
-    print(f"✅ NCM: Client created successfully! Type: {type(_ncm_instance).__name__}")
     return _ncm_instance
 
 
@@ -5247,54 +5218,53 @@ def _create_module_method(method_name: str) -> Any:
     return module_method
 
 
-# Auto-generate module-level functions for common methods
-def _setup_module_methods() -> None:
+# Module-level method delegation functions
+def _delegate_to_instance(method_name: str, *args: Any, **kwargs: Any) -> Any:
     """
-    Set up module-level functions for all public methods of NCM clients.
-    This allows users to call ncm.method_name() directly.
-    """
-    # Get a temporary instance to discover available methods
-    temp_instance = NcmClient()
+    Delegate method calls to the singleton instance.
     
-    # Get all methods from both v2 and v3 clients
-    v2_methods = set(dir(NcmClientv2)) - set(dir(BaseNcmClient))
-    v3_methods = set(dir(NcmClientv3)) - set(dir(BaseNcmClient))
-    all_methods = v2_methods.union(v3_methods)
-    
-    # Filter out private methods and special methods
-    public_methods = [method for method in all_methods 
-                     if not method.startswith('_') and callable(getattr(temp_instance, method, None))]
-    
-    # Create module-level functions
-    for method_name in public_methods:
-        if not hasattr(sys.modules[__name__], method_name):
-            setattr(sys.modules[__name__], method_name, _create_module_method(method_name))
-
-
-# Initialize module-level methods
-_setup_module_methods()
-
-# Auto-initialize with environment variables if available
-def _auto_init_from_env() -> None:
+    :param method_name: Name of the method to call
+    :type method_name: str
+    :param args: Positional arguments for the method
+    :param kwargs: Keyword arguments for the method
+    :return: Result of the method call
+    :raises AttributeError: If the method doesn't exist on the instance
     """
-    Automatically initialize the singleton instance with environment variables if available.
-    This happens on module import to provide zero-configuration usage.
-    """
-    global _ncm_instance
-    if _ncm_instance is None:
-        print("🔄 NCM: Auto-initializing on module import...")
-        env_v2_keys, env_v3_key = _load_api_keys_from_env()
-        if env_v2_keys or env_v3_key:
-            print("🔧 NCM: Creating NCM client instance...")
-            _ncm_instance = NcmClient(api_keys=env_v2_keys, api_key=env_v3_key)
-            print(f"✅ NCM: Auto-initialization complete! Client type: {type(_ncm_instance).__name__}")
+    instance = get_ncm_instance()
+    if not hasattr(instance, method_name):
+        # Provide a more helpful error message
+        if method_name == 'get_exchange_resources':
+            raise AttributeError(f"NCM client has no method '{method_name}'. This method requires a v3 API client. Please ensure you have a v3 API token configured.")
         else:
-            print("ℹ️  NCM: No environment variables found, using lazy initialization")
-    else:
-        print("ℹ️  NCM: Instance already exists, skipping auto-initialization")
+            raise AttributeError(f"NCM client has no method '{method_name}'")
+    return getattr(instance, method_name)(*args, **kwargs)
 
-# Auto-initialize on module import
-_auto_init_from_env()
+
+# Create module-level functions for key methods
+def get_routers(*args, **kwargs):
+    """Module-level access to get_routers method (v2 API)"""
+    return _delegate_to_instance('get_routers', *args, **kwargs)
+
+
+def get_exchange_resources(*args, **kwargs):
+    """Module-level access to get_exchange_resources method (v3 API)"""
+    return _delegate_to_instance('get_exchange_resources', *args, **kwargs)
+
+
+# Add other commonly used methods as needed
+def get_accounts(*args, **kwargs):
+    """Module-level access to get_accounts method"""
+    return _delegate_to_instance('get_accounts', *args, **kwargs)
+
+
+def get_groups(*args, **kwargs):
+    """Module-level access to get_groups method"""
+    return _delegate_to_instance('get_groups', *args, **kwargs)
+
+
+def get_alerts(*args, **kwargs):
+    """Module-level access to get_alerts method"""
+    return _delegate_to_instance('get_alerts', *args, **kwargs)
 
 
 # Backward compatibility: Create a submodule-like structure
