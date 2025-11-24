@@ -5,9 +5,10 @@ and identify unlicensed routers.
 
 This script:
 1. Gets all subscriptions with end_time later than yesterday
-2. For each subscription, fetches all asset_endpoints
-3. Creates a CSV report with router MAC, serial, subscription details
-4. Identifies unlicensed routers (not in any subscription)
+2. Gets all asset_endpoints from the system
+3. Correlates asset_endpoints with subscriptions by matching subscription IDs
+4. Creates a CSV report with router MAC, serial, subscription details
+5. Identifies unlicensed routers (not in any subscription)
 """
 
 import csv
