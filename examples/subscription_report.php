@@ -13,7 +13,7 @@
  */
 
 // Optional: Set your NCM API v3 token here, or use NCM_API_TOKEN/TOKEN environment variable
-$NCM_API_TOKEN = ''; // Set to your token string if you want to hardcode it
+$NCM_API_TOKEN = null; // Set to your token string if you want to hardcode it
 
 // Base URL for Cradlepoint NCM API v3
 define('API_BASE_URL', 'https://api.cradlepointecm.com/api/v3');
