@@ -14,19 +14,18 @@ This script:
 import csv
 import time
 from datetime import datetime, timedelta, timezone
-from typing import List, Dict, Set, Tuple
 import ncm
 
 # Optional: Set your NCM API v3 token here, or use NCM_API_TOKEN/TOKEN environment variable
 NCM_API_TOKEN = None  # Set to your token string if you want to hardcode it
 
-def get_yesterday_iso() -> str:
+def get_yesterday_iso():
     """Get yesterday's date in ISO format (YYYY-MM-DDTHH:MM:SSZ)"""
     yesterday = datetime.now(timezone.utc) - timedelta(days=1)
     return yesterday.strftime("%Y-%m-%dT00:00:00Z")
 
 
-def _get_v3_client() -> ncm.NcmClientv3:
+def _get_v3_client():
     """Get the v3 client from the singleton."""
     client = ncm.get_ncm_instance()
     if hasattr(client, 'v3'):
@@ -36,7 +35,7 @@ def _get_v3_client() -> ncm.NcmClientv3:
     raise RuntimeError("NCM v3 client not available. Please set NCM_API_TOKEN or TOKEN environment variable.")
 
 
-def get_subscriptions_with_asset_endpoints(end_time_gt: str) -> List[Dict]:
+def get_subscriptions_with_asset_endpoints(end_time_gt):
     """
     Get all subscriptions with end_time greater than the specified date.
     Returns subscriptions with their asset_endpoints relationship links.
@@ -55,7 +54,7 @@ def get_subscriptions_with_asset_endpoints(end_time_gt: str) -> List[Dict]:
     return subscriptions
 
 
-def get_all_asset_endpoints() -> List[Dict]:
+def get_all_asset_endpoints():
     """
     Get all asset_endpoints from the system.
     """
@@ -68,7 +67,7 @@ def get_all_asset_endpoints() -> List[Dict]:
     return asset_endpoints
 
 
-def correlate_subscriptions_and_asset_endpoints(subscriptions: List[Dict], asset_endpoints: List[Dict]) -> Tuple[List[Dict], Set[Tuple[str, str]]]:
+def correlate_subscriptions_and_asset_endpoints(subscriptions, asset_endpoints):
     """
     Correlate asset_endpoints with subscriptions by matching subscription IDs.
     Returns:
@@ -137,7 +136,7 @@ def correlate_subscriptions_and_asset_endpoints(subscriptions: List[Dict], asset
     return csv_rows, licensed_combos
 
 
-def identify_unlicensed_routers(asset_endpoints: List[Dict], licensed_combos: Set[Tuple[str, str]]) -> List[Dict]:
+def identify_unlicensed_routers(asset_endpoints, licensed_combos):
     """
     Identify routers that are not in any subscription (unlicensed).
     """
@@ -166,7 +165,7 @@ def identify_unlicensed_routers(asset_endpoints: List[Dict], licensed_combos: Se
     return unlicensed_rows
 
 
-def write_csv_report(csv_rows: List[Dict], output_file: str = 'subscription_report.csv'):
+def write_csv_report(csv_rows, output_file='subscription_report.csv'):
     """
     Write the CSV report to a file.
     """
