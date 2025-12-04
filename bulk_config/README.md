@@ -1,6 +1,6 @@
 # bulk_config.py
 
-Bulk configure devices in NCM from router_grid.csv file using column headers.
+Bulk configure devices in NCM from router_grid.csv file using column headers. Also sets custom1 and custom2 fields when values are provided in the CSV.
 
 ## Setup
 
@@ -23,9 +23,13 @@ Bulk configure devices in NCM from router_grid.csv file using column headers.
    python bulk_config.py
    ```
 
+## Custom Fields
+
+The script automatically sets custom1 and custom2 fields for each router when these columns are present in the CSV and contain non-empty values. Simply add `custom1` and/or `custom2` columns to your router_grid.csv file.
+
 ## Example
 
-For the included router_grid.csv with columns `id`, `name`, `desc`, `asset_id`, `primary_lan_ip`, `2ghz_ssid`, `5ghz_ssid`:
+For the included router_grid.csv with columns `id`, `name`, `desc`, `asset_id`, `primary_lan_ip`, `2ghz_ssid`, `5ghz_ssid`, `custom1`, `custom2`:
 
 ```python
 "system": {
@@ -57,6 +61,14 @@ For the included router_grid.csv with columns `id`, `name`, `desc`, `asset_id`, 
     }
 }
 ```
+
+**Custom Fields Example:**
+If your CSV includes custom1 and custom2 columns:
+```csv
+id,name,desc,asset_id,primary_lan_ip,2ghz_ssid,5ghz_ssid,custom1,custom2
+1234567,Router1,Test Router,ASSET001,192.168.1.1,WiFi_2G,WiFi_5G,Location A,Department IT
+```
+The script will automatically set the custom1 field to "Location A" and custom2 field to "Department IT" for that router.
 
 ## Requirements
 

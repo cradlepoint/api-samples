@@ -2,6 +2,7 @@
 
 Reads router_grid.csv with column headers and applies configurations
 using the NCM library's patch_configuration_managers method.
+Also sets custom1 and custom2 fields when present in CSV.
 
 To use this script:
 1. Export router_grid.csv from the Device View in NCM
@@ -9,25 +10,26 @@ To use this script:
 3. Copy the pending config output and paste it into the build_config return value
 4. Update router_grid.csv to contain the columns that need to be applied to the device level config
 5. Update build_config to reference router_grid column headers with row_data.get('column_name')
-6. Update csv_file variable if using a different filename than 'router_grid.csv'
-7. Update API keys below with your NCM API credentials
+6. If not included in router_grid.csv, add custom1 and/or custom2 columns to set those feilds
+7. Update csv_file variable if using a different filename than 'router_grid.csv'
+8. Update API keys below with your NCM API credentials
 """
 
 import csv
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 import ncm
 
 # Update this filename if using a different CSV file
-csv_file = 'router_grid.csv'
+csv_file: str = 'router_grid.csv'
 
 # Update these API keys with your NCM credentials
-api_keys = {
-    "X-CP-API-ID": "YOUR_CP_API_ID",
-    "X-CP-API-KEY": "YOUR_CP_API_KEY",
-    "X-ECM-API-ID": "YOUR_ECM_API_ID",
-    "X-ECM-API-KEY": "YOUR_ECM_API_KEY"
+api_keys: Dict[str, str] = {
+    "X-CP-API-ID": "5d4b40cd",
+    "X-CP-API-KEY": "4c1108d8b2da465588bb87bfe0cbbd2c",
+    "X-ECM-API-ID": "f7f08d19-61fe-49de-b634-f2629164de6b",
+    "X-ECM-API-KEY": "3f76025848c1dcd66731e4d838d0dd0a7bf27e09"
 }
-n2 = ncm.NcmClientv2(api_keys=api_keys)
+n2: ncm.NcmClientv2 = ncm.NcmClientv2(api_keys=api_keys)
 
 def build_config(row_data: Dict[str, str]) -> List[Any]:
     """Return router configuration with values from CSV row.
@@ -35,7 +37,7 @@ def build_config(row_data: Dict[str, str]) -> List[Any]:
     To update this configuration:
     1. Go to NCM device-level Edit Config screen
     2. Make your changes and view pending config
-    3. Copy the pending config JSON and paste below the return \ line
+    3. Copy the pending config JSON and paste below the return line
     4. Replace static values with row_data.get('column_name') for CSV columns
 
     Args:
@@ -152,12 +154,12 @@ def load_csv(filename: str) -> Dict[int, Dict[str, str]]:
     """Return a dictionary of router_ids containing config values from csv.
 
     Args:
-        filename (str): Name of csv file.
+        filename: Name of csv file.
 
     Returns:
-        dict: Dictionary of router configs keyed by router_id.
+        Dictionary of router configs keyed by router_id.
     """
-    router_configs = {}
+    router_configs: Dict[int, Dict[str, str]] = {}
     try:
         with open(filename, 'rt', encoding='utf-8-sig') as f:
             reader = csv.DictReader(f)
@@ -173,7 +175,13 @@ def load_csv(filename: str) -> Dict[int, Dict[str, str]]:
 
 
 def main() -> None:
-    """Main function to process router configurations."""
+    """Main function to process router configurations.
+    
+    Processes each router in the CSV file by:
+    1. Applying device configuration using patch_configuration_managers
+    2. Setting custom1 field if column exists and has non-empty value
+    3. Setting custom2 field if column exists and has non-empty value
+    """
     rows = load_csv(csv_file)
 
     for router_id, row_data in rows.items():
@@ -181,6 +189,15 @@ def main() -> None:
             config = {'configuration': build_config(row_data)}
             n2.patch_configuration_managers(
                 router_id=router_id, config_man_json=config)
+            
+            custom1_value: Optional[str] = row_data.get('custom1')
+            if custom1_value and custom1_value != '':
+                n2.set_custom1(router_id=router_id, text=custom1_value)
+
+            custom2_value: Optional[str] = row_data.get('custom2')
+            if custom2_value and custom2_value != '':
+                n2.set_custom2(router_id=router_id, text=custom2_value)
+            
             print(f'Successfully patched config to router: {router_id}')
         except Exception as e:
             print(f'Error patching config for router {router_id}: {e}')
