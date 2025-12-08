@@ -1,13 +1,14 @@
 # bulk_config.py
 
-Bulk configure devices in NCM from router_grid.csv file using column headers. Also sets custom1 and custom2 fields when values are provided in the CSV.
+Bulk configure devices in NCM from router_grid.csv file using column headers. Also injects desc into config and sets custom1 and custom2 fields when values are provided in the CSV.
 
 ## Setup
 
-1. Install dependencies:
+1. Install dependencies from requirements.txt:
    ```bash
    pip install -r requirements.txt
    ```
+   This will install the required NCM library to run the script.
 
 ## Usage
 
@@ -25,7 +26,7 @@ Bulk configure devices in NCM from router_grid.csv file using column headers. Al
 
 ## Custom Fields
 
-The script automatically sets custom1 and custom2 fields for each router when these columns are present in the CSV and contain non-empty values. Simply add `custom1` and/or `custom2` columns to your router_grid.csv file.
+The script automatically injects desc into the configuration at [0][system][desc] when the desc column is present in the CSV and contains a non-empty value. It also sets custom1 and custom2 fields for each router when these columns are present in the CSV and contain non-empty values. Simply add `desc`, `custom1` and/or `custom2` columns to your router_grid.csv file.
 
 ## Example
 
@@ -34,8 +35,7 @@ For the included router_grid.csv with columns `id`, `name`, `desc`, `asset_id`, 
 ```python
 "system": {
     "system_id": row_data.get('name', ''),
-    "asset_id": row_data.get('asset_id', ''),
-    "desc": row_data.get('desc', '')
+    "asset_id": row_data.get('asset_id', '')
 },
 "lan": {
     "00000000-0d93-319d-8220-4a1fb0372b51": {
