@@ -2,7 +2,7 @@
 
 Reads router_grid.csv with column headers and applies configurations
 using the NCM library's patch_configuration_managers method.
-Also sets custom1 and custom2 fields when present in CSV.
+Also sets desc, custom1 and custom2 fields when present in CSV.
 
 To use this script:
 1. Export router_grid.csv from the Device View in NCM
@@ -10,7 +10,7 @@ To use this script:
 3. Copy the pending config output and paste it into the build_config return value
 4. Update router_grid.csv to contain the columns that need to be applied to the device level config
 5. Update build_config to reference router_grid column headers with row_data.get('column_name')
-6. If not included in router_grid.csv, add custom1 and/or custom2 columns to set those feilds
+6. If not included in router_grid.csv, add desc, custom1 and/or custom2 columns to set those fields
 7. Update csv_file variable if using a different filename than 'router_grid.csv'
 8. Update API keys below with your NCM API credentials
 """
@@ -24,10 +24,10 @@ csv_file: str = 'router_grid.csv'
 
 # Update these API keys with your NCM credentials
 api_keys: Dict[str, str] = {
-    "X-CP-API-ID": "5d4b40cd",
-    "X-CP-API-KEY": "4c1108d8b2da465588bb87bfe0cbbd2c",
-    "X-ECM-API-ID": "f7f08d19-61fe-49de-b634-f2629164de6b",
-    "X-ECM-API-KEY": "3f76025848c1dcd66731e4d838d0dd0a7bf27e09"
+    "X-CP-API-ID": "",
+    "X-CP-API-KEY": "",
+    "X-ECM-API-ID": "",
+    "X-ECM-API-KEY": ""
 }
 n2: ncm.NcmClientv2 = ncm.NcmClientv2(api_keys=api_keys)
 
@@ -179,14 +179,20 @@ def main() -> None:
     
     Processes each router in the CSV file by:
     1. Applying device configuration using patch_configuration_managers
-    2. Setting custom1 field if column exists and has non-empty value
-    3. Setting custom2 field if column exists and has non-empty value
+    2. Injecting desc into config[0][system][desc] if column exists and has non-empty value
+    3. Setting custom1 field if column exists and has non-empty value
+    4. Setting custom2 field if column exists and has non-empty value
     """
     rows = load_csv(csv_file)
 
     for router_id, row_data in rows.items():
         try:
             config = {'configuration': build_config(row_data)}
+            
+            desc_value: Optional[str] = row_data.get('desc')
+            if desc_value and desc_value != '':
+                config['configuration'][0]['system']['desc'] = desc_value
+            
             n2.patch_configuration_managers(
                 router_id=router_id, config_man_json=config)
             
