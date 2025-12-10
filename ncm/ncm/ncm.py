@@ -107,7 +107,7 @@ import sys
 import os
 import json
 import uuid
-from typing import Union, Optional, Dict, Any
+from typing import Union, Optional, Dict, Any, Tuple
 
 
 def __is_json(test_json):
@@ -5082,7 +5082,7 @@ class NcmClient:
 _ncm_instance = None
 
 
-def _load_api_keys_from_env() -> tuple[Optional[Dict[str, str]], Optional[str]]:
+def _load_api_keys_from_env() -> Tuple[Optional[Dict[str, str]], Optional[str]]:
     """
     Load API keys from environment variables if available.
     
