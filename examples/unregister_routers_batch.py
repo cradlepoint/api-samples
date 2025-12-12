@@ -95,12 +95,12 @@ def read_router_ids_from_csv(csv_filename):
     return router_ids
 
 
-def delete_routers_batch(router_ids, ncm_client, batch_size=100, delay=0, log_file=None):
+def unregister_routers_batch(router_ids, ncm_client, batch_size=100, delay=0, log_file=None):
     """
-    Delete routers using the NCM client in batches.
+    Unregister routers using the NCM client in batches.
     
     Args:
-        router_ids: List of router IDs to delete
+        router_ids: List of router IDs to unregister
         ncm_client: Initialized NCM client instance
         batch_size: Number of routers to process per batch
         delay: Delay in seconds between batches
@@ -112,7 +112,7 @@ def delete_routers_batch(router_ids, ncm_client, batch_size=100, delay=0, log_fi
     total_routers = len(router_ids)
     num_batches = (total_routers + batch_size - 1) // batch_size  # Ceiling division
     
-    print(f"\nStarting deletion of {total_routers} routers in {num_batches} batch(es)...")
+    print(f"\nStarting unregistration of {total_routers} routers in {num_batches} batch(es)...")
     print(f"Batch size: {batch_size}, Delay between batches: {delay} seconds")
     print("=" * 80)
     
@@ -129,12 +129,12 @@ def delete_routers_batch(router_ids, ncm_client, batch_size=100, delay=0, log_fi
         
         for idx, router_id in enumerate(batch, start=1):
             batch_idx = start_idx + idx
-            print(f"  [{batch_idx}/{total_routers}] Deleting router ID: {router_id}...", end=' ', flush=True)
+            print(f"  [{batch_idx}/{total_routers}] Unregistering router ID: {router_id}...", end=' ', flush=True)
             
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
             try:
-                result = ncm_client.delete_router_by_id(router_id)
+                result = ncm_client.unregister_router_by_id(router_id)
                 
                 # Check if deletion was successful
                 if hasattr(result, 'status_code'):
@@ -148,7 +148,7 @@ def delete_routers_batch(router_ids, ncm_client, batch_size=100, delay=0, log_fi
                 # Successful DELETE usually returns 204 No Content
                 if status_code == 204 or (isinstance(result, dict) and result.get('success', False)):
                     status = 'success'
-                    message = 'Router deleted successfully'
+                    message = 'Router unregistered successfully'
                     print("✓ Success")
                     successful += 1
                 else:
@@ -203,13 +203,13 @@ def delete_routers_batch(router_ids, ncm_client, batch_size=100, delay=0, log_fi
 def main():
     """Main function."""
     parser = argparse.ArgumentParser(
-        description='Delete routers from NCM by reading router IDs from a CSV file',
+        description='Unregister routers from NCM by reading router IDs from a CSV file',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python delete_routers_batch.py routers.csv
-  python delete_routers_batch.py routers.csv --batch-size 50
-  python delete_routers_batch.py routers.csv --batch-size 200 --delay 30
+  python unregister_routers_batch.py routers.csv
+  python unregister_routers_batch.py routers.csv --batch-size 50
+  python unregister_routers_batch.py routers.csv --batch-size 200 --delay 30
         """
     )
     
@@ -231,7 +231,7 @@ Examples:
         sys.exit(1)
     
     print("=" * 80)
-    print("NCM Router Batch Deletion Script")
+    print("NCM Router Batch Unregistration Script")
     print("=" * 80)
     print(f"CSV file: {args.csv_file}")
     print(f"Batch size: {args.batch_size}")
@@ -246,7 +246,7 @@ Examples:
         print("No router IDs found in CSV file.")
         sys.exit(1)
     
-    print(f"Found {len(router_ids)} router IDs to delete.")
+    print(f"Found {len(router_ids)} router IDs to unregister.")
     
     # Initialize NCM client
     print("\nInitializing NCM client...")
@@ -282,21 +282,21 @@ Examples:
     
     # Create log file with timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_filename = f'NCM_Delete_Routers_Log_{timestamp}.txt'
+    log_filename = f'NCM_Unregister_Routers_Log_{timestamp}.txt'
     
     print(f"\nLog file: {log_filename}")
     
-    # Confirm before deletion
-    print(f"\n⚠️  WARNING: This will delete {len(router_ids)} routers from NCM!")
+    # Confirm before unregistration
+    print(f"\n⚠️  WARNING: This will unregister {len(router_ids)} routers from NCM!")
     response = input("Type 'yes' to continue, or anything else to cancel: ")
     
     if response.lower() != 'yes':
-        print("Deletion cancelled.")
+        print("Unregistration cancelled.")
         sys.exit(0)
     
-    # Open log file and delete routers
+    # Open log file and unregister routers
     with open(log_filename, 'w', encoding='utf-8') as log_file:
-        log_file.write(f"NCM Router Deletion Log\n")
+        log_file.write(f"NCM Router Unregistration Log\n")
         log_file.write(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         log_file.write(f"CSV file: {args.csv_file}\n")
         log_file.write(f"Total routers: {len(router_ids)}\n")
@@ -304,23 +304,23 @@ Examples:
         log_file.write(f"Delay between batches: {args.delay} seconds\n")
         log_file.write("=" * 80 + "\n\n")
         
-        summary = delete_routers_batch(router_ids, ncm_client, args.batch_size, args.delay, log_file)
+        summary = unregister_routers_batch(router_ids, ncm_client, args.batch_size, args.delay, log_file)
         
         # Write summary to log file
         log_file.write("\n" + "=" * 80 + "\n")
         log_file.write("SUMMARY\n")
         log_file.write("=" * 80 + "\n")
         log_file.write(f"Total routers processed: {summary['total']}\n")
-        log_file.write(f"Successfully deleted: {summary['successful']}\n")
+        log_file.write(f"Successfully unregistered: {summary['successful']}\n")
         log_file.write(f"Failed: {summary['failed']}\n")
         log_file.write(f"Completed: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
     
     # Print summary
     print("\n" + "=" * 80)
-    print("DELETION RESULTS SUMMARY")
+    print("UNREGISTRATION RESULTS SUMMARY")
     print("=" * 80)
     print(f"\nTotal routers processed: {summary['total']}")
-    print(f"Successfully deleted: {summary['successful']}")
+    print(f"Successfully unregistered: {summary['successful']}")
     print(f"Failed: {summary['failed']}")
     print(f"\nLog file: {log_filename}")
     
