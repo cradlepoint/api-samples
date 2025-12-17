@@ -1580,7 +1580,7 @@ class NcmClientv2(BaseNcmClient):
                           'id', 'id__in', 'ipv4_address', 'ipv4_address__in',
                           'mac', 'mac__in', 'name', 'name__in',
                           'reboot_required', 'reboot_required__in', 
-                          'serial_number','state', 'state__in', 
+                          'serial_number', 'serial_number__in', 'state', 'state__in', 
                           'state_updated_at__lt', 'state_updated_at__gt', 
                           'updated_at__lt', 'updated_at__gt', 'expand', 
                           'order_by', 'limit', 'offset']
@@ -5116,7 +5116,7 @@ def _load_api_keys_from_env() -> Tuple[Optional[Dict[str, str]], Optional[str]]:
 def get_ncm_instance() -> Union['NcmClientv2', 'NcmClientv3', 'NcmClientv2v3']:
     """
     Get the singleton NCM instance.
-    Raises an error if no instance has been created yet.
+    Automatically initializes from environment variables if no instance exists.
     
     Environment variables:
         - X_CP_API_ID: CP API ID for v2 API
@@ -5135,7 +5135,12 @@ def get_ncm_instance() -> Union['NcmClientv2', 'NcmClientv3', 'NcmClientv2v3']:
     """
     global _ncm_instance
     if _ncm_instance is None:
-        raise RuntimeError("No NCM instance has been created yet. Call ncm.set_api_keys() first.")
+        # Try to auto-initialize from environment variables
+        env_v2_keys, env_v3_key = _load_api_keys_from_env()
+        if env_v2_keys or env_v3_key:
+            _ncm_instance = NcmClient(api_keys=env_v2_keys, api_key=env_v3_key, log_events=False)
+        else:
+            raise RuntimeError("No NCM instance has been created yet. Call ncm.set_api_keys() first or set environment variables (X_CP_API_ID, X_CP_API_KEY, X_ECM_API_ID, X_ECM_API_KEY, NCM_API_TOKEN).")
     return _ncm_instance
 
 
