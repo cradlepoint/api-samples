@@ -137,24 +137,62 @@ def unregister_routers_batch(router_ids, ncm_client, batch_size=100, delay=0, lo
                 result = ncm_client.unregister_router_by_id(router_id)
                 
                 # Check if deletion was successful
-                if hasattr(result, 'status_code'):
-                    status_code = result.status_code
-                elif isinstance(result, dict):
-                    status_code = result.get('status_code', result.get('status', 'unknown'))
-                else:
-                    status_code = 'unknown'
+                # _return_handler returns:
+                # - Empty string or success message for 204 (successful DELETE)
+                # - "ERROR: {status_code}: {message}" for error status codes
+                # - None for unhandled status codes
                 
-                # Determine success based on result
-                # Successful DELETE usually returns 204 No Content
-                if status_code == 204 or (isinstance(result, dict) and result.get('success', False)):
-                    status = 'success'
-                    message = 'Router unregistered successfully'
-                    print("✓ Success")
-                    successful += 1
+                if result is None:
+                    status = 'error'
+                    message = 'Unknown error: No response from API'
+                    print(f"✗ Failed: {message}")
+                    failed += 1
+                elif isinstance(result, str):
+                    if result.startswith('ERROR:'):
+                        status = 'error'
+                        message = result
+                        print(f"✗ Failed: {result}")
+                        failed += 1
+                    elif result == '' or 'deleted Successfully' in result or 'operation successful' in result:
+                        status = 'success'
+                        message = 'Router unregistered successfully'
+                        print("✓ Success")
+                        successful += 1
+                    else:
+                        # Unknown response format, treat as success if not an error
+                        status = 'success'
+                        message = f'Router unregistered (response: {result})'
+                        print(f"✓ Success: {result}")
+                        successful += 1
+                elif hasattr(result, 'status_code'):
+                    # Handle response object with status_code attribute
+                    status_code = result.status_code
+                    if status_code == 204 or (isinstance(result, dict) and result.get('success', False)):
+                        status = 'success'
+                        message = 'Router unregistered successfully'
+                        print("✓ Success")
+                        successful += 1
+                    else:
+                        status = 'error'
+                        message = f"Failed: {result}"
+                        print(f"✗ Failed: {result}")
+                        failed += 1
+                elif isinstance(result, dict):
+                    # Handle dict response
+                    if result.get('success', False) or result.get('status_code') == 204:
+                        status = 'success'
+                        message = 'Router unregistered successfully'
+                        print("✓ Success")
+                        successful += 1
+                    else:
+                        status = 'error'
+                        message = f"Failed: {result}"
+                        print(f"✗ Failed: {result}")
+                        failed += 1
                 else:
                     status = 'error'
-                    message = f"Failed: {result}"
-                    print(f"✗ Failed: {result}")
+                    message = f"Unexpected response type: {type(result)} - {result}"
+                    print(f"✗ Failed: {message}")
                     failed += 1
                 
                 log_entry = f"[{timestamp}] Router ID: {router_id} - {status.upper()}: {message}\n"
