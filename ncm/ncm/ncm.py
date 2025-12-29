@@ -1737,6 +1737,8 @@ class NcmClientv2(BaseNcmClient):
         result = self._return_handler(ncm.status_code, ncm.text, call_type)
         return result
 
+    unregister_router_by_id = delete_router_by_id
+
     def delete_router_by_name(self, router_name):
         """
         This operation deletes a router by name.
@@ -1745,6 +1747,8 @@ class NcmClientv2(BaseNcmClient):
         """
         return self.delete_router_by_id(
             self.get_router_by_name(router_name)['id'])
+
+    unregister_router_by_name = delete_router_by_name
 
     def create_speed_test(self, net_device_ids: list, account_id=None,
                           host="netperf-west.bufferbloat.net",
