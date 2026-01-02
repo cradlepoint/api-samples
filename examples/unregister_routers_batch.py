@@ -9,8 +9,8 @@ Usage:
     python unregister_routers_batch.py <csv_file> [--batch-size BATCH_SIZE] [--delay DELAY]
 
 Options:
-    --batch-size: Number of routers to process per batch (default: 100)
-    --delay: Delay in seconds between batches (default: 0)
+    --batch-size: Number of routers to process per batch (default: 20)
+    --delay: Delay in seconds between batches (default: 3)
 
 Requirements:
     - CSV file with router IDs (handles columns: 'router_id', 'router id', 'id', 'routerId')
@@ -252,10 +252,10 @@ Examples:
     )
     
     parser.add_argument('csv_file', help='Path to CSV file containing router IDs')
-    parser.add_argument('--batch-size', type=int, default=100,
-                       help='Number of routers to process per batch (default: 100)')
-    parser.add_argument('--delay', type=int, default=0,
-                       help='Delay in seconds between batches (default: 0)')
+    parser.add_argument('--batch-size', type=int, default=20,
+                       help='Number of routers to process per batch (default: 20)')
+    parser.add_argument('--delay', type=int, default=3,
+                       help='Delay in seconds between batches (default: 3)')
     
     args = parser.parse_args()
     
