@@ -6,6 +6,9 @@ For encrypting NCM API keys into group or device configurations for use in SDK a
 
 This web application allows you to encrypt NCM API keys (APIv2 and APIv3) into group or device configurations. The encrypted keys can then be used by SDK applications running on the devices.
 
+<img width="924" height="746" alt="image" src="https://github.com/user-attachments/assets/98332cc0-0fb9-4e1b-a19e-2c3262aa5e98" />
+<img width="924" height="698" alt="image" src="https://github.com/user-attachments/assets/c13613fe-b604-4303-9637-a64b5b938fac" />
+
 ## Requirements
 
 - Python 3.x
