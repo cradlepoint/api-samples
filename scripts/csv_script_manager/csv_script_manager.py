@@ -514,6 +514,51 @@ exec(compile(open(r'{script_path}').read(), r'{script_path}', 'exec'))
             print(f'Error creating script: {str(e)}')
             self.send_error_response(f'Error creating script: {str(e)}')
     
+    def handle_delete_script(self):
+        """Delete a Python script."""
+        try:
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            
+            data = json.loads(post_data.decode('utf-8'))
+            script_name = data.get('script_name', '')
+            
+            if not script_name:
+                self.send_error_response('Script name required')
+                return
+            
+            # Security: prevent directory traversal
+            script_name = os.path.basename(script_name)
+            
+            # Ensure .py extension
+            if not script_name.endswith('.py'):
+                script_name += '.py'
+            
+            script_path = os.path.join(self.scripts_dir, script_name)
+            
+            # Verify script exists and is in scripts directory
+            if not os.path.exists(script_path):
+                self.send_error_response(f'Script not found: {script_name}')
+                return
+            
+            # Verify it's actually in the scripts directory (prevent path traversal)
+            if not os.path.abspath(script_path).startswith(os.path.abspath(self.scripts_dir)):
+                self.send_error_response('Invalid script path')
+                return
+            
+            # Delete the script file
+            os.remove(script_path)
+            
+            print(f'Script deleted: {script_name}')
+            self.send_json_response({
+                'success': True,
+                'script_name': script_name,
+                'message': 'Script deleted successfully'
+            })
+        except Exception as e:
+            print(f'Error deleting script: {str(e)}')
+            self.send_error_response(f'Error deleting script: {str(e)}')
+    
     def handle_get_example_script(self):
         """Get the content of the example.py script."""
         try:
