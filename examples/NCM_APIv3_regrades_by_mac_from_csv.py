@@ -1,8 +1,8 @@
 # This script applies/regrades a subscription to devices by MAC address using the NCM library (pip install -U ncm)
-# It reads a CSV file with device details and applies/regrades subscriptions to the devices in NCM in chunks of 100
+# It reads a CSV file with MAC addresses and subscriptions and applies/regrades subscriptions to the devices in NCM in chunks of 100
 # Usage: python NCM_APIv3_regrades_by_mac_from_csv.py <csv_filename> [token]
 # Token can be set via command-line argument, token environment variable, or hardcoded in the script
-# CSV file must contain columns for MAC addresses and subscription_id
+# CSV file must contain columns for MAC addresses and subscription
 # Column names are automatically detected (case-insensitive):
 #   MAC address: "mac", "mac address", or "mac_address"
 #   Subscription ID: "subscription_id", "subscription", or "subscription id"
