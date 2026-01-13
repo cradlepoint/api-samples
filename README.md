@@ -74,7 +74,7 @@ python script_name.py
 
 ## Web Interface
 
-For a convenient web-based interface to manage CSV files, API keys, and run scripts, check out the [CSV Script Manager](csv_script_manager/README.md).
+For a convenient web-based interface to manage CSV files, API keys, and run scripts, check out the [CSV Script Manager](scripts/csv_script_manager/README.md).
 
 The CSV Script Manager provides:
 - Web-based CSV file editor
