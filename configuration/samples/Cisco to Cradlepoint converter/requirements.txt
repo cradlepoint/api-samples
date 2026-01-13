@@ -1,0 +1,10 @@
+# Requirements for Cisco to Cradlepoint Converter
+# Install with: pip install -r requirements.txt
+
+# Core dependencies
+netaddr>=0.8.0
+ipaddress>=1.0.23
+
+# Optional dependencies for enhanced functionality
+requests>=2.25.0  # For API integration (optional)
+colorama>=0.4.4   # For colored output (optional)

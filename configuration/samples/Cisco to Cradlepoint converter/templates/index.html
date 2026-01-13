@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cisco to Cradlepoint Converter</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <style>
+        :root {
+            --luxury-primary: #2C3E50;
+            --luxury-secondary: #34495E;
+            --luxury-accent: #20B2AA;
+            --luxury-gold: #4FC3F7;
+            --luxury-silver: #BDC3C7;
+            --luxury-carbon: #34495E;
+            --luxury-glass: rgba(255, 255, 255, 0.1);
+            --luxury-glass-strong: rgba(255, 255, 255, 0.2);
+            --luxury-shadow: 0 8px 32px rgba(44, 62, 80, 0.3);
+            --luxury-shadow-strong: 0 16px 64px rgba(44, 62, 80, 0.4);
+            --luxury-teal: #20B2AA;
+            --luxury-light-blue: #4FC3F7;
+            --luxury-dark-grey: #2C3E50;
+            --luxury-light-grey: #ECF0F1;
+            --luxury-white: #FFFFFF;
+            --luxury-light-bg: #F8F9FA;
+            --luxury-card-bg: #FFFFFF;
+            --luxury-text-dark: #2C3E50;
+            --luxury-text-muted: #6C757D;
+            --luxury-border: #E9ECEF;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--luxury-light-bg);
+            color: var(--luxury-text-dark);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Animated background particles */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(32, 178, 170, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(79, 195, 247, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(189, 195, 199, 0.03) 0%, transparent 50%);
+            animation: luxuryFloat 20s ease-in-out infinite;
+            z-index: -1;
+        }
+
+        @keyframes luxuryFloat {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(1deg); }
+        }
+
+        /* Navigation */
+        .navbar {
+            background: var(--luxury-primary) !important;
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--luxury-border);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: white;
+        }
+
+        /* Hero Section */
+        .hero-section {
+            background: linear-gradient(135deg, var(--luxury-light-bg) 0%, var(--luxury-white) 100%);
+            border-bottom: 1px solid var(--luxury-border);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                linear-gradient(45deg, transparent 30%, var(--luxury-glass) 50%, transparent 70%),
+                linear-gradient(-45deg, transparent 30%, var(--luxury-glass-strong) 50%, transparent 70%);
+            animation: luxuryShimmer 3s ease-in-out infinite;
+        }
+
+        @keyframes luxuryShimmer {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.8; }
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .display-5 {
+            font-weight: 800;
+            background: linear-gradient(45deg, var(--luxury-text-dark), var(--luxury-teal));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .lead {
+            color: var(--luxury-text-muted);
+            font-weight: 400;
+        }
+
+        .badge {
+            background: linear-gradient(135deg, var(--luxury-teal), var(--luxury-light-blue)) !important;
+            border: 1px solid var(--luxury-teal);
+            color: white !important;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: 25px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .badge:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(32, 178, 170, 0.3);
+            border-color: var(--luxury-teal);
+        }
+
+        /* Upload Section */
+        .upload-section {
+            background: var(--luxury-glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--luxury-glass-strong);
+            border-radius: 20px;
+            box-shadow: var(--luxury-shadow);
+        }
+
+        .card {
+            background: var(--luxury-card-bg) !important;
+            border: 1px solid var(--luxury-border) !important;
+            border-radius: 20px !important;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1) !important;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .card:hover {
+            transform: translateY(-8px);
+            box-shadow: var(--luxury-shadow-strong);
+        }
+
+        .card-header {
+            background: linear-gradient(135deg, var(--luxury-teal), var(--luxury-light-blue)) !important;
+            border: none !important;
+            border-radius: 20px 20px 0 0 !important;
+            font-weight: 600;
+            color: white;
+        }
+
+        .upload-area {
+            border: 2px dashed var(--luxury-teal);
+            border-radius: 15px;
+            padding: 3rem 2rem;
+            text-align: center;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            background: linear-gradient(135deg, var(--luxury-light-bg) 0%, var(--luxury-white) 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .upload-area::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, var(--luxury-glass-strong), transparent);
+            transition: left 0.5s;
+        }
+
+        .upload-area:hover::before {
+            left: 100%;
+        }
+
+        .upload-area:hover {
+            border-color: var(--luxury-light-blue);
+            background: linear-gradient(135deg, var(--luxury-white) 0%, var(--luxury-light-bg) 100%);
+            transform: scale(1.02);
+            box-shadow: 0 8px 32px rgba(32, 178, 170, 0.2);
+        }
+
+        .upload-area.dragover {
+            border-color: var(--luxury-light-blue);
+            background: linear-gradient(135deg, var(--luxury-white) 0%, var(--luxury-light-bg) 100%);
+            transform: scale(1.05);
+            box-shadow: 0 12px 40px rgba(32, 178, 170, 0.3);
+        }
+
+        .btn {
+            border-radius: 12px;
+            font-weight: 600;
+            padding: 0.75rem 2rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--luxury-teal), var(--luxury-light-blue));
+            border: none;
+            box-shadow: 0 4px 15px rgba(32, 178, 170, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(32, 178, 170, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            border: none;
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4);
+        }
+
+        .btn-outline-primary {
+            border: 2px solid var(--luxury-teal);
+            color: var(--luxury-teal);
+            background: transparent;
+        }
+
+        .btn-outline-primary:hover {
+            background: var(--luxury-teal);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        /* Feature Cards */
+        .feature-card {
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            border: none;
+            background: var(--luxury-glass);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--luxury-teal), var(--luxury-light-blue));
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px) scale(1.02);
+            box-shadow: var(--luxury-shadow-strong);
+        }
+
+        .feature-card i {
+            background: linear-gradient(45deg, var(--luxury-teal), var(--luxury-light-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Form Elements */
+        .form-control {
+            background: var(--luxury-white);
+            border: 1px solid var(--luxury-border);
+            border-radius: 12px;
+            color: var(--luxury-text-dark);
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus {
+            background: var(--luxury-white);
+            border-color: var(--luxury-teal);
+            box-shadow: 0 0 0 0.2rem rgba(32, 178, 170, 0.25);
+            color: var(--luxury-text-dark);
+        }
+
+        .form-control::placeholder {
+            color: var(--luxury-text-muted);
+        }
+
+        .form-check-input:checked {
+            background-color: var(--luxury-teal);
+            border-color: var(--luxury-teal);
+        }
+
+        /* Loading Animation */
+        .loading {
+            display: none;
+        }
+
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+            border-color: var(--luxury-teal);
+            border-right-color: transparent;
+        }
+
+        /* Conversion Result */
+        .conversion-result {
+            display: none;
+        }
+
+        .alert-success {
+            background: linear-gradient(135deg, rgba(40, 167, 69, 0.2), rgba(32, 201, 151, 0.2));
+            border: 1px solid rgba(40, 167, 69, 0.3);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        /* Footer */
+        footer {
+            background: rgba(10, 10, 10, 0.95) !important;
+            backdrop-filter: blur(20px);
+            border-top: 1px solid var(--luxury-glass);
+        }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--luxury-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(45deg, var(--luxury-accent), var(--luxury-gold));
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(45deg, #ff8c42, #ffd700);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .hero-section {
+                padding: 2rem 0;
+            }
+            
+            .display-5 {
+                font-size: 2.5rem;
+            }
+            
+            .upload-area {
+                padding: 2rem 1rem;
+            }
+        }
+
+        /* Luxury Animation Classes */
+        .luxury-fade-in {
+            animation: luxuryFadeIn 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes luxuryFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .luxury-slide-up {
+            animation: luxurySlideUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes luxurySlideUp {
+            from {
+                opacity: 0;
+                transform: translateY(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Luxury Text Gradient */
+        .luxury-text-gradient {
+            background: linear-gradient(45deg, var(--luxury-teal), var(--luxury-light-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Luxury Icon Container */
+        .luxury-icon-container {
+            position: relative;
+            display: inline-block;
+        }
+
+        .luxury-icon {
+            font-size: 6rem;
+            background: linear-gradient(45deg, var(--luxury-teal), var(--luxury-light-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: luxuryIconFloat 3s ease-in-out infinite;
+        }
+
+        @keyframes luxuryIconFloat {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-10px) rotate(2deg); }
+        }
+
+        /* Luxury Particles */
+        .luxury-particles {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: var(--luxury-teal);
+            border-radius: 50%;
+            animation: luxuryParticle 4s linear infinite;
+        }
+
+        .particle:nth-child(1) {
+            top: 20%;
+            left: 20%;
+            animation-delay: 0s;
+        }
+
+        .particle:nth-child(2) {
+            top: 60%;
+            right: 20%;
+            animation-delay: 1.3s;
+        }
+
+        .particle:nth-child(3) {
+            bottom: 20%;
+            left: 50%;
+            animation-delay: 2.6s;
+        }
+
+        @keyframes luxuryParticle {
+            0% {
+                opacity: 0;
+                transform: scale(0) translateY(0);
+            }
+            10% {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+            90% {
+                opacity: 1;
+                transform: scale(1) translateY(-100px);
+            }
+            100% {
+                opacity: 0;
+                transform: scale(0) translateY(-100px);
+            }
+        }
+
+        /* Luxury Upload Icon */
+        .luxury-upload-icon {
+            font-size: 4rem;
+            background: linear-gradient(45deg, var(--luxury-teal), var(--luxury-light-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 1rem;
+            animation: luxuryUploadPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes luxuryUploadPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        /* Luxury Feature Icons */
+        .luxury-feature-icon {
+            font-size: 3rem;
+            background: linear-gradient(45deg, var(--luxury-teal), var(--luxury-light-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover .luxury-feature-icon {
+            transform: scale(1.1);
+        }
+
+        /* Luxury Spinner */
+        .luxury-spinner {
+            position: relative;
+            display: inline-block;
+        }
+
+        .luxury-spinner::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: -10px;
+            right: -10px;
+            bottom: -10px;
+            border: 2px solid var(--luxury-glass);
+            border-radius: 50%;
+            animation: luxurySpinnerRing 1.5s linear infinite;
+        }
+
+        @keyframes luxurySpinnerRing {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Luxury Alert */
+        .luxury-alert {
+            border: 1px solid rgba(40, 167, 69, 0.3);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .luxury-alert::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(40, 167, 69, 0.1), transparent);
+            animation: luxuryAlertShimmer 2s ease-in-out infinite;
+        }
+
+        @keyframes luxuryAlertShimmer {
+            0% { left: -100%; }
+            50% { left: 100%; }
+            100% { left: 100%; }
+        }
+
+        /* Luxury Button */
+        .luxury-btn {
+            position: relative;
+            overflow: hidden;
+            border-radius: 15px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .luxury-btn::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .luxury-btn:hover::after {
+            left: 100%;
+        }
+
+        /* Luxury Checkbox */
+        .luxury-checkbox .form-check-input {
+            background: var(--luxury-glass);
+            border: 2px solid var(--luxury-glass-strong);
+            border-radius: 6px;
+            transition: all 0.3s ease;
+        }
+
+        .luxury-checkbox .form-check-input:checked {
+            background: linear-gradient(135deg, var(--luxury-teal), var(--luxury-light-blue));
+            border-color: var(--luxury-teal);
+            box-shadow: 0 0 0 0.2rem rgba(32, 178, 170, 0.25);
+        }
+
+        /* Min Height for Hero */
+        .min-vh-50 {
+            min-height: 50vh;
+        }
+
+        /* Enhanced Card Hover Effects */
+        .card:hover .luxury-feature-icon {
+            animation: luxuryIconSpin 0.6s ease-in-out;
+        }
+
+        @keyframes luxuryIconSpin {
+            0% { transform: rotate(0deg) scale(1); }
+            50% { transform: rotate(180deg) scale(1.1); }
+            100% { transform: rotate(360deg) scale(1); }
+        }
+
+        /* Luxury Notification System */
+        .luxury-notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--luxury-glass-strong);
+            box-shadow: var(--luxury-shadow-strong);
+            z-index: 9999;
+            transform: translateX(100%);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-weight: 500;
+            max-width: 300px;
+        }
+
+        .luxury-notification-success {
+            background: linear-gradient(135deg, rgba(40, 167, 69, 0.2), rgba(32, 201, 151, 0.2));
+            border-color: rgba(40, 167, 69, 0.3);
+            color: #28a745;
+        }
+
+        .luxury-notification-error {
+            background: linear-gradient(135deg, rgba(220, 53, 69, 0.2), rgba(255, 107, 53, 0.2));
+            border-color: rgba(220, 53, 69, 0.3);
+            color: #dc3545;
+        }
+
+        /* Luxury Summary Stats */
+        .luxury-summary {
+            background: linear-gradient(135deg, var(--luxury-white) 0%, var(--luxury-light-bg) 100%);
+            border-radius: 15px;
+            padding: 1.5rem;
+            border: 1px solid var(--luxury-teal);
+        }
+
+        .luxury-stat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 1rem;
+            background: linear-gradient(135deg, var(--luxury-white) 0%, var(--luxury-light-bg) 100%);
+            border-radius: 12px;
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+            border: 1px solid var(--luxury-border);
+        }
+
+        .luxury-stat:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(32, 178, 170, 0.2);
+            border-color: var(--luxury-teal);
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(45deg, var(--luxury-teal), var(--luxury-light-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1;
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--luxury-text-muted);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand luxury-fade-in" href="#">
+                <i class="fas fa-network-wired me-2"></i>
+                <span class="luxury-text-gradient">Cisco to Cradlepoint Converter</span>
+            </a>
+            <div class="navbar-nav ms-auto">
+                <span class="nav-item">
+                    <span class="nav-link text-white-50">
+                        <i class="fas fa-cog me-1"></i>
+                        Enterprise Grade
+                    </span>
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero-section">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-lg-8 luxury-fade-in">
+                    <h1 class="display-5 fw-bold mb-2 luxury-slide-up">
+                        <span class="luxury-text-gradient">Convert Cisco Configs</span><br>
+                        <span class="text-white">to Cradlepoint</span>
+                    </h1>
+                    <p class="lead mb-2 luxury-slide-up" style="animation-delay: 0.2s;">
+                        Transform your Cisco Zone-Based Firewall configurations into Cradlepoint Zone Firewall format 
+                        with intelligent hierarchy flattening and DTD validation.
+                    </p>
+                    <div class="d-flex gap-2 flex-wrap luxury-slide-up" style="animation-delay: 0.4s;">
+                        <span class="badge">
+                            <i class="fas fa-check me-1"></i>Zone Mapping
+                        </span>
+                        <span class="badge">
+                            <i class="fas fa-check me-1"></i>Policy Flattening
+                        </span>
+                        <span class="badge">
+                            <i class="fas fa-check me-1"></i>DTD Validation
+                        </span>
+                    </div>
+                </div>
+                <div class="col-lg-4 luxury-fade-in" style="animation-delay: 0.6s;">
+                    <div class="text-center position-relative">
+                        <div class="luxury-icon-container">
+                            <i class="fas fa-exchange-alt luxury-icon"></i>
+                        </div>
+                        <div class="luxury-particles">
+                            <div class="particle"></div>
+                            <div class="particle"></div>
+                            <div class="particle"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Upload Section -->
+    <section class="py-3">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <div class="card luxury-slide-up">
+                        <div class="card-header">
+                            <h4 class="mb-0">
+                                <i class="fas fa-upload me-2"></i>
+                                Upload Cisco Configuration
+                            </h4>
+                        </div>
+                        <div class="card-body p-3">
+                            <div id="uploadForm">
+                                <div class="upload-area" id="uploadArea">
+                                    <div class="luxury-upload-icon">
+                                        <i class="fas fa-cloud-upload-alt"></i>
+                                    </div>
+                                    <h5 class="mb-2 text-dark">Drop your Cisco config file here</h5>
+                                    <p class="text-muted mb-3">or click to browse</p>
+                                    <input type="file" id="fileInput" name="file" accept=".txt,.conf,.cfg" style="display: none;">
+                                    <button type="button" class="btn btn-outline-primary" id="browseBtn">
+                                        <i class="fas fa-folder-open me-2"></i>
+                                        Browse Files
+                                    </button>
+                                </div>
+                                
+                                <div class="mt-4 text-center">
+                                    <small class="text-white-50">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        Supported formats: .txt, .conf, .cfg
+                                    </small>
+                                </div>
+                                
+                                <!-- DIA Zone Options -->
+                                <div class="mt-3">
+                                    <h6 class="text-dark mb-2">
+                                        <i class="fas fa-globe me-2"></i>DIA Zone Options
+                                    </h6>
+                                    <div class="form-check luxury-checkbox">
+                                        <input class="form-check-input" type="checkbox" id="addInternetZone" name="add_internet_zone" checked>
+                                        <label class="form-check-label text-dark" for="addInternetZone">
+                                            Add DIA zone and forward all zones to it
+                                        </label>
+                                    </div>
+                                    <div class="mt-2" id="internetZoneNameGroup">
+                                        <label for="internetZoneName" class="form-label text-muted">DIA Zone Name:</label>
+                                        <input type="text" class="form-control" id="internetZoneName" name="internet_zone_name" value="EXT-Internet" placeholder="Enter zone name">
+                                    </div>
+                                </div>
+                                
+                                <div class="loading text-center mt-4">
+                                    <div class="luxury-spinner">
+                                        <div class="spinner-border" role="status">
+                                            <span class="visually-hidden">Converting...</span>
+                                        </div>
+                                    </div>
+                                    <p class="mt-3 text-muted">Converting configuration...</p>
+                                </div>
+                                
+                                <div class="conversion-result mt-4">
+                                    <div class="alert alert-success luxury-alert">
+                                        <h5 class="mb-3">
+                                            <i class="fas fa-check-circle me-2"></i>Conversion Successful!
+                                        </h5>
+                                        <div id="configSummary"></div>
+                                    </div>
+                                    <div class="d-grid">
+                                        <button type="button" class="btn btn-success btn-lg luxury-btn" id="downloadBtn">
+                                            <i class="fas fa-download me-2"></i>
+                                            Download Cradlepoint Configuration
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- Footer -->
+    <footer class="text-dark py-2" style="background: linear-gradient(135deg, var(--luxury-light-bg) 0%, var(--luxury-white) 100%); border-top: 1px solid var(--luxury-border);">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h6 class="luxury-text-gradient mb-0">Cisco to Cradlepoint Converter</h6>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p class="text-muted mb-0 small">
+                        <i class="fas fa-crown me-1"></i>
+                        &copy; 2024 Enterprise Grade Converter
+                    </p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const uploadForm = document.getElementById('uploadForm');
+        const loading = document.querySelector('.loading');
+        const conversionResult = document.querySelector('.conversion-result');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const configSummary = document.getElementById('configSummary');
+
+        let currentSessionId = null;
+
+        // Luxury animation initialization
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add luxury fade-in animations to elements
+            const elements = document.querySelectorAll('.luxury-fade-in, .luxury-slide-up');
+            elements.forEach((el, index) => {
+                el.style.animationDelay = `${index * 0.1}s`;
+            });
+
+            // Add luxury hover effects to cards
+            const cards = document.querySelectorAll('.card');
+            cards.forEach(card => {
+                card.addEventListener('mouseenter', function() {
+                    this.style.transform = 'translateY(-8px) scale(1.02)';
+                });
+                card.addEventListener('mouseleave', function() {
+                    this.style.transform = 'translateY(0) scale(1)';
+                });
+            });
+        });
+
+        // DIA zone checkbox functionality
+        document.getElementById('addInternetZone').addEventListener('change', function() {
+            const nameGroup = document.getElementById('internetZoneNameGroup');
+            if (this.checked) {
+                nameGroup.style.display = 'block';
+            } else {
+                nameGroup.style.display = 'none';
+            }
+        });
+        
+        // Initialize DIA zone name group visibility on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const checkbox = document.getElementById('addInternetZone');
+            const nameGroup = document.getElementById('internetZoneNameGroup');
+            if (checkbox.checked) {
+                nameGroup.style.display = 'block';
+            }
+        });
+
+        // Prevent all form-related events on upload area
+        uploadArea.addEventListener('submit', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        });
+
+        uploadArea.addEventListener('formdata', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        });
+
+        // Drag and drop functionality
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                console.log('File dropped:', files[0].name);
+                selectedFile = files[0]; // Store the file reference directly
+                
+                // Add luxury animation to upload area
+                uploadArea.style.transform = 'scale(1.05)';
+                setTimeout(() => {
+                    uploadArea.style.transform = 'scale(1)';
+                }, 200);
+                
+                    uploadArea.innerHTML = `
+                        <div class="luxury-upload-icon">
+                            <i class="fas fa-file-alt"></i>
+                        </div>
+                        <h5 class="text-dark mb-2">${files[0].name}</h5>
+                        <p class="text-success mb-4">
+                            <i class="fas fa-check-circle me-1"></i>Ready to convert
+                        </p>
+                        <button type="button" class="btn btn-primary luxury-btn" id="convertBtn">
+                            <i class="fas fa-magic me-2"></i>
+                            Convert Configuration
+                        </button>
+                    `;
+                
+                // Add event listener to the new button
+                document.getElementById('convertBtn').addEventListener('click', convertFile);
+            }
+        });
+
+        // Browse button functionality
+        const browseBtn = document.getElementById('browseBtn');
+        browseBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            fileInput.click();
+        });
+
+        // Upload area click functionality (only for the area itself, not buttons)
+        uploadArea.addEventListener('click', (e) => {
+            // Only trigger if clicking on the upload area text/icons, not buttons
+            if (e.target.tagName === 'I' || e.target.tagName === 'H5' || e.target.tagName === 'P' || e.target === uploadArea) {
+                e.preventDefault();
+                e.stopPropagation();
+                fileInput.click();
+            }
+        });
+
+        fileInput.addEventListener('change', function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            console.log('File input changed');
+            
+            // Add a small delay to prevent immediate reopening
+            setTimeout(() => {
+                const file = event.target.files[0];
+                if (file) {
+                    console.log('File selected:', file.name);
+                    selectedFile = file; // Store the file reference
+                    
+                    // Add luxury animation to upload area
+                    uploadArea.style.transform = 'scale(1.05)';
+                    setTimeout(() => {
+                        uploadArea.style.transform = 'scale(1)';
+                    }, 200);
+                    
+                    uploadArea.innerHTML = `
+                        <div class="luxury-upload-icon">
+                            <i class="fas fa-file-alt"></i>
+                        </div>
+                        <h5 class="text-dark mb-2">${file.name}</h5>
+                        <p class="text-success mb-4">
+                            <i class="fas fa-check-circle me-1"></i>File selected successfully
+                        </p>
+                        <button type="button" class="btn btn-primary luxury-btn" id="convertBtn">
+                            <i class="fas fa-magic me-2"></i>
+                            Convert Configuration
+                        </button>
+                    `;
+                    
+                    // Add event listener to the new button
+                    document.getElementById('convertBtn').addEventListener('click', convertFile);
+                } else {
+                    console.log('No file selected');
+                }
+            }, 100);
+            
+            return false;
+        });
+
+        let selectedFile = null;
+
+        function convertFile(event) {
+            console.log('convertFile called', event);
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            
+            if (!selectedFile) {
+                // Luxury error notification
+                showLuxuryNotification('Please select a file first', 'error');
+                return false;
+            }
+            
+            console.log('Converting file:', selectedFile.name);
+            
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            
+            // Add DIA zone options
+            const addInternetZone = document.getElementById('addInternetZone').checked;
+            const internetZoneName = document.getElementById('internetZoneName').value;
+            formData.append('add_internet_zone', addInternetZone ? 'on' : '');
+            formData.append('internet_zone_name', internetZoneName);
+
+            // Show luxury loading animation
+            loading.style.display = 'block';
+            conversionResult.style.display = 'none';
+            
+            // Add luxury loading animation to the button
+            const convertBtn = document.getElementById('convertBtn');
+            if (convertBtn) {
+                convertBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Converting...';
+                convertBtn.disabled = true;
+            }
+
+            // Add timeout to prevent infinite loading
+            const timeoutId = setTimeout(() => {
+                console.log('Conversion timeout - resetting button');
+                loading.style.display = 'none';
+                if (convertBtn) {
+                    convertBtn.innerHTML = '<i class="fas fa-magic me-2"></i>Convert Configuration';
+                    convertBtn.disabled = false;
+                }
+                showLuxuryNotification('Conversion timed out. Please try again.', 'error');
+            }, 30000); // 30 second timeout
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Response data:', data);
+                clearTimeout(timeoutId); // Clear the timeout
+                loading.style.display = 'none';
+                
+                // Reset the button regardless of success/error
+                const convertBtn = document.getElementById('convertBtn');
+                if (convertBtn) {
+                    convertBtn.innerHTML = '<i class="fas fa-magic me-2"></i>Convert Configuration';
+                    convertBtn.disabled = false;
+                }
+                
+                if (data.success) {
+                    currentSessionId = data.session_id;
+                    configSummary.innerHTML = `
+                        <div class="luxury-summary">
+                            <h6 class="text-dark mb-3">
+                                <i class="fas fa-chart-bar me-2"></i>Configuration Summary
+                            </h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="luxury-stat">
+                                        <span class="stat-number">${data.config_summary.zones}</span>
+                                        <span class="stat-label">Zones</span>
+                                    </div>
+                                    <div class="luxury-stat">
+                                        <span class="stat-number">${data.config_summary.filter_policies}</span>
+                                        <span class="stat-label">Filter Policies</span>
+                                    </div>
+                                    <div class="luxury-stat">
+                                        <span class="stat-number">${data.config_summary.forwardings}</span>
+                                        <span class="stat-label">Forwardings</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="luxury-stat">
+                                        <span class="stat-number">${data.config_summary.ip_identities}</span>
+                                        <span class="stat-label">IP Identities</span>
+                                    </div>
+                                    <div class="luxury-stat">
+                                        <span class="stat-number">${data.config_summary.mac_identities}</span>
+                                        <span class="stat-label">MAC Identities</span>
+                                    </div>
+                                    <div class="luxury-stat">
+                                        <span class="stat-number">${data.config_summary.port_identities}</span>
+                                        <span class="stat-label">Port Identities</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    conversionResult.style.display = 'block';
+                    
+                    // Add luxury success animation
+                    conversionResult.style.animation = 'luxurySlideUp 0.6s ease-out';
+                    showLuxuryNotification('Conversion completed successfully!', 'success');
+                    
+                    // Scroll to results so user can see them
+                    setTimeout(() => {
+                        conversionResult.scrollIntoView({ 
+                            behavior: 'smooth', 
+                            block: 'start' 
+                        });
+                    }, 100);
+                } else {
+                    // Reset the button on error
+                    const convertBtn = document.getElementById('convertBtn');
+                    if (convertBtn) {
+                        convertBtn.innerHTML = '<i class="fas fa-magic me-2"></i>Convert Configuration';
+                        convertBtn.disabled = false;
+                    }
+                    showLuxuryNotification('Error: ' + data.error, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Conversion error:', error);
+                clearTimeout(timeoutId); // Clear the timeout
+                loading.style.display = 'none';
+                
+                // Reset the button
+                const convertBtn = document.getElementById('convertBtn');
+                if (convertBtn) {
+                    convertBtn.innerHTML = '<i class="fas fa-magic me-2"></i>Convert Configuration';
+                    convertBtn.disabled = false;
+                }
+                
+                showLuxuryNotification('Error: ' + error.message, 'error');
+            });
+            
+            return false;
+        }
+
+        // Luxury notification system
+        function showLuxuryNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `luxury-notification luxury-notification-${type}`;
+            notification.innerHTML = `
+                <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'} me-2"></i>
+                ${message}
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Animate in
+            setTimeout(() => {
+                notification.style.transform = 'translateX(0)';
+                notification.style.opacity = '1';
+            }, 100);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                notification.style.transform = 'translateX(100%)';
+                notification.style.opacity = '0';
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 3000);
+        }
+
+        downloadBtn.addEventListener('click', () => {
+            if (currentSessionId) {
+                window.location.href = `/download/${currentSessionId}`;
+            }
+        });
+    </script>
+</body>
+</html>
+
+
