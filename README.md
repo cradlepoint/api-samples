@@ -1,6 +1,6 @@
 # API Samples
 
-A collection of Python scripts for interacting with Cradlepoint APIs.
+A collection of Python scripts for interacting with Ericsson NetCloud Manager APIs.
 
 ## Setup
 
