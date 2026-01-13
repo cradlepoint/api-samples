@@ -20,17 +20,3 @@ Run the script to start the web server:
 ```bash
 python3 csv_script_manager.py
 ```
-
-Then open your browser to `http://localhost:8000`
-
-## Requirements
-
-- Python 3.6+
-- requests (installed automatically with ncm package)
-
-## Directory Structure
-
-- `csv_files/` - Stores CSV files
-- `scripts/` - Python scripts for processing CSV files
-- `static/` - Web interface files
-
