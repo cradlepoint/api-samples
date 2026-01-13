@@ -3,7 +3,7 @@
 # The CSV file must have the following columns named on row 1:
 # first name, last name, email, role
 # Possible values for role are: no_access, read_only_user, full_access_user, administrator
-# Usage: python "NCM API v3 Create Users from CSV.py" <csv_file_path>
+# Usage: python "NCM_APIv3_create_users_from_CSV.py" <csv_file_path>
 # Token can be set via TOKEN environment variable
 
 import csv
