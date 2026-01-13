@@ -1,2 +1,4 @@
-requests
+ncm
+flask
+werkzeug
 python-dateutil
