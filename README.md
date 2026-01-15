@@ -2,25 +2,6 @@
 
 A collection of Python scripts for interacting with Ericsson NetCloud Manager APIs.
 
-## Getting Started
-
-### Download and Extract the Repository
-
-**Using Git (Recommended):**
-```bash
-git clone <repository-url>
-cd api-samples
-```
-
-**Downloading as ZIP:**
-1. Download the repository as a ZIP file
-2. Extract the ZIP file to your desired location
-3. Navigate to the extracted `api-samples` folder
-
-```bash
-cd path/to/extracted/api-samples
-```
-
 ## Sample Scripts
 
 This repository contains many sample scripts in the `scripts` folder that demonstrate various API interactions and use cases. These scripts cover a wide range of functionality including:
@@ -68,6 +49,23 @@ For a convenient way to test and explore the Ericsson NetCloud Manager APIs, you
 The collection will now appear in your Postman workspace. You can use it to explore and test the various API endpoints.
 
 ## Setup
+
+### Download and Extract the Repository
+
+**Using Git (Recommended):**
+```bash
+git clone <repository-url>
+cd api-samples
+```
+
+**Downloading as ZIP:**
+1. Download the repository as a ZIP file
+2. Extract the ZIP file to your desired location
+3. Navigate to the extracted `api-samples` folder
+
+```bash
+cd path/to/extracted/api-samples
+```
 
 ### 1. Create a Python Virtual Environment
 
