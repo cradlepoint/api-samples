@@ -2,6 +2,10 @@
 
 A collection of Python scripts for interacting with Ericsson NetCloud Manager APIs.
 
+## Postman Collection
+
+For a convenient way to test and explore the Ericsson NetCloud Manager APIs, you can use the **Ericsson NCM API Postman Collection**. Import the `Ericsson NCM API Postman Collection.json` file into Postman to get started with pre-configured API requests.
+
 ## Setup
 
 ### 1. Create a Python Virtual Environment
