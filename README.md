@@ -2,9 +2,28 @@
 
 A collection of Python scripts for interacting with Ericsson NetCloud Manager APIs.
 
+## Getting Started
+
+### Download and Extract the Repository
+
+**Using Git (Recommended):**
+```bash
+git clone <repository-url>
+cd api-samples
+```
+
+**Downloading as ZIP:**
+1. Download the repository as a ZIP file
+2. Extract the ZIP file to your desired location
+3. Navigate to the extracted `api-samples` folder
+
+```bash
+cd path/to/extracted/api-samples
+```
+
 ## Sample Scripts
 
-This repository contains many sample scripts in the [scripts](scripts/) folder that demonstrate various API interactions and use cases. These scripts cover a wide range of functionality including:
+This repository contains many sample scripts in the `scripts` folder that demonstrate various API interactions and use cases. These scripts cover a wide range of functionality including:
 
 - Router management and configuration
 - Alert creation and management
@@ -14,7 +33,7 @@ This repository contains many sample scripts in the [scripts](scripts/) folder t
 - Configuration backups and restoration
 - And much more
 
-Browse the [scripts](scripts/)  folder to explore all available sample scripts.
+Browse the [scripts](scripts/) folder to explore all available sample scripts.
 
 ## CSV Script Manager
 
@@ -29,11 +48,10 @@ The CSV Script Manager provides:
 To use it:
 ```bash
 cd scripts/csv_script_manager
-python csv_script_manager.py    # Windows
-python3 csv_script_manager.py   # macOS/Linux
+python csv_script_manager.py
 ```
 
-Then open your browser to `http://localhost:8000`
+Then open your browser to http://localhost:8000
 
 ## Postman Collection
 
