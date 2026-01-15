@@ -2,9 +2,52 @@
 
 A collection of Python scripts for interacting with Ericsson NetCloud Manager APIs.
 
+## Sample Scripts
+
+This repository contains many sample scripts in the `scripts/` folder that demonstrate various API interactions and use cases. These scripts cover a wide range of functionality including:
+
+- Router management and configuration
+- Alert creation and management
+- User management
+- Location tracking and historical data export
+- Device metrics and signal samples
+- Configuration backups and restoration
+- And much more
+
+Browse the `scripts/` folder to explore all available sample scripts.
+
+## CSV Script Manager
+
+For a convenient web-based interface to manage CSV files, API keys, and run scripts, check out the [CSV Script Manager](scripts/csv_script_manager/README.md).
+
+The CSV Script Manager provides:
+- Web-based CSV file editor
+- API key management
+- Script execution interface
+- Easy script management
+
+To use it:
+```bash
+cd scripts/csv_script_manager
+python csv_script_manager.py    # Windows
+python3 csv_script_manager.py   # macOS/Linux
+```
+
+Then open your browser to `http://localhost:8000`
+
 ## Postman Collection
 
-For a convenient way to test and explore the Ericsson NetCloud Manager APIs, you can use the **Ericsson NCM API Postman Collection**. Import the `Ericsson NCM API Postman Collection.json` file into Postman to get started with pre-configured API requests.
+For a convenient way to test and explore the Ericsson NetCloud Manager APIs, you can use the **Ericsson NCM API Postman Collection**. This collection contains pre-configured API requests that you can use to interact with the APIs directly from Postman.
+
+### Importing the Collection
+
+1. Open Postman
+2. Click **Import** in the top left corner
+3. Select **File** or **Upload Files**
+4. Navigate to and select the `Ericsson NCM API Postman Collection.json` file from this repository
+5. Click **Import**
+
+The collection will now appear in your Postman workspace. You can use it to explore and test the various API endpoints.
 
 ## Setup
 
@@ -75,13 +118,3 @@ python script_name.py
 ```bash
 python3 script_name.py
 ```
-
-## Web Interface
-
-For a convenient web-based interface to manage CSV files, API keys, and run scripts, check out the [CSV Script Manager](scripts/csv_script_manager/README.md).
-
-The CSV Script Manager provides:
-- Web-based CSV file editor
-- API key management
-- Script execution interface
-- Easy script management
