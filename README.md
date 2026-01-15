@@ -4,7 +4,7 @@ A collection of Python scripts for interacting with Ericsson NetCloud Manager AP
 
 ## Sample Scripts
 
-This repository contains many sample scripts in the `scripts/` folder that demonstrate various API interactions and use cases. These scripts cover a wide range of functionality including:
+This repository contains many sample scripts in the [scripts](scripts/) folder that demonstrate various API interactions and use cases. These scripts cover a wide range of functionality including:
 
 - Router management and configuration
 - Alert creation and management
@@ -14,11 +14,11 @@ This repository contains many sample scripts in the `scripts/` folder that demon
 - Configuration backups and restoration
 - And much more
 
-Browse the `scripts/` folder to explore all available sample scripts.
+Browse the [scripts](scripts/)  folder to explore all available sample scripts.
 
 ## CSV Script Manager
 
-For a convenient web-based interface to manage CSV files, API keys, and run scripts, check out the [CSV Script Manager](scripts/csv_script_manager/README.md).
+For a convenient web-based interface to manage CSV files, API keys, and run scripts, check out the [CSV Script Manager](scripts/csv_script_manager).
 
 The CSV Script Manager provides:
 - Web-based CSV file editor
