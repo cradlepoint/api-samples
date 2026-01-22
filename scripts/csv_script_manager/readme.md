@@ -7,6 +7,7 @@ A web-based CSV file editor and script manager for processing CSV files with Pyt
 - Load, edit, and save CSV files through a web interface
 - Set and manage API keys
 - Download scripts from GitHub URLs
+- Displays instructions for each script from docstrings
 - Manage and execute Python scripts that process CSV files
 
 ## Usage
