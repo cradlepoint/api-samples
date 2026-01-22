@@ -2,6 +2,7 @@
 
 A collection of Python scripts for interacting with Ericsson NetCloud Manager APIs.
 
+<<<<<<< HEAD
 ## Getting Started
 
 ### Download and Extract the Repository
@@ -24,6 +25,11 @@ cd path/to/extracted/api-samples
 ## Sample Scripts
 
 This repository contains many sample scripts in the `scripts/` folder that demonstrate various API interactions and use cases. These scripts cover a wide range of functionality including:
+=======
+## Sample Scripts
+
+This repository contains many sample scripts in the `scripts` folder that demonstrate various API interactions and use cases. These scripts cover a wide range of functionality including:
+>>>>>>> af5e853d33494a8223053f6d3783621b840a69eb
 
 - Router management and configuration
 - Alert creation and management
@@ -33,11 +39,19 @@ This repository contains many sample scripts in the `scripts/` folder that demon
 - Configuration backups and restoration
 - And much more
 
+<<<<<<< HEAD
 Browse the `scripts/` folder to explore all available sample scripts.
 
 ## CSV Script Manager
 
 For a convenient web-based interface to manage CSV files, API keys, and run scripts, check out the [CSV Script Manager](scripts/csv_script_manager/README.md).
+=======
+Browse the [scripts](scripts/) folder to explore all available sample scripts.
+
+## CSV Script Manager
+
+For a convenient web-based interface to manage CSV files, API keys, and run scripts, check out the [CSV Script Manager](scripts/csv_script_manager).
+>>>>>>> af5e853d33494a8223053f6d3783621b840a69eb
 
 The CSV Script Manager provides:
 - Web-based CSV file editor
@@ -48,11 +62,18 @@ The CSV Script Manager provides:
 To use it:
 ```bash
 cd scripts/csv_script_manager
+<<<<<<< HEAD
 python csv_script_manager.py    # Windows
 python3 csv_script_manager.py   # macOS/Linux
 ```
 
 Then open your browser to `http://localhost:8000`
+=======
+python csv_script_manager.py
+```
+
+Then open your browser to http://localhost:8000
+>>>>>>> af5e853d33494a8223053f6d3783621b840a69eb
 
 ## Postman Collection
 
@@ -70,8 +91,28 @@ The collection will now appear in your Postman workspace. You can use it to expl
 
 ## Setup
 
+### Download and Extract the Repository
+
+<<<<<<< HEAD
+=======
+**Using Git (Recommended):**
+```bash
+git clone <repository-url>
+cd api-samples
+```
+
+**Downloading as ZIP:**
+1. Download the repository as a ZIP file
+2. Extract the ZIP file to your desired location
+3. Navigate to the extracted `api-samples` folder
+
+```bash
+cd path/to/extracted/api-samples
+```
+
 ### 1. Create a Python Virtual Environment
 
+>>>>>>> af5e853d33494a8223053f6d3783621b840a69eb
 **Windows:**
 ```cmd
 python -m venv venv
