@@ -244,15 +244,49 @@ body.tab-scripts .scripts-list-container {
     box-shadow: var(--shadow-sm);
 }
 
-.script-item-name {
+.script-item-expandable {
+    cursor: pointer;
+}
+
+.script-item-content {
+    display: flex;
+    flex-direction: column;
     flex: 1;
+    min-width: 0;
+}
+
+.script-item-name {
     font-weight: 500;
     color: var(--text-primary);
+}
+
+.script-item-description {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.3s ease, opacity 0.3s ease, padding-top 0.3s ease, margin-top 0.3s ease;
+    border-top: 1px solid transparent;
+}
+
+.script-item.expanded .script-item-description {
+    max-height: 500px;
+    opacity: 1;
+    border-top-color: var(--border-color);
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
 }
 
 .script-item-actions {
     display: flex;
     gap: 0.5rem;
+    flex-shrink: 0;
+    margin-left: 1rem;
 }
 
 .script-item-actions .btn {

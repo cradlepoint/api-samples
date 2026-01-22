@@ -1,20 +1,37 @@
 #!/usr/bin/env python3
 """
-Unregister routers from NCM by reading router IDs from a CSV file with batch processing.
+Unregister routers from NCM in batches by reading router IDs from a CSV file.
 
-This script reads router IDs from a CSV file and unregisters them using the NCM API
-in batches with configurable delays between batches.
+This script reads router IDs from a CSV file and unregisters (removes) them from NCM
+using the NCM API v2. It processes routers in configurable batches with adjustable
+delays between batches to avoid API rate limits. Includes a safety confirmation prompt
+before starting and creates a detailed timestamped log file of all operations.
+
+CSV Format:
+    Required columns (case-insensitive, automatically detected):
+        - Router ID: One of "router_id", "router id", "id", or "routerId"
+    
+    Example CSV:
+        router_id
+        1234567
+        1234568
+        id
+        1234569
 
 Usage:
-    python unregister_routers_batch.py <csv_file> [--batch-size BATCH_SIZE] [--delay DELAY]
+    python ncm_unregister_routers_batch.py <csv_file> [--batch-size BATCH_SIZE] [--delay DELAY]
 
 Options:
     --batch-size: Number of routers to process per batch (default: 20)
     --delay: Delay in seconds between batches (default: 3)
 
 Requirements:
-    - CSV file with router IDs (handles columns: 'router_id', 'router id', 'id', 'routerId')
-    - NCM API keys set as environment variables or configured in the script
+    - NCM API keys (X-CP-API-ID, X-CP-API-KEY, X-ECM-API-ID, X-ECM-API-KEY)
+      Set in script or as environment variables (X_CP_API_ID, X_CP_API_KEY, X_ECM_API_ID, X_ECM_API_KEY)
+    - CSV file with router IDs
+    - User confirmation required before unregistration begins
+
+Note: This operation is irreversible. A log file is created with timestamp for tracking results.
 """
 
 import csv
@@ -245,9 +262,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python unregister_routers_batch.py routers.csv
-  python unregister_routers_batch.py routers.csv --batch-size 50
-  python unregister_routers_batch.py routers.csv --batch-size 200 --delay 30
+  python ncm_unregister_routers_batch.py routers.csv
+  python ncm_unregister_routers_batch.py routers.csv --batch-size 50
+  python ncm_unregister_routers_batch.py routers.csv --batch-size 200 --delay 30
         """
     )
     

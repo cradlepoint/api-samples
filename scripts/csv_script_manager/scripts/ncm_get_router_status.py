@@ -1,19 +1,40 @@
+#!/usr/bin/env python3
 """
-Example script to fetch routers from NCM by CSV file.
+Get router status and information from NCM using identifiers from a CSV file.
+
+This script reads a CSV file containing router identifiers (ID, MAC address, or serial
+number) and retrieves the corresponding router information from NCM. It displays a
+formatted table showing router ID, name, and state. Automatically detects which
+identifier type is available in the CSV and uses the most appropriate lookup method.
+
+CSV Format:
+    Required columns (at least one, case-insensitive):
+        - id: Router ID (preferred)
+        - mac: MAC address (used if id not found)
+        - serial_number: Serial number (used if id and mac not found)
+    
+    Alternative column names accepted:
+        - For ID: "id", "router id", "router_id"
+        - For MAC: "mac", "mac address", "mac_address"
+        - For Serial: "serial_number", "serial number", "serial"
+    
+    Example CSV:
+        id,name,mac,serial_number
+        1234567,My Router,003044A2CA75,WC2338TA003678
 
 Usage:
-    python3 example.py <csv_file_path>
+    python3 ncm_get_router_status.py <csv_file_path>
 
-Example CSV file:
-    id,name,mac,serial_number
-    1234567,My Router,003044A2CA75,WC2338TA003678
+Requirements:
+    - NCM API access (configured via ncm module)
+    - CSV file with at least one router identifier column
 """
 import sys
 import csv
 import ncm
 
 if len(sys.argv) < 2:
-    print("Usage: python3 example.py <csv_file_path>")
+    print("Usage: python3 ncm_get_router_status.py <csv_file_path>")
     sys.exit(1)
 
 # Read CSV and find router identifiers

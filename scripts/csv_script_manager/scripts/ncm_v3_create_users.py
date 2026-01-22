@@ -1,10 +1,32 @@
-# This script creates and updates users in NCM API v3 using the NCM library (pip install ncm)
-# It reads a CSV file with user details and updates the users in NCM
-# The CSV file must have the following columns named on row 1:
-# first name, last name, email, role
-# Possible values for role are: no_access, read_only_user, full_access_user, administrator
-# Usage: python "NCM_APIv3_create_users.py" <csv_file_path>
-# Token can be set via TOKEN environment variable
+#!/usr/bin/env python3
+"""
+Create and manage users in NCM API v3 from a CSV file with user details and roles.
+
+This script reads a CSV file containing user information (first name, last name, email,
+and role) and automatically creates new users in NCM or updates existing users. It first
+creates the user account, then assigns the specified role. Supports all NCM user roles
+including administrator, full access, read-only, and no access.
+
+CSV Format:
+    Required columns (case-insensitive):
+        - first name: User's first name
+        - last name: User's last name
+        - email: User's email address
+        - role: User role (must be one of: no_access, read_only_user, full_access_user, administrator)
+    
+    Example CSV:
+        first name,last name,email,role
+        John,Doe,john.doe@example.com,full_access_user
+        Jane,Smith,jane.smith@example.com,administrator
+
+Usage:
+    python ncm_v3_create_users.py <csv_file_path>
+
+Requirements:
+    - NCM API v3 token set as TOKEN or NCM_API_TOKEN environment variable
+      (Can be set in the API Keys tab of the CSV Script Manager)
+    - CSV file with required columns in the first row
+"""
 
 import csv
 import os

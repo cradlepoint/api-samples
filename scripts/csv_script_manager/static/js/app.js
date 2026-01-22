@@ -1013,21 +1013,28 @@ if __name__ == '__main__':
                 data.scripts.forEach(script => {
                     const scriptItem = document.createElement('div');
                     scriptItem.className = 'script-item';
+                    const hasDescription = script.description && script.description.trim();
+                    const descriptionHtml = hasDescription 
+                        ? `<div class="script-item-description">${this.escapeHtml(script.description)}</div>`
+                        : '';
                     scriptItem.innerHTML = `
-                        <span class="script-item-name">${script.name}</span>
+                        <div class="script-item-content">
+                            <span class="script-item-name">${this.escapeHtml(script.name)}</span>
+                            ${descriptionHtml}
+                        </div>
                         <div class="script-item-actions">
-                            <button class="btn btn-sm btn-script-run" data-script="${script.name}" data-action="run" title="Run Script">
+                            <button class="btn btn-sm btn-script-run" data-script="${this.escapeHtml(script.name)}" data-action="run" title="Run Script">
                                 <svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <polygon points="5 3 19 12 5 21 5 3"></polygon>
                                 </svg> Run
                             </button>
-                            <button class="btn btn-sm btn-secondary" data-script="${script.name}" data-action="edit" title="Edit Script">
+                            <button class="btn btn-sm btn-secondary" data-script="${this.escapeHtml(script.name)}" data-action="edit" title="Edit Script">
                                 <svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                                 </svg> Edit
                             </button>
-                            <button class="btn btn-sm btn-danger" data-script="${script.name}" data-action="delete" title="Delete Script">
+                            <button class="btn btn-sm btn-danger" data-script="${this.escapeHtml(script.name)}" data-action="delete" title="Delete Script">
                                 <svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <polyline points="3 6 5 6 21 6"></polyline>
                                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -1035,6 +1042,19 @@ if __name__ == '__main__':
                             </button>
                         </div>
                     `;
+                    
+                    // Make script item clickable to expand/collapse if it has a description
+                    if (hasDescription) {
+                        scriptItem.classList.add('script-item-expandable');
+                        scriptItem.addEventListener('click', (e) => {
+                            // Don't expand if clicking on action buttons
+                            if (e.target.closest('.script-item-actions')) {
+                                return;
+                            }
+                            scriptItem.classList.toggle('expanded');
+                        });
+                    }
+                    
                     scriptsList.appendChild(scriptItem);
                 });
                 

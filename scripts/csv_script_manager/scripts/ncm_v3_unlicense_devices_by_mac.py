@@ -1,9 +1,31 @@
-# This script unlicenses devices by MAC address using the NCM library (pip install -U ncm)
-# It reads a CSV file with device details and unlicenses the devices in NCM in chunks of 100
-# Usage: python "NCM APIv3 unlicense by mac.py" <csv_file_path>
-# Token can be set via TOKEN environment variable
-# MAC address column is automatically detected (case-insensitive):
-#   "mac", "mac address", "mac_address", "MAC Address", etc.
+#!/usr/bin/env python3
+"""
+Unlicense devices in NCM API v3 by MAC address from a CSV file.
+
+This script reads a CSV file containing MAC addresses and removes licenses from the
+corresponding devices in NCM. It processes devices in batches of 100 for optimal API
+performance. Supports MAC addresses in any format (with colons, dashes, spaces, or
+no separators) and automatically normalizes them.
+
+CSV Format:
+    Required columns (case-insensitive, automatically detected):
+        - MAC address: One of "mac", "mac address", "mac_address", or "macaddress"
+    
+    Example CSV:
+        mac
+        003044A2CA75
+        00:30:44:A2:CA:76
+        mac_address
+        003044A2CA77
+
+Usage:
+    python ncm_v3_unlicense_devices_by_mac.py <csv_file_path>
+
+Requirements:
+    - NCM API v3 token set as TOKEN or NCM_API_TOKEN environment variable
+      (Can be set in the API Keys tab of the CSV Script Manager)
+    - CSV file with MAC addresses (can be in any format: with colons, dashes, spaces, or no separators)
+"""
 
 import csv
 import os

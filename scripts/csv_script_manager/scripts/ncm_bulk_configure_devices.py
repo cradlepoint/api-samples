@@ -1,22 +1,44 @@
-"""bulk_config.py - bulk configure devices in NCM from router_grid.csv file.
+#!/usr/bin/env python3
+"""
+Bulk configure multiple devices in NCM from a CSV file with custom device configurations.
 
-Reads router_grid.csv with column headers and applies configurations
-using the NCM library's patch_configuration_managers method.
-Also sets desc, custom1 and custom2 fields when present in CSV.
+This script reads a CSV file with device identifiers and configuration parameters, then
+applies device-level configurations to multiple routers in NCM using the NCM API v2.
+It supports customizing router configurations (LAN, WLAN, system settings) and can
+also set device description, custom1, and custom2 fields when present in the CSV.
 
-To use this script:
-1. Export router_grid.csv from the Device View in NCM
-2. Use NCM's device-level Edit Config screen to build your configuration
-3. Copy the pending config output and paste it into the build_config return value
-4. Update router_grid.csv to contain the columns that need to be applied to the device level config
-5. Update build_config to reference router_grid column headers with row_data.get('column_name')
-6. If not included in router_grid.csv, add desc, custom1 and/or custom2 columns to set those fields
-7. Update csv_file variable if using a different filename than 'router_grid.csv'
-8. Update API keys below with your NCM API credentials, or set them as environment variables
+CSV Format:
+    Required columns:
+        - id: Router ID (integer)
+    
+    Optional columns (used if present):
+        - desc: Device description
+        - custom1: Custom field 1
+        - custom2: Custom field 2
+        - Any other columns referenced in build_config() function (e.g., primary_lan_ip, name,
+          asset_id, 2ghz_ssid, 5ghz_ssid, etc.)
+    
+    Example CSV:
+        id,name,primary_lan_ip,desc,custom1,custom2,2ghz_ssid,5ghz_ssid
+        1234567,Router1,192.168.1.1,Description,Value1,Value2,SSID2G,SSID5G
 
 Usage:
-    python bulk_config.py                    # Uses default router_grid.csv and API keys from code/env
-    python bulk_config.py <csv_file_path>    # Uses specified CSV file and API keys from code/env
+    python ncm_bulk_configure_devices.py                    # Uses default router_grid.csv and API keys from code/env
+    python ncm_bulk_configure_devices.py <csv_file_path>    # Uses specified CSV file and API keys from code/env
+
+Requirements:
+    - NCM API keys (X-CP-API-ID, X-CP-API-KEY, X-ECM-API-ID, X-ECM-API-KEY)
+      Set in script or as environment variables (X_CP_API_ID, X_CP_API_KEY, X_ECM_API_ID, X_ECM_API_KEY)
+    - CSV file exported from NCM Device View or manually created with required columns
+
+To customize this script:
+    1. Export router_grid.csv from the Device View in NCM
+    2. Use NCM's device-level Edit Config screen to build your configuration
+    3. Copy the pending config output and paste it into the build_config() return value
+    4. Update router_grid.csv to contain the columns that need to be applied to the device level config
+    5. Update build_config() to reference router_grid column headers with row_data.get('column_name')
+    6. If not included in router_grid.csv, add desc, custom1 and/or custom2 columns to set those fields
+    7. Update csv_file variable if using a different filename than 'router_grid.csv'
 """
 
 import csv

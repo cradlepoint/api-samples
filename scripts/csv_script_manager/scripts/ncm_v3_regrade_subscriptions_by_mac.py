@@ -1,11 +1,33 @@
-# This script applies/regrades a subscription to devices by MAC address using the NCM library (pip install -U ncm)
-# It reads a CSV file with MAC addresses and subscriptions and applies/regrades subscriptions to the devices in NCM in chunks of 100
-# Usage: python NCM_APIv3_regrades_by_mac.py <csv_filename> [token]
-# Token can be set via command-line argument, token environment variable, or hardcoded in the script
-# CSV file must contain columns for MAC addresses and subscription (example subscription_id: BA-NCADV)
-# Column names are automatically detected (case-insensitive):
-#   MAC address: "mac", "mac address", or "mac_address"
-#   Subscription ID: "subscription_id", "subscription", or "subscription id"
+#!/usr/bin/env python3
+"""
+Apply or regrade device subscriptions in NCM API v3 by MAC address from a CSV file.
+
+This script reads a CSV file containing MAC addresses and subscription IDs, then applies
+or regrades subscriptions to the corresponding devices in NCM. It processes devices in
+chunks of 100 for optimal API performance and groups devices by subscription ID for
+efficient batch processing. Supports MAC addresses in any format (with or without separators).
+
+CSV Format:
+    Required columns (case-insensitive, automatically detected):
+        - MAC address: One of "mac", "mac address", or "mac_address"
+        - Subscription ID: One of "subscription_id", "subscription", or "subscription id"
+    
+    Example CSV:
+        mac,subscription_id
+        003044A2CA75,BA-NCADV
+        00:30:44:A2:CA:76,BA-NCADV
+        mac_address,subscription
+        003044A2CA77,BA-NCADV
+
+Usage:
+    python ncm_v3_regrade_subscriptions_by_mac.py <csv_filename> [token]
+
+Requirements:
+    - NCM API v3 token (can be provided via command-line argument, TOKEN environment variable,
+      or hardcoded in the script)
+    - CSV file with MAC addresses and subscription IDs
+    - MAC addresses can be in any format (colons, dashes, spaces, or no separators)
+"""
 
 import csv
 import os
