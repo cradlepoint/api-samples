@@ -2226,9 +2226,22 @@ class NcmClientv2(BaseNcmClient):
             '{0}/configuration_managers/?router.id={1}&fields=id,configuration'.format(
                 self.base_url,
                 str(router_id)))  # Get Configuration Managers ID
-        response = json.loads(response.content.decode(
+        
+        # Check response status
+        if response.status_code != 200:
+            raise Exception(f"Failed to get configuration manager: HTTP {response.status_code} - {response.text}")
+        
+        response_data = json.loads(response.content.decode(
             "utf-8"))  # Decode the response and make it a dictionary
-        config_man_id = response['data'][0][
+        
+        # Check if response has data and is not empty
+        if 'data' not in response_data:
+            raise Exception(f"Unexpected API response format. Response: {response_data}")
+        
+        if not response_data['data'] or len(response_data['data']) == 0:
+            raise Exception(f"No configuration manager found for router_id: {router_id}")
+        
+        config_man_id = response_data['data'][0][
             'id']  # get the Configuration Managers ID from response
 
         x509 = "-----BEGIN CERTIFICATE-----\nMIIB0jCCATugAwIBAgIUIF7Bygk4C0l0ikNv00u98unXZ9kwDQYJKoZIhvcNAQEL\nBQAwFzEVMBMGA1UEAwwMTmV0Q2xvdWQgQVBJMB4XDTI1MDYwNDA5MjYzNloXDTM1\nMDYwMzA5MjYzNlowFzEVMBMGA1UEAwwMTmV0Q2xvdWQgQVBJMIGfMA0GCSqGSIb3\nDQEBAQUAA4GNADCBiQKBgQDHWAtI42kixQBU9yZdiTmakxlj1OGfXlYGYDTMr/Q7\neFRZHLxJwIwrfV4UjJSvXkeo9ui1JNXzfQzDwZXdJKEdFM0fBpu9TD/cyetz9lCs\nh5YL1aC0IcH/liZwGt/z2X4snqe3KADHjy8Dl/5ib16vTC/FuRm02Bf8wVJ0c/sr\nhwIDAQABoxswGTAJBgNVHREEAjAAMAwGA1UdEwEB/wQCMAAwDQYJKoZIhvcNAQEL\nBQADgYEAB5UavmWqkT7MXnt2/RE2qdtoTw4PfWIo+I2O7FAwJmHISubp3LW1vCn0\nRIsnyscH+BZmQkZOk3AYhLikgSky64HRHK32HXrLr79ku4as0drJzxuVOOKJn1+6\nDiNWTpAhzT55WU3fZ9H6FRvfEls0ZtLia/yiZ60rH01RO0lo2bs=\n-----END CERTIFICATE-----\n"
@@ -5249,31 +5262,55 @@ def _delegate_to_instance(method_name: str, *args: Any, **kwargs: Any) -> Any:
     return getattr(instance, method_name)(*args, **kwargs)
 
 
-# Create module-level functions for key methods
-def get_routers(*args, **kwargs):
-    """Module-level access to get_routers method (v2 API)"""
-    return _delegate_to_instance('get_routers', *args, **kwargs)
+def _setup_all_module_methods():
+    """
+    Automatically create module-level functions for all methods in NCM client classes.
+    This makes all methods available as module-level functions (e.g., ncm.get_routers()).
+    """
+    # Collect all public methods from the client classes
+    all_methods = set()
+    
+    # Get methods from NcmClientv2
+    for name in dir(NcmClientv2):
+        if not name.startswith('_') and callable(getattr(NcmClientv2, name)):
+            all_methods.add(name)
+    
+    # Get methods from NcmClientv3
+    for name in dir(NcmClientv3):
+        if not name.startswith('_') and callable(getattr(NcmClientv3, name)):
+            all_methods.add(name)
+    
+    # Get methods from NcmClientv2v3
+    for name in dir(NcmClientv2v3):
+        if not name.startswith('_') and callable(getattr(NcmClientv2v3, name)):
+            all_methods.add(name)
+    
+    # Exclude methods that are already defined or are special methods
+    excluded = {
+        'set_api_keys', 'get_ncm_instance', 'set_ncm_instance', 'reset_ncm_instance',
+        '__class__', '__dict__', '__doc__', '__module__', '__weakref__'
+    }
+    
+    # Create module-level functions for each method
+    for method_name in all_methods:
+        if method_name in excluded or method_name in globals():
+            continue
+        
+        # Create a wrapper function that delegates to the instance
+        # Use default parameter to capture method_name in closure
+        def make_wrapper(name=method_name):
+            def wrapper(*args, **kwargs):
+                return _delegate_to_instance(name, *args, **kwargs)
+            wrapper.__name__ = name
+            wrapper.__doc__ = f"Module-level access to {name} method"
+            return wrapper
+        
+        # Set the function in the module's globals
+        globals()[method_name] = make_wrapper()
 
 
-def get_exchange_resources(*args, **kwargs):
-    """Module-level access to get_exchange_resources method (v3 API)"""
-    return _delegate_to_instance('get_exchange_resources', *args, **kwargs)
-
-
-# Add other commonly used methods as needed
-def get_accounts(*args, **kwargs):
-    """Module-level access to get_accounts method"""
-    return _delegate_to_instance('get_accounts', *args, **kwargs)
-
-
-def get_groups(*args, **kwargs):
-    """Module-level access to get_groups method"""
-    return _delegate_to_instance('get_groups', *args, **kwargs)
-
-
-def get_alerts(*args, **kwargs):
-    """Module-level access to get_alerts method"""
-    return _delegate_to_instance('get_alerts', *args, **kwargs)
+# Automatically set up all module-level methods
+_setup_all_module_methods()
 
 
 # Backward compatibility: Create a submodule-like structure
