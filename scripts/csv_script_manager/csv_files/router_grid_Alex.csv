@@ -1,0 +1,3 @@
+id,router_state,config_status,is_individually_configured,location_service_mode,name,asset_id,desc,group_name,actual_firmware_version,router_state_ts,product_name,mac,ip_address,last_fw_activity_state,account_name,custom1,custom2,serial_number
+4978020,onlinesdsd,synched,TRUE,sdfsd,car54router,🟢 12.22V | 0.00A | 8.20W | DBM: -57dBm | SINR: 13.4dB | RSRP: -90dBm | RSRQ: -15dB,,,7.25.81,38:13.4,R1900,003044A2CA75,172.56.50.112,,aterrell account,POST,MAN,WC2338TA003678
+1850632,,,,,,,,,,,,,,,,,,

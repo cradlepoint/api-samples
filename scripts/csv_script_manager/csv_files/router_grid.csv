@@ -1,0 +1,3 @@
+id,name,desc,asset_id,custom1,custom2,primary_lan_ip,2ghz_ssid,5ghz_ssid
+4388070,E100,E100,12345,custom 1 value,custom 2 value,10.0.0.1,Washington 2G,Washington 5G
+5115934,E400,E400,ABCDE,,,10.0.2.1,Adams 2G,Adams 5G

@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NCM API CSV Script Manager</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <h1><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
+            </svg> NCM API CSV Script Manager</h1>
+        </header>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="csv">CSV Editor</button>
+            <button class="tab-btn" data-tab="apikeys">API Keys</button>
+            <button class="tab-btn" data-tab="scripts">Python Scripts</button>
+        </div>
+
+        <!-- Main Content -->
+        <main class="app-main">
+            <!-- CSV Editor Tab -->
+            <div class="tab-content active" id="csvTab">
+                <!-- CSV Actions -->
+                <div class="csv-actions-bar">
+                    <button id="newFileBtn" class="btn btn-secondary" title="New CSV">
+                        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg> New CSV
+                    </button>
+                    <button id="loadFileBtn" class="btn btn-secondary" title="Upload from file...">
+                        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg> Upload from file...
+                    </button>
+                    <button id="saveBtn" class="btn btn-primary" title="Save" disabled>
+                        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                            <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                            <polyline points="7 3 7 8 15 8"></polyline>
+                        </svg> Save
+                    </button>
+                    <button id="saveAsBtn" class="btn btn-primary" title="Save As" disabled>
+                        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                            <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                            <polyline points="7 3 7 8 15 8"></polyline>
+                        </svg> Save As
+                    </button>
+                    <button id="exportBtn" class="btn btn-secondary" title="Export CSV" disabled>
+                        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg> Export
+                    </button>
+                </div>
+                <!-- File Info Bar -->
+                <div class="file-info-bar" id="fileInfoBar" style="display: none;">
+                    <span class="file-name" id="fileName">No file loaded</span>
+                    <span class="file-stats" id="fileStats"></span>
+                </div>
+
+                <!-- Toolbar -->
+                <div class="toolbar">
+                    <div class="toolbar-left">
+                        <button id="addRowBtn" class="btn btn-sm btn-secondary" disabled>
+                            <svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg> Add Row
+                        </button>
+                        <button id="addColBtn" class="btn btn-sm btn-secondary" disabled>
+                            <svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg> Add Column
+                        </button>
+                        <button id="deleteRowBtn" class="btn btn-sm btn-danger" disabled>
+                            <svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg> Delete Row
+                        </button>
+                    </div>
+                    <div class="toolbar-right">
+                        <input type="file" id="fileInput" accept=".csv" style="display: none;">
+                    </div>
+                </div>
+
+                <!-- CSV Table Container -->
+                <div class="table-container">
+                    <div class="table-wrapper" id="tableWrapper">
+                        <table class="csv-table" id="csvTable">
+                            <thead id="tableHead">
+                                <tr>
+                                    <th class="row-header">#</th>
+                                    <th class="col-header">Column 1</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableBody">
+                                <tr>
+                                    <td class="row-header">1</td>
+                                    <td class="editable-cell" contenteditable="true"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Empty State -->
+                <div class="empty-state" id="emptyState">
+                    <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                    </svg>
+                    <h2>No CSV file loaded</h2>
+                    <p>Click "Load" to open an existing CSV file or "New" to create a new one</p>
+                </div>
+            </div>
+
+            <!-- API Keys Tab -->
+            <div class="tab-content" id="apikeysTab">
+                <div class="api-keys-container">
+                    <div class="api-keys-form">
+                        <div class="api-keys-header">
+                            <h2>API Keys Configuration</h2>
+                            <div class="environment-info">
+                                <span class="environment-label">Environment:</span>
+                                <span class="environment-name" id="environmentName">Loading...</span>
+                            </div>
+                        </div>
+                        <form id="apiKeysForm">
+                            <div class="form-section">
+                                <h3>NCM API v2 Keys</h3>
+                                <div class="form-group">
+                                    <label for="x_cp_api_id">
+                                        X-CP-API-ID
+                                        <span class="status-indicator" id="status_x_cp_api_id"></span>
+                                    </label>
+                                    <input type="text" id="x_cp_api_id" name="X_CP_API_ID" class="input-field api-key-input" placeholder="Enter CP API ID" data-env-var="X_CP_API_ID">
+                                </div>
+                                <div class="form-group">
+                                    <label for="x_cp_api_key">
+                                        X-CP-API-KEY
+                                        <span class="status-indicator" id="status_x_cp_api_key"></span>
+                                    </label>
+                                    <input type="text" id="x_cp_api_key" name="X_CP_API_KEY" class="input-field api-key-input" placeholder="Enter CP API Key" data-env-var="X_CP_API_KEY">
+                                </div>
+                                <div class="form-group">
+                                    <label for="x_ecm_api_id">
+                                        X-ECM-API-ID
+                                        <span class="status-indicator" id="status_x_ecm_api_id"></span>
+                                    </label>
+                                    <input type="text" id="x_ecm_api_id" name="X_ECM_API_ID" class="input-field api-key-input" placeholder="Enter ECM API ID" data-env-var="X_ECM_API_ID">
+                                </div>
+                                <div class="form-group">
+                                    <label for="x_ecm_api_key">
+                                        X-ECM-API-KEY
+                                        <span class="status-indicator" id="status_x_ecm_api_key"></span>
+                                    </label>
+                                    <input type="text" id="x_ecm_api_key" name="X_ECM_API_KEY" class="input-field api-key-input" placeholder="Enter ECM API Key" data-env-var="X_ECM_API_KEY">
+                                </div>
+                            </div>
+                            
+                            <div class="form-section">
+                                <h3>NCM API v3 Token</h3>
+                                <div class="form-group">
+                                    <label for="ncm_api_token">
+                                        APIv3 Token
+                                        <span class="status-indicator" id="status_token"></span>
+                                    </label>
+                                    <input type="text" id="ncm_api_token" name="TOKEN" class="input-field api-key-input" placeholder="Enter APIv3 Token" data-env-var="TOKEN">
+                                </div>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary">Save API Keys</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Python Scripts Tab -->
+            <div class="tab-content" id="scriptsTab">
+                <!-- Script Actions Bar -->
+                <div class="script-actions-bar">
+                    <button id="newScriptBtn" class="btn btn-secondary">
+                        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg> New Script...
+                    </button>
+                    <button id="uploadScriptBtn" class="btn btn-secondary">
+                        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg> Upload from file...
+                    </button>
+                    <button id="downloadScriptUrlBtn" class="btn btn-secondary">
+                        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg> Download from URL...
+                    </button>
+                    <input type="file" id="uploadScriptFileInput" accept=".py" style="display: none;">
+                </div>
+
+                <!-- Scripts List -->
+                <div class="scripts-list-container">
+                    <div id="scriptsList" class="scripts-list">
+                        <div class="loading-message">Loading scripts...</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Modals -->
+        <!-- Load File Modal -->
+        <div class="modal" id="loadModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Load CSV File</h2>
+                    <button class="modal-close" id="closeLoadModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="file-upload-area" id="fileUploadArea">
+                        <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        <p>Click to select a CSV file or drag and drop</p>
+                        <input type="file" id="fileSelectInput" accept=".csv">
+                    </div>
+                    <div class="file-list-section">
+                        <h3>Saved Files</h3>
+                        <div class="file-list" id="fileList">
+                            <div class="loading">Loading files...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Save As Modal -->
+        <div class="modal" id="saveAsModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Save As</h2>
+                    <button class="modal-close" id="closeSaveAsModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <label for="saveAsFilename">Filename:</label>
+                    <input type="text" id="saveAsFilename" placeholder="example.csv" class="input-field">
+                    <div class="modal-actions">
+                        <button class="btn btn-secondary" id="cancelSaveAsBtn">Cancel</button>
+                        <button class="btn btn-primary" id="confirmSaveAsBtn">Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Run Script Modal -->
+        <div class="modal" id="runScriptModal">
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h2>Run Script</h2>
+                    <button class="modal-close" id="closeRunScriptModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="script-selection">
+                        <div class="script-info" id="scriptInfo">
+                            <p>Script: <strong id="runScriptName">-</strong></p>
+                            <p>CSV File: <strong id="scriptCsvFile">-</strong></p>
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-secondary" id="cancelRunScriptBtn">Cancel</button>
+                        <button class="btn btn-primary" id="confirmRunScriptBtn">Run</button>
+                    </div>
+                    <div class="script-output" id="scriptOutput" style="display: none;">
+                        <div class="script-output-header">
+                            <h3>Script Output</h3>
+                            <button class="btn btn-sm btn-secondary" id="saveOutputBtn" title="Save output as text file">
+                                <svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                    <polyline points="7 3 7 8 15 8"></polyline>
+                                </svg> Save Output
+                            </button>
+                        </div>
+                        <div class="output-status" id="outputStatus"></div>
+                        <pre class="output-content" id="outputContent"></pre>
+                        <pre class="output-error" id="outputError" style="display: none;"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add/Edit Script Modal -->
+        <div class="modal" id="addScriptModal">
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h2 id="addScriptModalTitle">Add/Edit Script</h2>
+                    <button class="modal-close" id="closeAddScriptModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="script-form">
+                        <div class="script-name-section">
+                            <label for="scriptName">Script Name:</label>
+                            <input type="text" id="scriptName" placeholder="my_script.py" class="input-field">
+                        </div>
+                        <label for="scriptContent" style="margin-top: 1rem;">Script Content:</label>
+                        <textarea id="scriptContent" class="input-field script-editor" rows="11" placeholder="#!/usr/bin/env python3
+import sys
+import csv
+
+def main():
+    csv_file = sys.argv[1]
+    # Your script code here
+    print(f'Processing: {csv_file}')
+
+if __name__ == '__main__':
+    main()"></textarea>
+                        <div class="script-help">
+                            <p><strong>Note:</strong> The CSV file path will be passed as the first command-line argument (<code>sys.argv[1]</code>).</p>
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-secondary" id="cancelAddScriptBtn">Cancel</button>
+                        <button class="btn btn-primary" id="confirmAddScriptBtn">Save Script</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Download Script URL Modal -->
+        <div class="modal" id="downloadScriptUrlModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Download Script from URL</h2>
+                    <button class="modal-close" id="closeDownloadScriptUrlModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <label for="scriptUrlInput">Script URL:</label>
+                    <input type="url" id="scriptUrlInput" placeholder="https://example.com/script.py" class="input-field">
+                    <div class="script-help" style="margin-top: 1rem;">
+                        <p><strong>Supported URL types:</strong></p>
+                        <ul style="margin: 0.5rem 0 0 1.5rem; padding: 0; color: var(--text-secondary); font-size: 0.875rem;">
+                            <li><strong>GitHub folder URLs:</strong> Downloads all .py files from the folder<br>
+                                <code style="font-size: 0.75rem;">https://github.com/user/repo/tree/branch/folder</code></li>
+                            <li><strong>GitHub blob URLs:</strong> Automatically converted to raw format<br>
+                                <code style="font-size: 0.75rem;">https://github.com/user/repo/blob/branch/file.py</code></li>
+                            <li><strong>Raw GitHub URLs:</strong> Direct file download<br>
+                                <code style="font-size: 0.75rem;">https://raw.githubusercontent.com/user/repo/branch/file.py</code></li>
+                            <li><strong>Direct file URLs:</strong> Any URL pointing to a .py file</li>
+                        </ul>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-secondary" id="cancelDownloadScriptUrlBtn">Cancel</button>
+                        <button class="btn btn-primary" id="confirmDownloadScriptUrlBtn">Download</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notification -->
+        <div class="notification" id="notification"></div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
+
