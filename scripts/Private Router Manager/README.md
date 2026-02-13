@@ -2,6 +2,8 @@
 
 A web application for managing Cradlepoint routers in isolated networks. Upload a CSV of router IPs, configure credentials, and deploy licenses, NCOS firmware, configuration files, or SDK apps—or check online status—across all routers at once.
 
+<img width="1371" height="855" alt="image" src="https://github.com/user-attachments/assets/a163305e-e604-4fc3-bdf9-464e0f5527af" />
+
 ## Features
 
 ### CSV Management
