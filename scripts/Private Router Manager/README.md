@@ -1,0 +1,63 @@
+# Private Router Manager
+
+A web application for managing Cradlepoint routers in isolated networks. Upload a CSV of router IPs, configure credentials, and deploy licenses, NCOS firmware, configuration files, or SDK apps—or check online status—across all routers at once.
+
+## Features
+
+### CSV Management
+
+- **Open** — Load a CSV from the `csv/` folder. Your CSV must include an `ip_address` or `ip address` column.
+- **Upload** — Upload a CSV file from your computer.
+- **Download** — Download the current table as CSV.
+- **New CSV** — Start fresh with a single empty row.
+- **Save / Save As** — Save to the `csv/` folder. Credentials and last-opened file are remembered.
+- **Add Row / Add Column** — Edit the table directly.
+
+### Credentials & Port
+
+- **Same credentials for all routers** — Use one username/password for every router.
+- **Same port for all routers** — Use one port (default 8080) for every router.
+- When unchecked, your CSV can have `username`, `password`, and `port` columns per row.
+- Credentials are stored locally in `credentials_config.json`.
+
+### Deployment Types
+
+| Type | Purpose |
+|------|---------|
+| **Online Status** | Check uptime of each router via `/api/status/system/uptime`. Results shown in the table. Saves CSV when done. |
+| **Licenses** | Deploy `.lic` files to each router via the `feature` endpoint. |
+| **NCOS** | Deploy firmware `.bin` files or download from Cradlepoint ECM. |
+| **Configuration** | Deploy config `.bin` files via `config_save` endpoint. |
+| **SDK Apps** | Deploy `.tar.gz` archives via SCP to `/app_upload`. Uses SSH port 22 (configurable). |
+
+### NCOS Download
+
+To download NCOS from Cradlepoint ECM:
+
+1. Set API keys (env vars or `api_keys.json`):
+   - `X_CP_API_ID`, `X_CP_API_KEY`
+   - `X_ECM_API_ID`, `X_ECM_API_KEY`
+2. Enter version (e.g. `7.22.60`) and optional model (e.g. `ibr900`).
+3. Search, select a firmware, and download. Files are saved to the `NCOS/` folder.
+
+### SDK Apps
+
+- Supported format: `.tar.gz` archives.
+- Deployed via SCP to `/app_upload` on each router.
+- Uses `sshpass` (macOS/Linux) or `pscp` (Windows).
+- "Lost connection" after transfer is treated as success (router may reboot).
+
+## Running
+
+```bash
+pip install -r requirements.txt
+python app.py
+```
+
+Then open **http://localhost:9000** in your browser.
+
+## Requirements
+
+- Python 3.7+
+- Flask, requests
+- For SDK Apps: `sshpass` (macOS/Linux) or PuTTY `pscp` (Windows)
