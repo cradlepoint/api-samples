@@ -1,9 +1,0 @@
-Deployment started: 2026-02-13_12.28.32
-Type: sdk_apps | File: hello_world v1.0.0.tar.gz
-
-2026-02-13 12:28:33 Successfully pushed to 192.168.1.3:22
-2026-02-13 12:28:33 (Connection closed after transfer - normal for Cradlepoint)
-2026-02-13 12:28:33 Successfully pushed to 192.168.1.4:22
-2026-02-13 12:28:33 (Connection closed after transfer - normal for Cradlepoint)
-2026-02-13 12:28:34 Successfully pushed to 192.168.1.5:22
-2026-02-13 12:28:34 (Connection closed after transfer - normal for Cradlepoint)
