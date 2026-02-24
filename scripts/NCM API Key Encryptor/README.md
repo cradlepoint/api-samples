@@ -1,10 +1,9 @@
 # NCM API Key Encryptor
 
-For encrypting NCM API keys into group or device configurations for use in SDK applications.
-
-## Description
-
 This web application allows you to encrypt NCM API keys (APIv2 and APIv3) into group or device configurations. The encrypted keys can then be used by SDK applications running on the devices.
+
+<img width="914" height="747" alt="image" src="https://github.com/user-attachments/assets/3045407b-867d-4b04-8644-b85e663da2b9" />
+<img width="914" height="715" alt="image" src="https://github.com/user-attachments/assets/18b4c0c8-7da3-422e-ba7d-fa6e7e35fec1" />
 
 ## Requirements
 
