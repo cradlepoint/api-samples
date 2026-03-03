@@ -129,7 +129,6 @@ Many scripts accept command-line arguments. Check the script's docstring or run 
 ## CSV Script Manager
 
 For a convenient web-based interface to manage CSV files, API keys, and run scripts, check out the CSV Script Manager.
-> Want just the CSV Script Manager?  [Get it here!](https://github.com/phate999/csv_script_manager)
 
 The CSV Script Manager provides:
 - Web-based CSV file editor
