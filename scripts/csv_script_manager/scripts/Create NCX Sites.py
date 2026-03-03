@@ -1,21 +1,35 @@
 #!/usr/bin/env python3
 """
-Create NCX sites for all routers in an NCM group.
+Create NCX sites for routers specified by router_id, group_id, or group_name.
 
-This script uses the NCM v3 API client to create an NCX exchange site in a
-specified NCX network for every router in a specified NCM group. All user
-inputs (group and network IDs) are read from a CSV file.
+This script uses the NCM v2 API for router lookups and the NCM v3 API client to
+create an NCX exchange site in a specified NCX network. Use exactly one of:
+router_id (individual device(s)), group_id, or group_name (group of devices).
 
 CSV Format:
-    Required columns (case-insensitive):
-        - group_id: NCM group ID that contains the routers
+    Device/Group columns (use ONE of):
+        - router_id: Individual router ID ("id", "router_id", or "router id"). Allows multiple rows.
+        - group_id: Group ID ("group_id" or "group id"). First row only.
+        - group_name: Group name ("group_name" or "group name"). First row only.
+    
+    Required columns:
         - ncx_network_id: NCX network ID to attach the sites to
-
-    The first data row is used; additional rows are ignored.
-
-    Example CSV:
+    
+    Optional columns:
+        - site_name: Custom site name (defaults to router name if not provided)
+    
+    Example (by router):
+        router_id,ncx_network_id,site_name
+        12345,abcd-efgh-ijkl,My Site A
+        67890,abcd-efgh-ijkl
+    
+    Example (by group ID):
         group_id,ncx_network_id
         1234,abcd-efgh-ijkl
+    
+    Example (by group name):
+        group_name,ncx_network_id
+        My Group,abcd-efgh-ijkl
 
 Usage:
     python "Create NCX Sites.py" <config_csv_path>
@@ -23,13 +37,8 @@ Usage:
 Requirements:
     - NCM Python helper module `ncm` available in PYTHONPATH
     - NCM / NCX API access
-    - CSV config file providing group_id and ncx_network_id
-    - API keys and token provided via environment variables:
-        - X_ECM_API_ID
-        - X_ECM_API_KEY
-        - X_CP_API_ID
-        - X_CP_API_KEY
-        - NCM_API_TOKEN
+    - API keys set as environment variables: X_ECM_API_ID, X_ECM_API_KEY,
+      X_CP_API_ID, X_CP_API_KEY, TOKEN or NCM_API_TOKEN
 """
 
 import csv
@@ -39,8 +48,13 @@ import sys
 from ncm import ncm
 
 
-def load_group_and_network_from_csv(csv_filename: str) -> tuple[str, str]:
-    """Read required group_id and ncx_network_id from the first CSV row."""
+def load_config_from_csv(csv_filename: str) -> tuple[str, list[tuple[str, str, str | None]]]:
+    """
+    Read CSV and determine mode (router_id, group_id, or group_name) and rows.
+    Returns (mode, [(identifier, ncx_network_id, site_name_override), ...]).
+    site_name_override is from optional "site_name" column (router_id mode only), else None.
+    For group modes there is one entry; for router_id there can be many.
+    """
     try:
         with open(csv_filename, "r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
@@ -49,27 +63,74 @@ def load_group_and_network_from_csv(csv_filename: str) -> tuple[str, str]:
 
             headers = {h.lower().strip(): h for h in reader.fieldnames}
 
-            group_key = next(
-                (headers[k] for k in ["group_id", "group id"] if k in headers), None
-            )
             network_key = next(
                 (headers[k] for k in ["ncx_network_id", "ncx network id"] if k in headers),
                 None,
             )
-
-            if not group_key or not network_key:
+            if not network_key:
                 raise ValueError(
-                    "CSV must contain 'group_id' and 'ncx_network_id' columns "
+                    "CSV must contain 'ncx_network_id'. "
                     f"(found: {reader.fieldnames})"
                 )
 
-            for row in reader:
-                group_id = row.get(group_key, "").strip()
-                network_id = row.get(network_key, "").strip()
-                if group_id and network_id:
-                    return group_id, network_id
+            router_key = next(
+                (headers[k] for k in ["id", "router_id", "router id"] if k in headers), None
+            )
+            group_id_key = next(
+                (headers[k] for k in ["group_id", "group id"] if k in headers), None
+            )
+            group_name_key = next(
+                (headers[k] for k in ["group_name", "group name"] if k in headers), None
+            )
+            site_name_key = next(
+                (headers[k] for k in ["site_name", "site name"] if k in headers), None
+            )
 
-            raise ValueError("No data row with both group_id and ncx_network_id found")
+            if router_key:
+                mode = "router_id"
+            elif group_id_key and group_name_key:
+                raise ValueError(
+                    "CSV must not contain both 'group_id' and 'group_name'; use one or the other. "
+                    f"(found: {reader.fieldnames})"
+                )
+            elif group_id_key:
+                mode = "group_id"
+            elif group_name_key:
+                mode = "group_name"
+            else:
+                raise ValueError(
+                    "CSV must contain a router/device column ('id' or 'router_id') or a group "
+                    "column ('group_id' or 'group_name'). " f"(found: {reader.fieldnames})"
+                )
+            rows = []
+
+            for row in reader:
+                network_id = row.get(network_key, "").strip()
+                if not network_id:
+                    continue
+                site_override = None
+                if site_name_key:
+                    site_override = row.get(site_name_key, "").strip() or None
+                if mode == "router_id":
+                    ident = row.get(router_key, "").strip()
+                    if ident:
+                        rows.append((ident, network_id, site_override))
+                elif mode == "group_id":
+                    ident = row.get(group_id_key, "").strip()
+                    if ident:
+                        rows.append((ident, network_id, None))
+                        break
+                else:
+                    ident = row.get(group_name_key, "").strip()
+                    if ident:
+                        rows.append((ident, network_id, None))
+                        break
+
+            if not rows:
+                raise ValueError(
+                    f"No data row with {mode} and ncx_network_id found"
+                )
+            return mode, rows
     except FileNotFoundError:
         raise FileNotFoundError(f"CSV file not found: {csv_filename}") from None
 
@@ -81,50 +142,86 @@ def build_api_keys() -> dict:
         "X-ECM-API-KEY": os.environ.get("X_ECM_API_KEY", ""),
         "X-CP-API-ID": os.environ.get("X_CP_API_ID", ""),
         "X-CP-API-KEY": os.environ.get("X_CP_API_KEY", ""),
-        "token": os.environ.get("NCM_API_TOKEN", ""),
+        "token": os.environ.get("TOKEN") or os.environ.get("NCM_API_TOKEN", ""),
     }
     return api_keys
 
 
-def create_ncx_sites(group_id: str, ncx_network_id: str) -> None:
-    """Create NCX sites for all routers in the specified NCM group."""
+def create_ncx_sites(mode: str, rows: list[tuple[str, str, str | None]]) -> None:
+    """Create NCX sites for routers specified by mode and (identifier, ncx_network_id, site_name_override) rows."""
     api_keys = build_api_keys()
-
-    n = ncm.NcmClient(api_keys=api_keys, log_events=False)
-    routers = n.get_routers(group=group_id, limit="all")
-    if not routers:
-        print("No routers found!")
+    token = api_keys.get("token") or os.environ.get("TOKEN") or os.environ.get("NCM_API_TOKEN")
+    if not token:
+        print("Error: TOKEN or NCM_API_TOKEN is required for NCX v3 API (set in API Keys tab).")
         return
 
-    for router in routers:
-        site = n.v3.create_exchange_site(router["name"], ncx_network_id, router["id"])
-        if not isinstance(site, str):
-            print(
-                f'Error creating NCX site for router {router["id"]} {router["name"]}.  '
-                "Check subscriptions!"
-            )
+    n2 = ncm.NcmClientv2(api_keys=api_keys, log_events=False)
+    n3 = ncm.NcmClientv3(api_key=token, log_events=False)
+
+    for identifier, ncx_network_id, site_name_override in rows:
+        if mode == "router_id":
+            routers = n2.get_routers(id__in=[identifier])
+        else:
+            routers = n2.get_routers(group=identifier, limit="all")
+
+        if not routers:
+            print(f"No routers found for {mode}={identifier!r}.")
             continue
 
-        sites = n.v3.get_exchange_sites(name=router["name"])
-        if not sites:
-            print(
-                f'Error creating NCX site for router {router["id"]} {router["name"]}.'
+        for router in routers:
+            site_name = site_name_override or router["name"]
+            site = n3.create_exchange_site(
+                site_name, ncx_network_id, router["id"]
             )
-            continue
+            # API may return a string (e.g. site id) or a dict (created resource) on success
+            if isinstance(site, str):
+                pass  # success, continue to verify
+            elif isinstance(site, dict) and (site.get("data") or site.get("id")):
+                # Many REST APIs return the created object; treat as success
+                pass
+            else:
+                # Real failure: show what the API returned
+                print(
+                    f'Error creating NCX site for router {router["id"]} {router["name"]}.'
+                )
+                if site is not None:
+                    print(f"  API response: {site}")
+                print("  Possible causes:")
+                print("    - Router lacks NCX-capable subscription")
+                print("    - NCX network lacks proper licensing")
+                print("    - Site name already exists")
+                print("    - Router already attached to another NCX site")
+                print("    - Invalid ncx_network_id or insufficient API permissions")
+                continue
 
-        site_router_id = ""
-        try:
-            site_router_id = sites[0]["relationships"]["endpoints"]["data"][0]["id"]
-            if str(site_router_id) != str(router["id"]):
-                raise ValueError
-            print(
-                f'Successfully created exchange site for router '
-                f'{site_router_id} {router["name"]}'
-            )
-        except (KeyError, IndexError, ValueError):
-            print(
-                f"Site exists but wrong router: {site_router_id} != {router['id']}"
-            )
+            sites = n3.get_exchange_sites(name=site_name)
+            if not sites:
+                print(
+                    f'Error creating NCX site for router {router["id"]} {router["name"]}.'
+                )
+                continue
+
+            site_router_id = ""
+            try:
+                first = sites[0]
+                if not isinstance(first, dict):
+                    print(
+                        f'Created exchange site for router {router["id"]} {router["name"]} '
+                        "(could not verify endpoint: unexpected API response format)"
+                    )
+                else:
+                    site_router_id = first["relationships"]["endpoints"]["data"][0]["id"]
+                    if str(site_router_id) != str(router["id"]):
+                        raise ValueError
+                    print(
+                        f'Successfully created exchange site for router '
+                        f'{site_router_id} {router["name"]}'
+                    )
+            except (KeyError, IndexError, ValueError, TypeError):
+                print(
+                    f"Site created for router {router['id']} {router['name']}; "
+                    "could not verify endpoint (unexpected API response structure)."
+                )
 
 
 def main() -> None:
@@ -135,14 +232,13 @@ def main() -> None:
     csv_filename = sys.argv[1]
 
     try:
-        group_id, ncx_network_id = load_group_and_network_from_csv(csv_filename)
+        mode, rows = load_config_from_csv(csv_filename)
     except Exception as exc:
         print(f"Error reading configuration from CSV: {exc}")
         sys.exit(1)
 
-    create_ncx_sites(group_id, ncx_network_id)
+    create_ncx_sites(mode, rows)
 
 
 if __name__ == "__main__":
     main()
-
