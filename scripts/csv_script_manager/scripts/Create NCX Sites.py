@@ -170,9 +170,14 @@ def create_ncx_sites(mode: str, rows: list[tuple[str, str, str | None]]) -> None
 
         for router in routers:
             site_name = site_name_override or router["name"]
-            site = n3.create_exchange_site(
-                site_name, ncx_network_id, router["id"]
-            )
+            try:
+                site = n3.create_exchange_site(
+                    site_name, ncx_network_id, router["id"]
+                )
+            except Exception as e:
+                print(f'Error creating NCX site for router {router["id"]} {router["name"]}: {e}')
+                continue
+            
             # API may return a string (e.g. site id) or a dict (created resource) on success
             if isinstance(site, str):
                 pass  # success, continue to verify
@@ -180,18 +185,8 @@ def create_ncx_sites(mode: str, rows: list[tuple[str, str, str | None]]) -> None
                 # Many REST APIs return the created object; treat as success
                 pass
             else:
-                # Real failure: show what the API returned
-                print(
-                    f'Error creating NCX site for router {router["id"]} {router["name"]}.'
-                )
-                if site is not None:
-                    print(f"  API response: {site}")
-                print("  Possible causes:")
-                print("    - Router lacks NCX-capable subscription")
-                print("    - NCX network lacks proper licensing")
-                print("    - Site name already exists")
-                print("    - Router already attached to another NCX site")
-                print("    - Invalid ncx_network_id or insufficient API permissions")
+                # Real failure
+                print(f'Error creating NCX site for router {router["id"]} {router["name"]}: API returned {type(site).__name__}: {site}')
                 continue
 
             sites = n3.get_exchange_sites(name=site_name)
