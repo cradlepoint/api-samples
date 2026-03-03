@@ -156,7 +156,7 @@ def create_ncx_sites(mode: str, rows: list[tuple[str, str, str | None]]) -> None
         return
 
     n2 = ncm.NcmClientv2(api_keys=api_keys, log_events=False)
-    n3 = ncm.NcmClientv3(api_key=token, log_events=False)
+    n3 = ncm.NcmClientv3(api_key=token, log_events=True)  # Enable logging to see API errors
 
     for identifier, ncx_network_id, site_name_override in rows:
         if mode == "router_id":

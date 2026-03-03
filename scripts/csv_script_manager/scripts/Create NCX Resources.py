@@ -129,7 +129,7 @@ def get_lans(n: ncm.NcmClient, router: dict) -> list[str]:
 def create_ncx_resources(group_id: str, ncx_network_id: str) -> None:
     """Create NCX IP subnet resources for all routers in the group."""
     api_keys = build_api_keys()
-    n = ncm.NcmClient(api_keys=api_keys, log_events=False)
+    n = ncm.NcmClient(api_keys=api_keys, log_events=True)
 
     routers = n.get_routers(group=group_id, limit="all")
     if not routers:

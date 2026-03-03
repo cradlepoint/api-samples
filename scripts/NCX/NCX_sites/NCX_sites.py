@@ -16,7 +16,7 @@ api_keys = {
     'token': 'NCM_API_v3_Token'
 }
 
-n = ncm.NcmClient(api_keys=api_keys, log_events=False)
+n = ncm.NcmClient(api_keys=api_keys, log_events=True)
 routers = n.get_routers(group=group_id, limit='all')
 if not routers:
     print(f'No routers found!')

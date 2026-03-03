@@ -86,7 +86,7 @@ if not api_keys:
     print("     You can set them in the API Keys tab of the CSV Script Manager")
     sys.exit(1)
 
-n2 = ncm.NcmClientv2(api_keys=api_keys)
+n2 = ncm.NcmClientv2(api_keys=api_keys, log_events=True)
 
 def build_config(row_data):
     """Return router configuration with values from CSV row.

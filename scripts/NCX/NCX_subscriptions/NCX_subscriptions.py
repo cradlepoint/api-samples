@@ -17,7 +17,7 @@ api_keys = {
 # NCX-SCL, NCX-SCM, NCX-SCIOT, NCX-SCS, NCX-SDWANL, NCX-SDWANM, NCX-SDWANMICRO, NCX-SDWANS
 subscriptions = ["NCX-SCL"]  # Subscriptions to apply to routers
 
-n = ncm.NcmClient(api_keys=api_keys, log_events=False)
+n = ncm.NcmClient(api_keys=api_keys, log_events=True)
 routers = n.get_routers(group=group_id, limit='all')
 if not routers:
     print(f'No routers found!')

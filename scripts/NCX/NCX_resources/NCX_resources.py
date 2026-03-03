@@ -17,7 +17,7 @@ api_keys = {
     'token': 'NCM_API_v3_Token'
 }
 
-n = ncm.NcmClient(api_keys=api_keys, log_events=False)
+n = ncm.NcmClient(api_keys=api_keys, log_events=True)
 
 def get_site(router):
     sites = n.get_exchange_sites(name=router["name"])
