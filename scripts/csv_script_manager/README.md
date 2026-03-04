@@ -13,10 +13,11 @@ A web-based CSV file editor and script manager for processing CSV files with Pyt
 
 ## Screenshots
 
-<img width="1645" height="854" alt="image" src="https://github.com/user-attachments/assets/42b3be8d-9b11-45f9-85dc-2e7b6118a85c" />
-<img width="1645" height="854" alt="image" src="https://github.com/user-attachments/assets/22309051-02be-49c4-a320-81e72facd4c6" />
-<img width="1631" height="857" alt="image" src="https://github.com/user-attachments/assets/d8b540b5-bc0b-4e84-bcf7-144c4f74c284" />
-<img width="1631" height="857" alt="image" src="https://github.com/user-attachments/assets/11f94fab-3f0c-4538-bc05-7559ebdea62c" />
+<img width="1534" height="852" alt="image" src="https://github.com/user-attachments/assets/20fd17fc-2853-411f-9fe6-d3ba09b30d63" />
+<img width="1534" height="852" alt="image" src="https://github.com/user-attachments/assets/9e4284b3-dc5a-4217-8bc0-7954ee73689d" />
+<img width="1534" height="852" alt="image" src="https://github.com/user-attachments/assets/2c728285-18c0-444a-b4a6-daffa98439ba" />
+<img width="1534" height="852" alt="image" src="https://github.com/user-attachments/assets/abc62b79-4a4f-4ce2-ba11-0fd3f77d9e65" />
+<img width="1534" height="852" alt="image" src="https://github.com/user-attachments/assets/995de37a-9124-453f-a021-efc81596d9c6" />
 
 
 ## Installation
