@@ -458,6 +458,23 @@ if __name__ == '__main__':
             </div>
         </div>
 
+        <!-- Unsaved Changes Confirm Modal -->
+        <div class="modal" id="unsavedChangesModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Unsaved Changes</h2>
+                    <button class="modal-close" id="closeUnsavedChangesModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p>You have unsaved changes. Would you like to save before running the script?</p>
+                    <div class="modal-actions">
+                        <button class="btn btn-secondary" id="discardChangesBtn">Don't Save</button>
+                        <button class="btn btn-primary" id="saveAndRunBtn">Save & Run</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Notification -->
         <div class="notification" id="notification"></div>
     </div>

@@ -244,11 +244,10 @@ body {
 /* Content Area */
 .content-area {
     flex: 1;
-    overflow-y: auto;
+    overflow: hidden;
     padding: 2rem;
     background: transparent;
-    margin-left: 168px;
-    height: calc(100vh - 73px);
+    margin-left: 200px;
     transition: var(--transition);
 }
 
@@ -439,6 +438,10 @@ body {
     text-align: left;
     border: 1px solid var(--border-color);
     min-width: 120px;
+    max-width: 300px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .csv-table th {
@@ -475,6 +478,10 @@ body {
     outline: 2px solid var(--primary-color);
     outline-offset: -2px;
     background: rgba(79, 70, 229, 0.05);
+    white-space: normal;
+    overflow: visible;
+    position: relative;
+    z-index: 100;
 }
 
 .csv-table tbody tr:hover td:not(.row-header) {
@@ -647,7 +654,7 @@ body {
 
 /* Scripts List */
 .scripts-list-container {
-    max-height: 600px;
+    max-height: calc(100vh - 400px);
     overflow-y: auto;
 }
 
@@ -1051,7 +1058,15 @@ body.dark-mode .file-upload-area p {
 body.dark-mode .nav-item,
 body.dark-mode .panel-header h2,
 body.dark-mode .sidebar-title,
-body.dark-mode #app-title {
+body.dark-mode #app-title,
+body.dark-mode .file-name,
+body.dark-mode .file-stats,
+body.dark-mode .form-section h3,
+body.dark-mode .form-group label,
+body.dark-mode .environment-label,
+body.dark-mode .environment-name,
+body.dark-mode .script-item-name,
+body.dark-mode .loading-message {
     color: #f9fafb;
 }
 
@@ -1103,6 +1118,22 @@ body.dark-mode .info-note {
 body.dark-mode .notification {
     background: #1e293b;
     border-color: #4b5563;
+    color: #f9fafb;
+}
+
+body.dark-mode .output-content,
+body.dark-mode .script-help,
+body.dark-mode .info-note {
+    background: #374151;
+    color: #f9fafb;
+}
+
+body.dark-mode .script-info {
+    background: #374151;
+    color: #f9fafb;
+}
+
+body.dark-mode .script-info strong {
     color: #f9fafb;
 }
 

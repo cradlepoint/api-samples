@@ -15,9 +15,15 @@ class CSVEditor {
     init() {
         this.setupEventListeners();
         this.loadFileList();
+        this.restoreActiveTab();
         this.loadLastFile();
         this.loadScriptsList();
         this.loadApiKeysStatus();
+    }
+    
+    restoreActiveTab() {
+        const savedTab = localStorage.getItem('activeTab') || 'csv';
+        this.switchTab(savedTab);
     }
     
     loadLastFile() {
@@ -118,6 +124,11 @@ class CSVEditor {
         document.getElementById('confirmDownloadScriptUrlBtn').addEventListener('click', () => this.downloadScriptFromUrl());
         document.getElementById('cancelDownloadScriptUrlBtn').addEventListener('click', () => this.hideDownloadScriptUrlModal());
         document.getElementById('closeDownloadScriptUrlModal').addEventListener('click', () => this.hideDownloadScriptUrlModal());
+        
+        // Unsaved changes modal
+        document.getElementById('closeUnsavedChangesModal').addEventListener('click', () => this.hideUnsavedChangesModal());
+        document.getElementById('discardChangesBtn').addEventListener('click', () => this.discardAndRun());
+        document.getElementById('saveAndRunBtn').addEventListener('click', () => this.saveAndRun());
         
         // Click outside modal to close
         document.getElementById('loadModal').addEventListener('click', (e) => {
@@ -993,6 +1004,9 @@ if __name__ == '__main__':
             }
         });
         
+        // Save active tab to localStorage
+        localStorage.setItem('activeTab', tabName);
+        
         // Load scripts list when switching to scripts tab
         if (tabName === 'scripts') {
             this.loadScriptsList();
@@ -1104,24 +1118,53 @@ if __name__ == '__main__':
         
         // Check if there are unsaved changes
         if (this.isDirty) {
-            if (confirm('You have unsaved changes. Save before running the script?')) {
-                const savePromise = this.saveFile();
-                if (savePromise && typeof savePromise.then === 'function') {
-                    savePromise.then(() => {
-                        this.executeScript(scriptName);
-                    }).catch(() => {
-                        this.executeScript(scriptName);
-                    });
-                } else {
-                    setTimeout(() => {
-                        this.executeScript(scriptName);
-                    }, 500);
-                }
-                return;
-            }
+            this.pendingScriptName = scriptName;
+            this.showUnsavedChangesModal();
+            return;
         }
         
         this.executeScript(scriptName);
+    }
+    
+    showUnsavedChangesModal() {
+        document.getElementById('unsavedChangesModal').classList.add('active');
+    }
+    
+    hideUnsavedChangesModal() {
+        document.getElementById('unsavedChangesModal').classList.remove('active');
+        this.pendingScriptName = null;
+    }
+    
+    discardAndRun() {
+        this.hideUnsavedChangesModal();
+        if (this.pendingScriptName) {
+            this.executeScript(this.pendingScriptName);
+        }
+    }
+    
+    saveAndRun() {
+        const scriptName = this.pendingScriptName;
+        this.pendingScriptName = null;
+        this.hideUnsavedChangesModal();
+        
+        const savePromise = this.saveFile();
+        if (savePromise && typeof savePromise.then === 'function') {
+            savePromise.then(() => {
+                if (scriptName) {
+                    this.executeScript(scriptName);
+                }
+            }).catch(() => {
+                if (scriptName) {
+                    this.executeScript(scriptName);
+                }
+            });
+        } else {
+            setTimeout(() => {
+                if (scriptName) {
+                    this.executeScript(scriptName);
+                }
+            }, 500);
+        }
     }
     
     executeScript(scriptName) {
