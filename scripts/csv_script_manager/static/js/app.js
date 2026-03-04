@@ -35,12 +35,23 @@ class CSVEditor {
     }
     
     setupEventListeners() {
-        // Tab switching
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const tab = e.target.dataset.tab;
+        // Navigation switching
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                const tab = e.currentTarget.dataset.tab;
                 this.switchTab(tab);
             });
+        });
+        
+        // Sidebar toggle
+        document.getElementById('sidebarToggle').addEventListener('click', () => {
+            document.getElementById('sidebar').classList.toggle('collapsed');
+        });
+        
+        // Dark mode toggle
+        document.getElementById('darkModeToggle').addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
         });
         
         // API Keys form submission
@@ -956,13 +967,14 @@ if __name__ == '__main__':
         });
     }
     
+    
     switchTab(tabName) {
-        // Update tab buttons
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            if (btn.dataset.tab === tabName) {
-                btn.classList.add('active');
+        // Update nav items
+        document.querySelectorAll('.nav-item').forEach(item => {
+            if (item.dataset.tab === tabName) {
+                item.classList.add('active');
             } else {
-                btn.classList.remove('active');
+                item.classList.remove('active');
             }
         });
         
@@ -974,12 +986,6 @@ if __name__ == '__main__':
                 content.classList.remove('active');
             }
         });
-        
-        // Update body background color
-        document.body.className = '';
-        if (tabName) {
-            document.body.classList.add('tab-' + tabName);
-        }
         
         // Load scripts list when switching to scripts tab
         if (tabName === 'scripts') {
@@ -1419,13 +1425,5 @@ if __name__ == '__main__':
 // Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     const editor = new CSVEditor();
-    // Set initial background color based on active tab
-    const activeTab = document.querySelector('.tab-btn.active');
-    if (activeTab) {
-        const tabName = activeTab.dataset.tab;
-        if (tabName) {
-            document.body.classList.add('tab-' + tabName);
-        }
-    }
 });
 
