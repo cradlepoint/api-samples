@@ -389,6 +389,7 @@ class CSVEditorHandler(SimpleHTTPRequestHandler):
                                 'description': description
                             })
             
+            scripts.sort(key=lambda x: x['name'].lower())
             self.send_json_response({'scripts': scripts})
         except Exception as e:
             print(f'Error listing scripts: {str(e)}')

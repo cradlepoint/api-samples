@@ -1018,6 +1018,7 @@ body.dark-mode .sidebar-header,
 body.dark-mode .panel-header,
 body.dark-mode .control-panel,
 body.dark-mode .modal-content,
+body.dark-mode .modal-header,
 body.dark-mode .file-item,
 body.dark-mode .script-item,
 body.dark-mode .api-keys-form,
@@ -1025,10 +1026,26 @@ body.dark-mode .file-info-bar,
 body.dark-mode .toolbar,
 body.dark-mode .csv-actions-bar,
 body.dark-mode .script-actions-bar,
-body.dark-mode .environment-info {
+body.dark-mode .environment-info,
+body.dark-mode .script-help {
     background: #1e293b;
     color: #f9fafb;
     border-color: #4b5563;
+}
+
+body.dark-mode .file-upload-area {
+    border-color: #4b5563;
+    background: #1e293b;
+    color: #f9fafb;
+}
+
+body.dark-mode .file-upload-area:hover {
+    border-color: var(--primary-color);
+    background: #374151;
+}
+
+body.dark-mode .file-upload-area p {
+    color: #d1d5db;
 }
 
 body.dark-mode .nav-item,
@@ -1081,6 +1098,12 @@ body.dark-mode .info-note {
     background: rgba(79, 70, 229, 0.2);
     border-color: var(--primary-color);
     color: #d1d5db;
+}
+
+body.dark-mode .notification {
+    background: #1e293b;
+    border-color: #4b5563;
+    color: #f9fafb;
 }
 
 /* Responsive */

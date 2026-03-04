@@ -52,7 +52,13 @@ class CSVEditor {
         // Dark mode toggle
         document.getElementById('darkModeToggle').addEventListener('click', () => {
             document.body.classList.toggle('dark-mode');
+            localStorage.setItem('darkMode', document.body.classList.contains('dark-mode'));
         });
+        
+        // Load dark mode preference
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.body.classList.add('dark-mode');
+        }
         
         // API Keys form submission
         document.getElementById('apiKeysForm').addEventListener('submit', (e) => {
