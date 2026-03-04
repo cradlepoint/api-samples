@@ -110,13 +110,14 @@ csv_script_manager/
 ├── csv_files/               # Directory for CSV files
 ├── scripts/                 # Directory for Python scripts
 │   ├── Configure Devices.py
-│   ├── Create NCX Sites.py
 │   ├── Create NCX Resources.py
-│   ├── Get Router Status.py
-│   ├── Unregister Routers Batch.py
+│   ├── Create NCX Sites.py
 │   ├── Create Users.py
-│   ├── Regrade Subscriptions by MAC.py
-│   └── Unlicense Devices by MAC.py
+│   ├── Get Router Status.py
+│   ├── Regrade Subscriptions.py
+│   ├── Set Router Fields.py
+│   ├── Unlicense Devices.py
+│   └── Unregister Routers.py
 ├── static/                  # Web interface files
 │   ├── index.html
 │   ├── css/

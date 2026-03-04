@@ -170,12 +170,15 @@ The CSV Script Manager provides:
 
 The CSV Script Manager includes several pre-configured scripts:
 
-- **ncm_bulk_configure_devices.py** - Bulk configure multiple devices with custom configurations
-- **ncm_v3_create_users.py** - Create and manage users in NCM API v3
-- **ncm_v3_regrade_subscriptions_by_mac.py** - Apply or regrade device subscriptions by MAC address
-- **ncm_v3_unlicense_devices_by_mac.py** - Unlicense devices by MAC address
-- **ncm_get_router_status.py** - Get router status and information using identifiers
-- **ncm_unregister_routers_batch.py** - Unregister routers in batches with logging
+- **Configure Devices.py** - Bulk configure multiple devices with custom configurations
+- **Create NCX Resources.py** - Create NCX resources from CSV data
+- **Create NCX Sites.py** - Create NCX sites from CSV data
+- **Create Users.py** - Create and manage users in NCM API v3
+- **Get Router Status.py** - Get router status and information using identifiers
+- **Regrade Subscriptions.py** - Apply or regrade device subscriptions
+- **Set Router Fields.py** - Update router fields (name, description, asset_id, custom1, custom2)
+- **Unlicense Devices.py** - Unlicense devices
+- **Unregister Routers.py** - Unregister routers in batches with logging
 
 Each script includes detailed documentation in its docstring explaining the required CSV format and usage.
 
