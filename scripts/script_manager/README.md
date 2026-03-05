@@ -81,8 +81,9 @@ A web-based CSV file editor and script manager for processing CSV files with Pyt
 1. **View available scripts**: All Python scripts in the `scripts/` directory are automatically listed
 2. **Create new scripts**: Use the script editor to create new Python scripts
 3. **Download from GitHub**: Paste a GitHub URL to download scripts directly
-4. **Run scripts**: Select a script and CSV file, then execute them together
-5. **Download results**: After running a script, you can download the results or updated CSV files
+4. **Pull from Repository**: Click "Pull Repo..." to check for and download new or updated scripts from the official GitHub repository
+5. **Run scripts**: Select a script and optionally choose a CSV file, then execute them together
+6. **Download results**: After running a script, you can download the results or updated CSV files
 
 ### Setting API Keys
 
