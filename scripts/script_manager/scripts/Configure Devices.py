@@ -83,7 +83,7 @@ if not api_keys:
     print("Error: No API keys found. Please set them either:")
     print("  1. In the script (api_keys dictionary), or")
     print("  2. As environment variables (X_CP_API_ID, X_CP_API_KEY, X_ECM_API_ID, X_ECM_API_KEY)")
-    print("     You can set them in the API Keys tab of the CSV Script Manager")
+    print("     You can set them in the API Keys tab of the Script Manager")
     sys.exit(1)
 
 n2 = ncm.NcmClientv2(api_keys=api_keys, log_events=True)

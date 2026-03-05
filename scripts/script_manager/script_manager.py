@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CSV Editor - A web-based CSV file editor.
+Script Manager - A web-based CSV file editor and script manager.
 Allows users to load, edit, and save CSV files through a modern web interface.
 Works on Windows, macOS, and Linux.
 """
@@ -961,8 +961,8 @@ if __name__ == '__main__':
             self.send_error_response('Error setting API keys')
 
 # App starts here
-print('Starting CSV Script Manager...')
+print('Starting Script Manager...')
 
 server = HTTPServer(('', PORT), CSVEditorHandler)
-print(f'CSV Script Manager web server started on port {PORT}')
+print(f'Script Manager web server started on port {PORT}')
 server.serve_forever()

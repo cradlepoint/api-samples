@@ -24,7 +24,7 @@ token = os.environ.get('TOKEN') or os.environ.get('NCM_API_TOKEN')
 
 if not token:
     print("Error: Please set your NCM API v3 token as TOKEN environment variable")
-    print("You can set it in the API Keys tab of the CSV Script Manager")
+    print("Error: Please set your NCM API v3 token as TOKEN environment variable")
     sys.exit(1)
 
 # Initialize the NCM client

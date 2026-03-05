@@ -1,4 +1,4 @@
-# CSV Script Manager
+# Script Manager
 
 A web-based CSV file editor and script manager for processing CSV files with Python scripts, specifically designed for NCM (Network Control Manager) API operations.
 
@@ -28,13 +28,13 @@ A web-based CSV file editor and script manager for processing CSV files with Pyt
    
    **Windows:**
    ```bash
-   cd csv_script_manager
+   cd script_manager
    ```
    Or right-click in the project folder in File Explorer and select "Open in Terminal" or "Open PowerShell window here".
    
    **macOS/linux:**
    ```bash
-   cd csv_script_manager
+   cd script_manager
    ```
    Or right-click on the project folder in Finder and select Services > New Terminal at Folder.
 
@@ -53,12 +53,12 @@ A web-based CSV file editor and script manager for processing CSV files with Pyt
    
    **Windows:**
    ```bash
-   python csv_script_manager.py
+   python script_manager.py
    ```
    
    **macOS/Linux:**
    ```bash
-   python csv_script_manager.py
+   python script_manager.py
    ```
 
 5. **Open your web browser** and navigate to:
@@ -104,8 +104,8 @@ Scripts should follow a standardized format with detailed docstrings. See [SCRIP
 ## Project Structure
 
 ```
-csv_script_manager/
-├── csv_script_manager.py    # Main application file
+script_manager/
+├── script_manager.py        # Main application file
 ├── requirements.txt         # Python dependencies
 ├── csv_files/               # Directory for CSV files
 ├── scripts/                 # Directory for Python scripts

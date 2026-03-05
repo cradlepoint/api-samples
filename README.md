@@ -56,7 +56,7 @@ pip install -r requirements.txt
 
 This will install all required dependencies including:
 - `ncm` - Ericsson NetCloud Manager Python library
-- `flask` - Web framework (for CSV Script Manager)
+- `flask` - Web framework (for Script Manager)
 - `werkzeug` - WSGI utilities
 - `python-dateutil` - Date parsing utilities
 
@@ -126,22 +126,22 @@ python3 script_name.py
 
 Many scripts accept command-line arguments. Check the script's docstring or run it with `--help` (if supported) for usage information.
 
-## CSV Script Manager
+## Script Manager
 
-For a convenient web-based interface to manage CSV files, API keys, and run scripts, check out the CSV Script Manager.
+For a convenient web-based interface to manage CSV files, API keys, and run scripts, check out the Script Manager.
 
-The CSV Script Manager provides:
+The Script Manager provides:
 - Web-based CSV file editor
 - API key management interface
 - Script execution interface
 - Easy script management and organization
 - Displays script instructions from docstrings
 
-### Using CSV Script Manager
+### Using Script Manager
 
-1. Navigate to the CSV Script Manager directory:
+1. Navigate to the Script Manager directory:
    ```bash
-   cd scripts/csv_script_manager
+   cd scripts/script_manager
    ```
 
 2. Make sure your virtual environment is activated
@@ -150,12 +150,12 @@ The CSV Script Manager provides:
 
    **Windows:**
    ```cmd
-   python csv_script_manager.py
+   python script_manager.py
    ```
 
    **macOS:**
    ```bash
-   python3 csv_script_manager.py
+   python3 script_manager.py
    ```
 
 4. Open your browser to `http://localhost:8000`
@@ -166,9 +166,9 @@ The CSV Script Manager provides:
    - Select and run scripts
    - View script documentation
 
-### Available Scripts in CSV Script Manager
+### Available Scripts in Script Manager
 
-The CSV Script Manager includes several pre-configured scripts:
+The Script Manager includes several pre-configured scripts:
 
 - **Configure Devices.py** - Bulk configure multiple devices with custom configurations
 - **Create NCX Resources.py** - Create NCX resources from CSV data
@@ -213,7 +213,7 @@ The collection will now appear in your Postman workspace. You can use it to expl
 - Verify environment variables are set correctly
 - Make sure your virtual environment is activated
 - Check that variable names match exactly (case-sensitive on macOS)
-- For CSV Script Manager, use the API Keys tab in the web interface
+- For Script Manager, use the API Keys tab in the web interface
 
 ### Import Errors
 

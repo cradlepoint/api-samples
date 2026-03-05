@@ -1,10 +1,10 @@
-# Script Format Guide for CSV Script Manager
+# Script Format Guide for Script Manager
 
-This guide explains the standardized format for scripts used with the CSV Script Manager and how to format your code and CSV files accordingly.
+This guide explains the standardized format for scripts used with the Script Manager and how to format your code and CSV files accordingly.
 
 ## Standardized Docstring Format
 
-All scripts in the `scripts/` directory should follow a consistent triple-quoted docstring format at the top of the file. The CSV Script Manager extracts and displays these docstrings in the web interface, making it easy for users to understand what each script does and what CSV format it expects.
+All scripts in the `scripts/` directory should follow a consistent triple-quoted docstring format at the top of the file. The Script Manager extracts and displays these docstrings in the web interface, making it easy for users to understand what each script does and what CSV format it expects.
 
 ### Required Sections
 
@@ -66,9 +66,9 @@ Requirements:
 """
 ```
 
-## How CSV Script Manager Uses Docstrings
+## How Script Manager Uses Docstrings
 
-The CSV Script Manager:
+The Script Manager:
 
 1. **Extracts docstrings** from scripts using the `extract_docstring()` method
 2. **Displays them** in the web interface when listing available scripts
@@ -125,7 +125,7 @@ The CSV Script Manager:
 
 ### Accessing CSV Data
 
-The CSV Script Manager passes the CSV file path as the first command-line argument:
+The Script Manager passes the CSV file path as the first command-line argument:
 
 ```python
 import sys
@@ -170,7 +170,7 @@ value = row[column_map['required_column']]
 
 Scripts should support API keys from multiple sources:
 
-1. **Environment Variables** (preferred for CSV Script Manager):
+1. **Environment Variables** (preferred for Script Manager):
    ```python
    token = os.environ.get('TOKEN') or os.environ.get('NCM_API_TOKEN')
    ```
@@ -253,11 +253,11 @@ with open(csv_filename, 'r', encoding='utf-8') as file:
 - **List requirements** including API keys and dependencies
 - **Handle CSV files** passed as `sys.argv[1]`
 - **Support case-insensitive column matching** for better user experience
-- **Use environment variables** for API keys (compatible with CSV Script Manager)
+- **Use environment variables** for API keys (compatible with Script Manager)
 - **Include shebang line** (`#!/usr/bin/env python3`) for cross-platform compatibility
 
 Following this format ensures your scripts are:
 - Easy to understand for users
-- Properly displayed in the CSV Script Manager interface
+- Properly displayed in the Script Manager interface
 - Consistent with other scripts in the repository
 - Well-documented for maintenance and updates

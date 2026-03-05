@@ -1,2 +1,4 @@
 .venv
 .DS_Store
+scripts/script_manager/csv_files/router_grid.csv
+scripts/script_manager/.last_file.txt
