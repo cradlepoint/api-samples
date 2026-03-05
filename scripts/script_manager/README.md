@@ -1,6 +1,6 @@
 # Script Manager
 
-A web-based CSV file editor and script manager for processing CSV files with Python scripts, specifically designed for NCM (Network Control Manager) API operations.
+A web-based CSV file editor and script manager for processing CSV files with Python scripts, specifically designed for NCM API operations.
 
 ## Features
 
