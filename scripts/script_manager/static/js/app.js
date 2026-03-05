@@ -130,6 +130,12 @@ class CSVEditor {
         document.getElementById('discardChangesBtn').addEventListener('click', () => this.discardAndRun());
         document.getElementById('saveAndRunBtn').addEventListener('click', () => this.saveAndRun());
         
+        // Pull repo modal
+        document.getElementById('pullRepoBtn').addEventListener('click', () => this.showPullRepoModal());
+        document.getElementById('closePullRepoModal').addEventListener('click', () => this.hidePullRepoModal());
+        document.getElementById('cancelPullRepoBtn').addEventListener('click', () => this.hidePullRepoModal());
+        document.getElementById('confirmPullRepoBtn').addEventListener('click', () => this.pullRepo());
+        
         // Click outside modal to close
         document.getElementById('loadModal').addEventListener('click', (e) => {
             if (e.target.id === 'loadModal') {
@@ -809,10 +815,7 @@ class CSVEditor {
             return;
         }
         
-        if (!this.currentFilename) {
-            this.showNotification('No CSV file loaded', 'error');
-            return;
-        }
+        const csvFile = document.getElementById('scriptCsvFileSelect').value;
         
         const runBtn = document.getElementById('confirmRunScriptBtn');
         const outputDiv = document.getElementById('scriptOutput');
@@ -836,7 +839,7 @@ class CSVEditor {
             },
             body: JSON.stringify({
                 script: scriptName,
-                csv_file: this.currentFilename
+                csv_file: csvFile
             })
         })
         .then(response => response.json())
@@ -1110,12 +1113,6 @@ if __name__ == '__main__':
     }
     
     runScriptFromList(scriptName) {
-        if (!this.currentFilename) {
-            this.showNotification('Please load a CSV file first', 'error');
-            this.switchTab('csv');
-            return;
-        }
-        
         // Check if there are unsaved changes
         if (this.isDirty) {
             this.pendingScriptName = scriptName;
@@ -1167,14 +1164,104 @@ if __name__ == '__main__':
         }
     }
     
+    showPullRepoModal() {
+        document.getElementById('pullRepoModal').classList.add('active');
+        document.getElementById('pullRepoOutput').style.display = 'none';
+    }
+    
+    hidePullRepoModal() {
+        document.getElementById('pullRepoModal').classList.remove('active');
+    }
+    
+    pullRepo() {
+        const confirmBtn = document.getElementById('confirmPullRepoBtn');
+        const outputDiv = document.getElementById('pullRepoOutput');
+        const statusDiv = document.getElementById('pullRepoStatus');
+        const contentDiv = document.getElementById('pullRepoContent');
+        
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = 'Pulling...';
+        outputDiv.style.display = 'block';
+        statusDiv.className = 'output-status running';
+        statusDiv.textContent = 'Checking for updates...';
+        contentDiv.textContent = '';
+        
+        fetch('/api/pull-repo', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        })
+        .then(response => response.json())
+        .then(data => {
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = 'Pull Scripts';
+            
+            if (data.error) {
+                statusDiv.className = 'output-status error';
+                statusDiv.textContent = 'Error';
+                contentDiv.textContent = data.error;
+                return;
+            }
+            
+            statusDiv.className = 'output-status success';
+            statusDiv.textContent = 'Success';
+            contentDiv.textContent = data.message;
+            this.showNotification(data.message, 'success');
+            this.loadScriptsList();
+        })
+        .catch(error => {
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = 'Pull Scripts';
+            statusDiv.className = 'output-status error';
+            statusDiv.textContent = 'Error';
+            contentDiv.textContent = error.message;
+            this.showNotification('Error pulling scripts: ' + error.message, 'error');
+        });
+    }
+    
     executeScript(scriptName) {
         document.getElementById('runScriptName').textContent = scriptName;
-        document.getElementById('scriptCsvFile').textContent = this.currentFilename;
+        
+        // Populate CSV file dropdown
+        this.populateCsvFileDropdown();
+        
         document.getElementById('runScriptModal').classList.add('active');
         document.getElementById('scriptOutput').style.display = 'none';
         
         // Store script name for execution
         this.currentScriptToRun = scriptName;
+    }
+    
+    populateCsvFileDropdown() {
+        const select = document.getElementById('scriptCsvFileSelect');
+        select.innerHTML = '<option value="">None</option>';
+        
+        // Add current file if loaded
+        if (this.currentFilename) {
+            const option = document.createElement('option');
+            option.value = this.currentFilename;
+            option.textContent = this.currentFilename;
+            option.selected = true;
+            select.appendChild(option);
+        }
+        
+        // Load and add other CSV files
+        fetch('/api/list')
+            .then(response => response.json())
+            .then(data => {
+                if (data.files && data.files.length > 0) {
+                    data.files.forEach(file => {
+                        if (file.name !== this.currentFilename) {
+                            const option = document.createElement('option');
+                            option.value = file.name;
+                            option.textContent = file.name;
+                            select.appendChild(option);
+                        }
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error loading CSV files:', error);
+            });
     }
     
     editScriptFromList(scriptName) {

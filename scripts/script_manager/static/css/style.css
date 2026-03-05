@@ -74,6 +74,15 @@ body {
     gap: 1rem;
 }
 
+.app-logo {
+    height: 40px;
+    width: auto;
+}
+
+body.dark-mode .app-logo {
+    content: url('/static/logo_dark.png');
+}
+
 .sidebar-toggle {
     background: none;
     border: none;

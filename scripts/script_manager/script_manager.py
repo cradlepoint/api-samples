@@ -80,6 +80,8 @@ class CSVEditorHandler(SimpleHTTPRequestHandler):
             self.handle_delete_script()
         elif parsed_path.path == '/api/set-api-keys':
             self.handle_set_api_keys()
+        elif parsed_path.path == '/api/pull-repo':
+            self.handle_pull_repo()
         else:
             self.send_error(HTTPStatus.NOT_FOUND, "Not found")
     
@@ -959,6 +961,116 @@ if __name__ == '__main__':
             import traceback
             traceback.print_exc()
             self.send_error_response('Error setting API keys')
+    
+    def handle_pull_repo(self):
+        """Pull scripts from GitHub repository."""
+        try:
+            # Convert to API URL
+            api_url = 'https://api.github.com/repos/cradlepoint/api-samples/contents/scripts/script_manager/scripts?ref=master'
+            
+            print(f'Fetching scripts from: {api_url}')
+            response = requests.get(api_url, timeout=30, headers={'User-Agent': 'Script-Manager/1.0', 'Accept': 'application/vnd.github.v3+json'})
+            response.raise_for_status()
+            contents = response.json()
+            
+            if not isinstance(contents, list):
+                self.send_error_response('Invalid response from GitHub')
+                return
+            
+            # Filter for .py files
+            py_files = [item for item in contents if item.get('type') == 'file' and item.get('name', '').endswith('.py')]
+            
+            if not py_files:
+                self.send_json_response({
+                    'success': True,
+                    'message': 'No Python scripts found in repository'
+                })
+                return
+            
+            # Download and save scripts
+            downloaded = 0
+            updated = 0
+            skipped = 0
+            errors = []
+            
+            for item in py_files:
+                script_name = item.get('name')
+                download_url = item.get('download_url')
+                github_sha = item.get('sha')
+                
+                if not download_url:
+                    continue
+                
+                try:
+                    script_path = os.path.join(self.scripts_dir, script_name)
+                    file_exists = os.path.exists(script_path)
+                    
+                    # Check if file needs updating by comparing content hash
+                    needs_update = True
+                    if file_exists:
+                        import hashlib
+                        with open(script_path, 'rb') as f:
+                            local_content = f.read()
+                            local_sha = hashlib.sha1(b'blob ' + str(len(local_content)).encode() + b'\0' + local_content).hexdigest()
+                        
+                        if local_sha == github_sha:
+                            needs_update = False
+                            skipped += 1
+                            print(f'Skipped (up to date): {script_name}')
+                    
+                    if needs_update:
+                        script_response = requests.get(download_url, timeout=30, headers={'User-Agent': 'Script-Manager/1.0'})
+                        script_response.raise_for_status()
+                        script_content = script_response.text
+                        
+                        with open(script_path, 'w', encoding='utf-8') as f:
+                            f.write(script_content)
+                        
+                        try:
+                            os.chmod(script_path, 0o755)
+                        except (OSError, AttributeError):
+                            pass
+                        
+                        if file_exists:
+                            updated += 1
+                        else:
+                            downloaded += 1
+                        
+                        print(f'{'Updated' if file_exists else 'Downloaded'}: {script_name}')
+                except Exception as e:
+                    errors.append(f'{script_name}: {str(e)}')
+                    print(f'Error processing {script_name}: {str(e)}')
+            
+            message_parts = []
+            if downloaded > 0:
+                message_parts.append(f'{downloaded} new script(s) downloaded')
+            if updated > 0:
+                message_parts.append(f'{updated} script(s) updated')
+            if skipped > 0:
+                message_parts.append(f'{skipped} script(s) already up to date')
+            if errors:
+                message_parts.append(f'{len(errors)} error(s)')
+            
+            message = ', '.join(message_parts) if message_parts else 'No changes'
+            
+            if errors:
+                message += '\n\nErrors:\n' + '\n'.join(errors)
+            
+            self.send_json_response({
+                'success': True,
+                'message': message,
+                'downloaded': downloaded,
+                'updated': updated,
+                'errors': len(errors)
+            })
+        except requests.exceptions.RequestException as e:
+            print(f'Error pulling repo: {str(e)}')
+            self.send_error_response(f'Error accessing GitHub: {str(e)}')
+        except Exception as e:
+            print(f'Error pulling repo: {str(e)}')
+            import traceback
+            traceback.print_exc()
+            self.send_error_response(f'Error pulling scripts: {str(e)}')
 
 # App starts here
 print('Starting Script Manager...')
