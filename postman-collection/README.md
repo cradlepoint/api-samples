@@ -44,6 +44,7 @@ Add the following variables to your environment with your actual API credentials
 | `X-ECM-API-KEY` | Your ECM API Key |
 | `X-CP-API-ID` | Your CP API ID |
 | `X-CP-API-KEY` | Your CP API Key |
+| `TOKEN` | Your NCM API v3 Token |
 
 **How to obtain these credentials:**
 - Follow the official Ericsson documentation: [Obtaining API Keys](https://docs.cradlepoint.com/r/NCM-APIv2-Overview/Obtaining-API-Keys)
