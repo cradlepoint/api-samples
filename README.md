@@ -186,12 +186,20 @@ Each script includes detailed documentation in its docstring explaining the requ
 
 For a convenient way to test and explore the Ericsson NetCloud Manager APIs, you can use the **Ericsson NCM API Postman Collection**. This collection contains pre-configured API requests that you can use to interact with the APIs directly from Postman.
 
+### Downloading the Collection File from GitHub
+
+If you only need the Postman collection file without cloning the entire repository:
+
+1. Navigate to the file on GitHub: `Ericsson NCM API Postman Collection.json`
+2. Click the **Download** button (or **Download raw file** icon) in the top right
+3. Save the file to your computer
+
 ### Importing the Collection
 
 1. Open Postman
 2. Click **Import** in the top left corner
 3. Select **File** or **Upload Files**
-4. Navigate to and select the `Ericsson NCM API Postman Collection.json` file from this repository
+4. Navigate to and select the `Ericsson NCM API Postman Collection.json` file
 5. Click **Import**
 
 The collection will now appear in your Postman workspace. You can use it to explore and test the various API endpoints.
