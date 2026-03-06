@@ -4,6 +4,14 @@ This folder contains the **Ericsson Enterprise Wireless NetCloud Manager (NCM) A
 
 ## 📥 How to Import the Collection
 
+### Downloading the Collection File from GitHub
+
+If you only need the Postman collection file without cloning the entire repository:
+
+1. Navigate to the file on GitHub: `Ericsson NCM API Postman Collection.json`
+2. Click the **Download** button (or **Download raw file** icon) in the top right
+3. Save the file to your computer
+
 ### Step 1: Open Postman
 1. Launch **Postman** on your computer
 2. If you don't have Postman, download it from [postman.com](https://www.postman.com/downloads/)
@@ -11,7 +19,7 @@ This folder contains the **Ericsson Enterprise Wireless NetCloud Manager (NCM) A
 ### Step 2: Import the Collection
 1. Click the **Import** button (top-left corner of Postman)
 2. Select **Upload Files**
-3. Choose the **`Ericsson NCM API Postman Collection.json`** file from this folder
+3. Choose the **`Ericsson NCM API Postman Collection.json`** file
 4. Click **Import**
 
 The collection will now appear in your Postman sidebar under **Collections**.
