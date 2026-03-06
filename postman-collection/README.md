@@ -88,6 +88,8 @@ Run operations on multiple devices using CSV files:
 2. Select **Test data file** and upload your CSV
 3. Postman will execute the request for each row in your CSV
 
+**Note:** Bulk operations with CSV files require a paid Postman account.
+
 **CSV Example:**
 ```csv
 id,mac,serial_number,ip_address
@@ -100,6 +102,8 @@ The collection includes pre-built multi-step workflows under "Automation Workflo
 - Call multiple API endpoints in sequence
 - Handle common complex operations automatically
 - Pass data between requests
+
+**Note:** Automation workflows require a paid Postman account.
 
 ---
 
