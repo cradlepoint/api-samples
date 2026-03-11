@@ -411,13 +411,12 @@ class CSVEditorHandler(SimpleHTTPRequestHandler):
                 self.send_error_response('Script name required')
                 return
             
-            if not csv_filename:
-                self.send_error_response('CSV filename required')
-                return
+            # CSV file is optional - some scripts don't need input files
             
             # Security: prevent directory traversal
             script_name = os.path.basename(script_name)
-            csv_filename = os.path.basename(csv_filename)
+            if csv_filename:
+                csv_filename = os.path.basename(csv_filename)
             
             # Build script path
             script_path = os.path.join(self.scripts_dir, script_name)
@@ -432,17 +431,22 @@ class CSVEditorHandler(SimpleHTTPRequestHandler):
                 self.send_error_response('Invalid script path')
                 return
             
-            # Build CSV file path
-            csv_filepath = os.path.join(self.csv_dir, csv_filename)
-            if not os.path.exists(csv_filepath):
-                self.send_error_response(f'CSV file not found: {csv_filename}')
-                return
+            # Build CSV file path if provided
+            csv_filepath = None
+            if csv_filename:
+                csv_filepath = os.path.join(self.csv_dir, csv_filename)
+                if not os.path.exists(csv_filepath):
+                    self.send_error_response(f'CSV file not found: {csv_filename}')
+                    return
             
             # Execute Python script with CSV filename as argument
             # Working directory is the app directory
             script_dir = os.path.dirname(os.path.abspath(__file__))
             
-            print(f'Executing Python script: {script_name} with CSV file: {csv_filename}')
+            if csv_filepath:
+                print(f'Executing Python script: {script_name} with CSV file: {csv_filename}')
+            else:
+                print(f'Executing Python script: {script_name} (no CSV file)')
             
             try:
                 # Run Python script with timeout (30 seconds)
@@ -452,12 +456,22 @@ class CSVEditorHandler(SimpleHTTPRequestHandler):
                 # Create a wrapper script that adds the app directory to sys.path
                 # This allows scripts to import modules from the parent directory
                 # The wrapper preserves sys.argv so scripts can access command-line arguments
-                wrapper_script = f'''import sys
+                if csv_filepath:
+                    wrapper_script = f'''import sys
 import os
 # Add app directory to Python path so scripts can import from parent folder
 sys.path.insert(0, r'{script_dir}')
 # Execute the actual script with proper sys.argv
 sys.argv = [r'{script_path}', r'{csv_filepath}']
+exec(compile(open(r'{script_path}').read(), r'{script_path}', 'exec'))
+'''
+                else:
+                    wrapper_script = f'''import sys
+import os
+# Add app directory to Python path so scripts can import from parent folder
+sys.path.insert(0, r'{script_dir}')
+# Execute the actual script with proper sys.argv (no CSV file)
+sys.argv = [r'{script_path}']
 exec(compile(open(r'{script_path}').read(), r'{script_path}', 'exec'))
 '''
                 
@@ -488,7 +502,7 @@ exec(compile(open(r'{script_path}').read(), r'{script_path}', 'exec'))
                     'stdout': result.stdout,
                     'stderr': result.stderr,
                     'script': script_name,
-                    'csv_file': csv_filename
+                    'csv_file': csv_filename or 'None'
                 }
                 
                 print(f'Script execution completed with exit code: {result.returncode}')
