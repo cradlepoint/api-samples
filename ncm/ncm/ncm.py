@@ -275,7 +275,8 @@ class NcmClientv2(BaseNcmClient):
                         if params is not None:
                             from urllib.parse import urlencode
                             query_string = urlencode(params)
-                            url = f'{url}?{query_string}'
+                            separator = '&' if '?' in url else '?'
+                            url = f'{url}{separator}{query_string}'
                         while url and (len(results) < limit):
                             ncm = self.session.get(url)
                             if not (200 <= ncm.status_code < 300):
@@ -292,7 +293,8 @@ class NcmClientv2(BaseNcmClient):
             if params is not None:
                 from urllib.parse import urlencode
                 query_string = urlencode(params)
-                url = f'{url}?{query_string}'
+                separator = '&' if '?' in url else '?'
+                url = f'{url}{separator}{query_string}'
             while url and (len(results) < limit):
                 ncm = self.session.get(url)
                 if not (200 <= ncm.status_code < 300):
