@@ -33,10 +33,13 @@ class CSVEditor {
             .then(data => {
                 if (data.filename) {
                     this.loadFile(data.filename);
+                } else {
+                    this.newFile(true);
                 }
             })
             .catch(error => {
                 console.error('Error loading last file:', error);
+                this.newFile(true);
             });
     }
     
@@ -225,18 +228,20 @@ class CSVEditor {
         });
     }
     
-    newFile() {
+    newFile(silent = false) {
         if (this.isDirty && !confirm('You have unsaved changes. Create a new file anyway?')) {
             return;
         }
         
         this.currentFilename = null;
         this.csvData = [['']];
-        this.headers = null;
+        this.headers = ['id'];
         this.isDirty = false;
         this.renderTable();
         this.updateUI();
-        this.showNotification('New file created', 'success');
+        if (!silent) {
+            this.showNotification('New file created', 'success');
+        }
     }
     
     showLoadModal() {

@@ -89,12 +89,12 @@
                                         <line x1="5" y1="12" x2="19" y2="12"></line>
                                     </svg> New CSV
                                 </button>
-                                <button id="loadFileBtn" class="btn btn-secondary" title="Upload from file...">
+                                <button id="loadFileBtn" class="btn btn-secondary" title="Open">
                                     <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                                         <polyline points="17 8 12 3 7 8"></polyline>
                                         <line x1="12" y1="3" x2="12" y2="15"></line>
-                                    </svg> Upload from file...
+                                    </svg> Open
                                 </button>
                                 <button id="saveBtn" class="btn btn-primary" title="Save" disabled>
                                     <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -153,20 +153,10 @@
 
                             <!-- CSV Table Container -->
                             <div class="table-container">
-                                <div class="table-wrapper" id="tableWrapper">
+                                <div class="table-wrapper" id="tableWrapper" style="display: none;">
                                     <table class="csv-table" id="csvTable">
-                                        <thead id="tableHead">
-                                            <tr>
-                                                <th class="row-header">#</th>
-                                                <th class="col-header">Column 1</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="tableBody">
-                                            <tr>
-                                                <td class="row-header">1</td>
-                                                <td class="editable-cell" contenteditable="true"></td>
-                                            </tr>
-                                        </tbody>
+                                        <thead id="tableHead"></thead>
+                                        <tbody id="tableBody"></tbody>
                                     </table>
                                 </div>
                             </div>
