@@ -6,7 +6,7 @@ A collection of Python scripts for interacting with Ericsson NetCloud Manager AP
 
 ### Prerequisites
 
-- Python 3.7 or higher
+- Python 3.7 or higher — Windows users, see the [Windows Python Setup Guide](WINDOWS_PYTHON_SETUP.md) if `python` isn't working in your terminal
 - Git (optional, for cloning the repository)
 
 ### Download and Extract the Repository
