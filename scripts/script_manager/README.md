@@ -116,7 +116,7 @@ script_manager/
 │   ├── Create NCX Sites.py
 │   ├── Create Users.py
 │   ├── Get Router Status.py
-│   ├── Regrade Subscriptions.py
+│   ├── Update Subscriptions.py
 │   ├── Set Router Fields.py
 │   ├── Unlicense Devices.py
 │   └── Unregister Routers.py

@@ -175,10 +175,10 @@ The Script Manager includes several pre-configured scripts:
 - **Create NCX Sites.py** - Create NCX sites from CSV data
 - **Create Users.py** - Create and manage users in NCM API v3
 - **Get Router Status.py** - Get router status and information using identifiers
-- **Regrade Subscriptions.py** - Apply or regrade device subscriptions
 - **Set Router Fields.py** - Update router fields (name, description, asset_id, custom1, custom2)
 - **Unlicense Devices.py** - Unlicense devices
 - **Unregister Routers.py** - Unregister routers in batches with logging
+- **Update Subscriptions.py** - Apply or regrade device subscriptions
 
 Each script includes detailed documentation in its docstring explaining the required CSV format and usage.
 
