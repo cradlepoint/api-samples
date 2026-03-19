@@ -117,6 +117,7 @@ class CSVEditor {
         });
         document.getElementById('cancelRunScriptBtn').addEventListener('click', () => this.hideRunScriptModal());
         document.getElementById('confirmRunScriptBtn').addEventListener('click', () => this.runScript());
+        document.getElementById('cancelRunningScriptBtn').addEventListener('click', () => this.cancelRunningScript());
         document.getElementById('saveOutputBtn').addEventListener('click', () => this.saveScriptOutput());
         document.getElementById('closeAddScriptModal').addEventListener('click', (e) => {
             e.stopPropagation();
@@ -773,6 +774,8 @@ class CSVEditor {
     
     hideRunScriptModal() {
         document.getElementById('runScriptModal').classList.remove('active');
+        document.getElementById('confirmRunScriptBtn').style.display = 'inline-flex';
+        document.getElementById('cancelRunningScriptBtn').style.display = 'none';
         this.currentScriptToRun = null;
     }
     
@@ -823,89 +826,142 @@ class CSVEditor {
         const csvFile = document.getElementById('scriptCsvFileSelect').value;
         
         const runBtn = document.getElementById('confirmRunScriptBtn');
+        const cancelRunBtn = document.getElementById('cancelRunningScriptBtn');
         const outputDiv = document.getElementById('scriptOutput');
         const outputStatus = document.getElementById('outputStatus');
         const outputContent = document.getElementById('outputContent');
         const outputError = document.getElementById('outputError');
         
-        // Show output area
+        // Show output area with running state
         outputDiv.style.display = 'block';
         outputStatus.className = 'output-status running';
-        outputStatus.textContent = 'Running script...';
+        outputStatus.innerHTML = '<span class="spinner"></span> Running script...';
         outputContent.textContent = '';
         outputError.style.display = 'none';
         outputError.textContent = '';
-        runBtn.disabled = true;
+        runBtn.style.display = 'none';
+        cancelRunBtn.style.display = 'inline-flex';
         
+        // Start the script via POST
         fetch('/api/run-script', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                script: scriptName,
-                csv_file: csvFile
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ script: scriptName, csv_file: csvFile })
         })
         .then(response => response.json())
         .then(data => {
-            runBtn.disabled = false;
-            
             if (data.error) {
                 outputStatus.className = 'output-status error';
                 outputStatus.textContent = 'Error';
                 outputError.textContent = data.error;
                 outputError.style.display = 'block';
+                runBtn.style.display = 'inline-flex';
+                cancelRunBtn.style.display = 'none';
                 return;
             }
             
-            if (data.success) {
-                outputStatus.className = 'output-status success';
-                outputStatus.textContent = `Script completed successfully (exit code: ${data.exit_code})`;
-            } else {
-                outputStatus.className = 'output-status error';
-                outputStatus.textContent = `Script failed (exit code: ${data.exit_code})`;
-            }
+            // Connect to SSE stream for live output
+            const startTime = Date.now();
+            const evtSource = new EventSource('/api/script-stream');
+            this._currentEventSource = evtSource;
             
-            // Combine stdout and stderr for display
-            let combinedOutput = '';
-            if (data.stdout) {
-                combinedOutput += data.stdout;
-            }
-            if (data.stderr) {
-                // For successful scripts, stderr is informational, not an error
-                if (data.success) {
-                    // Append stderr to stdout for successful scripts
-                    if (combinedOutput && !combinedOutput.endsWith('\n')) {
-                        combinedOutput += '\n';
-                    }
-                    combinedOutput += data.stderr;
-                } else {
-                    // For failed scripts, show stderr as error
-                    outputError.textContent = data.stderr;
-                    outputError.style.display = 'block';
+            const updateElapsed = () => {
+                if (evtSource.readyState === EventSource.CLOSED) return;
+                const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                const mins = Math.floor(elapsed / 60);
+                const secs = elapsed % 60;
+                const timeStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+                outputStatus.innerHTML = `<span class="spinner"></span> Running script... (${timeStr})`;
+                requestAnimationFrame(() => setTimeout(updateElapsed, 1000));
+            };
+            updateElapsed();
+            
+            evtSource.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                
+                if (msg.output) {
+                    outputContent.textContent += msg.output;
+                    // Auto-scroll to bottom
+                    outputContent.scrollTop = outputContent.scrollHeight;
                 }
-            }
+                
+                if (msg.done) {
+                    evtSource.close();
+                    this._currentEventSource = null;
+                    runBtn.style.display = 'inline-flex';
+                    cancelRunBtn.style.display = 'none';
+                    
+                    if (msg.cancelled) {
+                        outputStatus.className = 'output-status error';
+                        outputStatus.textContent = 'Script cancelled';
+                        this.showNotification('Script cancelled', 'error');
+                    } else if (msg.exit_code === 0) {
+                        outputStatus.className = 'output-status success';
+                        outputStatus.textContent = `Script completed successfully (exit code: ${msg.exit_code})`;
+                        this.showNotification('Script executed successfully', 'success');
+                    } else {
+                        outputStatus.className = 'output-status error';
+                        outputStatus.textContent = `Script failed (exit code: ${msg.exit_code})`;
+                        this.showNotification('Script execution failed', 'error');
+                    }
+                    
+                    if (msg.stderr) {
+                        if (msg.exit_code === 0) {
+                            outputContent.textContent += msg.stderr;
+                        } else {
+                            outputError.textContent = msg.stderr;
+                            outputError.style.display = 'block';
+                        }
+                    }
+                }
+                
+                if (msg.error) {
+                    evtSource.close();
+                    this._currentEventSource = null;
+                    outputStatus.className = 'output-status error';
+                    outputStatus.textContent = 'Error';
+                    outputError.textContent = msg.error;
+                    outputError.style.display = 'block';
+                    runBtn.style.display = 'inline-flex';
+                    cancelRunBtn.style.display = 'none';
+                }
+            };
             
-            if (combinedOutput) {
-                outputContent.textContent = combinedOutput;
-            } else {
-                outputContent.textContent = '(No output)';
-            }
-            
-            this.showNotification(
-                data.success ? 'Script executed successfully' : 'Script execution failed',
-                data.success ? 'success' : 'error'
-            );
+            evtSource.onerror = () => {
+                evtSource.close();
+                this._currentEventSource = null;
+                // Only show error if we haven't already received a 'done' message
+                if (outputStatus.className.includes('running')) {
+                    outputStatus.className = 'output-status error';
+                    outputStatus.textContent = 'Connection to script lost';
+                    runBtn.style.display = 'inline-flex';
+                    cancelRunBtn.style.display = 'none';
+                }
+            };
         })
         .catch(error => {
-            runBtn.disabled = false;
+            runBtn.style.display = 'inline-flex';
+            cancelRunBtn.style.display = 'none';
             outputStatus.className = 'output-status error';
             outputStatus.textContent = 'Error';
             outputError.textContent = 'Error executing script: ' + error.message;
             outputError.style.display = 'block';
             this.showNotification('Error executing script: ' + error.message, 'error');
         });
+    }
+    
+    cancelRunningScript() {
+        fetch('/api/cancel-script', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        }).catch(() => {});
+        
+        // Close the SSE stream
+        if (this._currentEventSource) {
+            this._currentEventSource.close();
+            this._currentEventSource = null;
+        }
     }
     
     

@@ -10,10 +10,15 @@ import os
 import re
 import subprocess
 import threading
+import time
 import requests
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from http import HTTPStatus
 from urllib.parse import parse_qs, urlparse
+
+# Global state for the currently running script process
+_running_process = None
+_running_process_lock = threading.Lock()
 
 # Port for the web interface
 PORT = 8000
@@ -54,6 +59,8 @@ class CSVEditorHandler(SimpleHTTPRequestHandler):
             self.handle_get_environment_info()
         elif parsed_path.path == '/api/api-keys-status':
             self.handle_get_api_keys_status()
+        elif parsed_path.path == '/api/script-stream':
+            self.handle_script_stream()
         elif parsed_path.path == '/' or parsed_path.path == '/index.html':
             # Serve index.html for root path
             self.path = '/static/index.html'
@@ -72,6 +79,8 @@ class CSVEditorHandler(SimpleHTTPRequestHandler):
             self.handle_save_file()
         elif parsed_path.path == '/api/run-script':
             self.handle_run_script()
+        elif parsed_path.path == '/api/cancel-script':
+            self.handle_cancel_script()
         elif parsed_path.path == '/api/create-script':
             self.handle_create_script()
         elif parsed_path.path == '/api/download-script-url':
@@ -398,7 +407,13 @@ class CSVEditorHandler(SimpleHTTPRequestHandler):
             self.send_error_response(f'Error listing scripts: {str(e)}')
     
     def handle_run_script(self):
-        """Execute a script with the CSV filename as an argument."""
+        """Execute a script with the CSV filename as an argument (no timeout).
+        
+        Launches the script as a background process. The frontend uses
+        /api/script-stream (SSE) to receive live output and /api/cancel-script
+        to terminate the process early.
+        """
+        global _running_process
         try:
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
@@ -439,8 +454,13 @@ class CSVEditorHandler(SimpleHTTPRequestHandler):
                     self.send_error_response(f'CSV file not found: {csv_filename}')
                     return
             
+            # Don't allow a second script while one is already running
+            with _running_process_lock:
+                if _running_process is not None and _running_process.get('process') and _running_process['process'].poll() is None:
+                    self.send_error_response('A script is already running. Cancel it first.')
+                    return
+            
             # Execute Python script with CSV filename as argument
-            # Working directory is the app directory
             script_dir = os.path.dirname(os.path.abspath(__file__))
             
             if csv_filepath:
@@ -449,68 +469,52 @@ class CSVEditorHandler(SimpleHTTPRequestHandler):
                 print(f'Executing Python script: {script_name} (no CSV file)')
             
             try:
-                # Run Python script with timeout (30 seconds)
-                # Detect Python command (python3 or python) for cross-platform compatibility
                 python_cmd = self._detect_python_command()
                 
-                # Create a wrapper script that adds the app directory to sys.path
-                # This allows scripts to import modules from the parent directory
-                # The wrapper preserves sys.argv so scripts can access command-line arguments
                 if csv_filepath:
                     wrapper_script = f'''import sys
 import os
-# Add app directory to Python path so scripts can import from parent folder
 sys.path.insert(0, r'{script_dir}')
-# Execute the actual script with proper sys.argv
 sys.argv = [r'{script_path}', r'{csv_filepath}']
 exec(compile(open(r'{script_path}').read(), r'{script_path}', 'exec'))
 '''
                 else:
                     wrapper_script = f'''import sys
 import os
-# Add app directory to Python path so scripts can import from parent folder
 sys.path.insert(0, r'{script_dir}')
-# Execute the actual script with proper sys.argv (no CSV file)
 sys.argv = [r'{script_path}']
 exec(compile(open(r'{script_path}').read(), r'{script_path}', 'exec'))
 '''
                 
-                # Write wrapper to a temporary file
                 wrapper_path = os.path.join(script_dir, '.script_wrapper.py')
                 with open(wrapper_path, 'w') as f:
                     f.write(wrapper_script)
                 
-                try:
-                    result = subprocess.run(
-                        [python_cmd, wrapper_path],
-                        cwd=script_dir,
-                        capture_output=True,
-                        text=True,
-                        timeout=30
-                    )
-                finally:
-                    # Clean up wrapper script
-                    if os.path.exists(wrapper_path):
-                        try:
-                            os.remove(wrapper_path)
-                        except:
-                            pass
+                # Launch with Popen — no timeout, runs until done or cancelled
+                proc = subprocess.Popen(
+                    [python_cmd, '-u', wrapper_path],
+                    cwd=script_dir,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
                 
-                response_data = {
-                    'success': result.returncode == 0,
-                    'exit_code': result.returncode,
-                    'stdout': result.stdout,
-                    'stderr': result.stderr,
+                with _running_process_lock:
+                    _running_process = {
+                        'process': proc,
+                        'script': script_name,
+                        'csv_file': csv_filename or 'None',
+                        'wrapper_path': wrapper_path,
+                        'cancelled': False,
+                        'start_time': time.time()
+                    }
+                
+                self.send_json_response({
+                    'started': True,
                     'script': script_name,
                     'csv_file': csv_filename or 'None'
-                }
+                })
                 
-                print(f'Script execution completed with exit code: {result.returncode}')
-                self.send_json_response(response_data)
-                
-            except subprocess.TimeoutExpired:
-                print(f'Script execution timed out: {script_name}')
-                self.send_error_response('Script execution timed out (30 seconds)')
             except Exception as e:
                 print(f'Error executing script: {str(e)}')
                 self.send_error_response(f'Error executing script: {str(e)}')
@@ -518,6 +522,95 @@ exec(compile(open(r'{script_path}').read(), r'{script_path}', 'exec'))
         except Exception as e:
             print(f'Error in handle_run_script: {str(e)}')
             self.send_error_response(f'Error running script: {str(e)}')
+
+    def handle_cancel_script(self):
+        """Cancel the currently running script process."""
+        global _running_process
+        with _running_process_lock:
+            if _running_process is None or _running_process['process'].poll() is not None:
+                self.send_error_response('No script is currently running')
+                return
+            _running_process['cancelled'] = True
+            proc = _running_process['process']
+        
+        try:
+            proc.terminate()
+            # Give it a moment to terminate gracefully
+            try:
+                proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+            print(f'Script cancelled: {_running_process["script"]}')
+            self.send_json_response({'cancelled': True})
+        except Exception as e:
+            self.send_error_response(f'Error cancelling script: {str(e)}')
+
+    def handle_script_stream(self):
+        """SSE endpoint that streams live stdout/stderr from the running script."""
+        global _running_process
+        
+        with _running_process_lock:
+            info = _running_process
+        
+        if info is None or info.get('process') is None:
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/event-stream')
+            self.send_header('Cache-Control', 'no-cache')
+            self.send_header('Connection', 'keep-alive')
+            self.end_headers()
+            self.wfile.write(b'data: {"error":"No script is running"}\n\n')
+            self.wfile.flush()
+            return
+        
+        proc = info['process']
+        
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/event-stream')
+        self.send_header('Cache-Control', 'no-cache')
+        self.send_header('Connection', 'keep-alive')
+        self.end_headers()
+        
+        def send_sse(data_dict):
+            try:
+                payload = json.dumps(data_dict)
+                self.wfile.write(f'data: {payload}\n\n'.encode())
+                self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError):
+                return False
+            return True
+        
+        # Stream stdout line by line
+        try:
+            for line in iter(proc.stdout.readline, ''):
+                if not send_sse({'output': line}):
+                    break
+            
+            proc.wait()
+            
+            # Grab any remaining stderr
+            stderr_output = proc.stderr.read()
+            
+            # Clean up wrapper
+            wrapper_path = info.get('wrapper_path')
+            if wrapper_path and os.path.exists(wrapper_path):
+                try:
+                    os.remove(wrapper_path)
+                except Exception:
+                    pass
+            
+            was_cancelled = info.get('cancelled', False)
+            
+            send_sse({
+                'done': True,
+                'exit_code': proc.returncode,
+                'stderr': stderr_output,
+                'cancelled': was_cancelled
+            })
+            
+            print(f'Script execution completed with exit code: {proc.returncode}')
+            
+        except (BrokenPipeError, ConnectionResetError):
+            pass
     
     def handle_create_script(self):
         """Create or update a Python script."""
