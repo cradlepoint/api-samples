@@ -215,6 +215,11 @@ The collection will now appear in your Postman workspace. You can use it to expl
 **Problem:** Virtual environment activation fails
 - Make sure you're in the correct directory when creating the virtual environment
 
+### Windows Python PATH Issues
+
+**Problem:** `python` isn't recognized, or typing `python` opens the Microsoft Store
+- Follow the [Windows Python Setup Guide](WINDOWS_PYTHON_SETUP.md) for step-by-step instructions on installing Python correctly and configuring your PATH on Windows 11.
+
 ### API Key Issues
 
 **Problem:** Scripts report missing API keys

@@ -109,8 +109,17 @@ def main():
     
     print(f"Processing {len(rows)} routers...")
     
-    # Get all locations once
-    locations = n2.get_locations()
+    # Collect router IDs from CSV
+    router_ids = []
+    for row in rows:
+        rid = str(row[id_column]).split('/')[-2] if '/' in str(row[id_column]) else str(row[id_column])
+        router_ids.append(rid)
+    
+    # Fetch only locations for routers in the CSV
+    print(f"Fetching locations for {len(router_ids)} routers...")
+    locations = n2.get_locations(router__in=router_ids)
+    print(f"Retrieved {len(locations)} locations.")
+    
     location_map = {}
     for loc in locations:
         router_url = loc.get('router', '')
