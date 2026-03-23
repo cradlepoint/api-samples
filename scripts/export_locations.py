@@ -60,8 +60,9 @@ def load_api_keys():
 def find_id_column(fieldnames):
     """Find the router ID column from common variants."""
     candidates = ["id", "router", "routerid", "router id", "router_id"]
+    # Strip BOM, whitespace, underscores, and spaces for matching
     normalized = {
-        col.lower().strip().replace(" ", "").replace("_", ""): col
+        col.lstrip('\ufeff').lower().strip().replace(" ", "").replace("_", ""): col
         for col in fieldnames
     }
     for name in candidates:

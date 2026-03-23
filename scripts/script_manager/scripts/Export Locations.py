@@ -91,7 +91,7 @@ def main():
     # Support common router ID column variants (case-insensitive)
     id_candidates = ['id', 'router', 'routerid', 'router id', 'router_id']
     normalized = {
-        col.lower().strip().replace(' ', '').replace('_', ''): col
+        col.lstrip('\ufeff').lower().strip().replace(' ', '').replace('_', ''): col
         for col in original_fieldnames
     }
     
