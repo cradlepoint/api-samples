@@ -56,6 +56,7 @@ import os
 import re
 from datetime import datetime
 import ncm
+ncm.set_api_keys(log_events=True)
 
 # ============================================================================
 # DATE/TIME RANGE FILTER

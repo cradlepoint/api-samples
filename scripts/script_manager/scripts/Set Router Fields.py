@@ -36,6 +36,7 @@ Requirements:
 import sys
 import csv
 import ncm
+ncm.set_api_keys(log_events=True)
 
 if len(sys.argv) < 2:
     print('Usage: python "Set Router Fields.py" <csv_file_path>')

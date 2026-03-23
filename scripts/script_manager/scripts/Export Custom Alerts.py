@@ -48,7 +48,7 @@ if not api_keys:
     print("Error: Please set NCM API v2 keys as environment variables")
     sys.exit(1)
 
-ncm.api_keys = api_keys
+ncm.set_api_keys(api_keys=api_keys, log_events=True)
 
 # Calculate start time (90 days ago)
 start_time = datetime.utcnow() - timedelta(days=90)

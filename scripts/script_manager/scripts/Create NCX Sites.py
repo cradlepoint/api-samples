@@ -155,7 +155,7 @@ def create_ncx_sites(mode: str, rows: list[tuple[str, str, str | None]]) -> None
         print("Error: TOKEN or NCM_API_TOKEN is required for NCX v3 API (set in API Keys tab).")
         return
 
-    n2 = ncm.NcmClientv2(api_keys=api_keys, log_events=False)
+    n2 = ncm.NcmClientv2(api_keys=api_keys, log_events=True)
     n3 = ncm.NcmClientv3(api_key=token, log_events=True)  # Enable logging to see API errors
 
     for identifier, ncx_network_id, site_name_override in rows:
