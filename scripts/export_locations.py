@@ -17,15 +17,12 @@ import os
 import sys
 import csv
 
-# Add the repo root to path so ncm can be imported
 script_dir = os.path.dirname(os.path.abspath(__file__))
-repo_root = os.path.dirname(script_dir)
-sys.path.insert(0, repo_root)
 
 try:
     import ncm
 except ImportError:
-    print("Error: 'ncm' library not found. Make sure the ncm folder is in the repo root.")
+    print("Error: 'ncm' library not found. Install it with: pip install ncm")
     input("Press Enter to exit...")
     sys.exit(1)
 
