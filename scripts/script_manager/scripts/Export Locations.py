@@ -115,10 +115,20 @@ def main():
         rid = str(row[id_column]).split('/')[-2] if '/' in str(row[id_column]) else str(row[id_column])
         router_ids.append(rid)
     
-    # Fetch only locations for routers in the CSV
-    print(f"Fetching locations for {len(router_ids)} routers...")
-    locations = n2.get_locations(router__in=router_ids)
-    print(f"Retrieved {len(locations)} locations.")
+    # Fetch locations in batches with progress reporting
+    # The NCM client chunks router__in into groups of 100 internally,
+    # but we batch here ourselves so we can show progress.
+    batch_size = 100
+    locations = []
+    total = len(router_ids)
+    for i in range(0, total, batch_size):
+        batch = router_ids[i:i + batch_size]
+        batch_num = i // batch_size + 1
+        total_batches = (total + batch_size - 1) // batch_size
+        print(f"Fetching locations batch {batch_num}/{total_batches} ({len(batch)} routers)...", flush=True)
+        batch_locations = n2.get_locations(router__in=batch)
+        locations.extend(batch_locations)
+    print(f"Retrieved {len(locations)} locations.", flush=True)
     
     location_map = {}
     for loc in locations:
