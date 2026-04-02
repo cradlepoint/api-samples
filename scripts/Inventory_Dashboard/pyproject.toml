@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "inventory-sdk"
+version = "0.1.0"
+description = "Python SDK for querying Ericsson NetCloud Manager inventory — routers, devices, accounts, and more."
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+authors = [
+    {name = "Matthew Schultz"},
+]
+dependencies = [
+    "httpx>=0.27,<1",
+    "pydantic>=2.0,<3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+    "respx>=0.21",
+]
+
+[project.urls]
+Homepage = "https://github.com/mschultz-21/Inventory-SDK"
+Repository = "https://github.com/mschultz-21/Inventory-SDK"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["inventory_sdk*"]

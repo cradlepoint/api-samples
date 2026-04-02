@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Fix Errors After Run",
+  "description": "After running any shell command (typically tests or script execution), the agent reviews the output for errors and iterates on fixes until the code runs clean.",
+  "version": "1",
+  "when": {
+    "type": "postToolUse",
+    "toolTypes": [
+      "shell"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Review the output of the command that just ran. If there are any errors (syntax errors, import errors, runtime exceptions, API errors), diagnose the root cause and fix the code. Re-run until clean. If the error reveals something about the API that isn't documented, make a note to update docs in the reflexion step."
+  }
+}

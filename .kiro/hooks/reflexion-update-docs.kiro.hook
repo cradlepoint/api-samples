@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Reflexion: Update Docs",
+  "description": "After the agent stops, it reviews whether any new API behaviors, gotchas, or patterns were discovered during the session and updates docs/known-issues.md, docs/common-patterns.md, and docs/CHANGELOG.md accordingly. Only updates docs for generally applicable discoveries, not app-specific ones.",
+  "version": "1",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Review the work you just completed. Did you discover any new API behaviors, gotchas, workarounds, or reusable patterns that are NOT already documented in docs/known-issues.md or docs/common-patterns.md? If yes, and if the discovery applies generally (not just to this specific app), update the relevant docs file and append an entry to docs/CHANGELOG.md. If nothing new was discovered, do nothing."
+  }
+}

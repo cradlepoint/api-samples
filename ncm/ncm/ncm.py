@@ -889,7 +889,7 @@ class NcmClientv2(BaseNcmClient):
         get_url = '{0}/groups/'.format(self.base_url)
 
         allowed_params = ['account', 'account__in', 'id', 'id__in', 'name',
-                          'name__in', 'expand', 'limit', 'offset']
+                          'name__in', 'expand', 'fields', 'limit', 'offset']
         params = self.__parse_kwargs(kwargs, allowed_params)
 
         return self.__get_json(get_url, call_type, params=params)

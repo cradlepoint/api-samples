@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Check Docs Before Writing",
+  "description": "Before writing any Python file, the agent checks the NCM API documentation and known issues to ensure the code follows documented patterns and avoids known gotchas.",
+  "version": "1",
+  "when": {
+    "type": "preToolUse",
+    "toolTypes": [
+      "write"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Check if the file being written is a Python (.py) file. If it is NOT a .py file (e.g., it's a .md, .json, .css, .html, or other non-Python file), skip this check entirely and proceed with the write. If it IS a .py file, verify: (1) Have you consulted the relevant docs in docs/ for the API endpoints being used? (2) Have you checked docs/known-issues.md for gotchas? (3) Are you following the patterns in docs/common-patterns.md? (4) Are all API URLs using trailing slashes? (5) Is error handling with retries included? (6) Does the script call check_env() from utils.env_check at startup? If you haven't consulted the docs yet, read the relevant ones now before proceeding."
+  }
+}
