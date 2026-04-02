@@ -4,6 +4,8 @@ Python SDK for querying Ericsson NetCloud Manager inventory — routers, network
 
 Combines the NCM [v2 API](https://developer.cradlepoint.com) (API key auth) and [v3 API](https://developer.cradlepoint.com) (bearer token auth) into a single unified client.
 
+<img width="1718" height="856" alt="image" src="https://github.com/user-attachments/assets/30e4e868-ea99-4465-bd13-c3d3773ef6c2" />
+
 ## Features
 
 - Full v2 + v3 API coverage with typed Pydantic models
