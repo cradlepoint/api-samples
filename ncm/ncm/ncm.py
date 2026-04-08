@@ -100,6 +100,7 @@ https://developer.cradlepoint.com
 
 from requests import Session
 from requests.adapters import HTTPAdapter
+import requests
 from http import HTTPStatus
 from urllib3.util.retry import Retry
 from datetime import datetime, timedelta
@@ -171,7 +172,9 @@ class BaseNcmClient:
 
     def _return_handler(self, status_code, returntext, obj_type):
         """
-        Prints returned HTTP request information if self.logEvents is True.
+        Handles HTTP response status codes. Raises exceptions for error
+        status codes so callers can use try/except for error handling.
+        Returns response data for success codes.
         """
         if str(status_code) == '200':
             return f'{obj_type} operation successful.'
@@ -186,16 +189,28 @@ class BaseNcmClient:
             return returntext
         elif str(status_code) == '400':
             self.log('error', 'Bad Request')
-            return f'ERROR: {status_code}: {returntext}'
+            raise requests.exceptions.HTTPError(
+                f'{status_code}: {returntext}',
+                response=type('Response', (), {'status_code': status_code, 'text': str(returntext)})()
+            )
         elif str(status_code) == '401':
             self.log('error', 'Unauthorized Access')
-            return f'ERROR: {status_code}: {returntext}'
+            raise requests.exceptions.HTTPError(
+                f'{status_code}: {returntext}',
+                response=type('Response', (), {'status_code': status_code, 'text': str(returntext)})()
+            )
         elif str(status_code) == '404':
             self.log('error', 'Resource Not Found\n')
-            return f'ERROR: {status_code}: {returntext}'
+            raise requests.exceptions.HTTPError(
+                f'{status_code}: {returntext}',
+                response=type('Response', (), {'status_code': status_code, 'text': str(returntext)})()
+            )
         elif str(status_code) == '500':
             self.log('error', 'HTTP 500 - Server Error\n')
-            return f'ERROR: {status_code}: {returntext}'
+            raise requests.exceptions.HTTPError(
+                f'{status_code}: {returntext}',
+                response=type('Response', (), {'status_code': status_code, 'text': str(returntext)})()
+            )
         else:
             self.log('info', f'HTTP Status Code: {status_code} - {returntext}\n')
 
@@ -2965,6 +2980,8 @@ class NcmClientv3(BaseNcmClient):
         }
         mac = mac if isinstance(mac, list) else [mac]
         for smac in mac:
+            # Normalize MAC to bare uppercase hex (strip colons, dashes, dots)
+            normalized = smac.upper().replace(':', '').replace('-', '').replace('.', '')
             data = {
                 "op": "add",
                 "data": {
@@ -2972,13 +2989,18 @@ class NcmClientv3(BaseNcmClient):
                     "attributes": {
                         "action": action,
                         "subscription_type": subscription_id,
-                        "mac_address": smac.replace(':','') if len(smac) == 17 else smac
+                        "mac_address": normalized
                     }
                 }
             }
             payload["atomic:operations"].append(data)
 
-        ncm = self.session.post(post_url, json=payload)
+        headers = {
+            'Content-Type': 'application/vnd.api+json;ext="https://jsonapi.org/ext/atomic"',
+            'Accept': 'application/vnd.api+json;ext="https://jsonapi.org/ext/atomic"'
+        }
+
+        ncm = self.session.post(post_url, json=payload, headers=headers)
         result = self._return_handler(ncm.status_code, ncm.json(), call_type)
         return result
 
