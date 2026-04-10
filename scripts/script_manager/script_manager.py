@@ -59,6 +59,8 @@ class CSVEditorHandler(SimpleHTTPRequestHandler):
             self.handle_get_environment_info()
         elif parsed_path.path == '/api/api-keys-status':
             self.handle_get_api_keys_status()
+        elif parsed_path.path == '/api/account-name':
+            self.handle_get_account_name()
         elif parsed_path.path == '/api/script-stream':
             self.handle_script_stream()
         elif parsed_path.path == '/' or parsed_path.path == '/index.html':
@@ -579,6 +581,19 @@ exec(compile(open(r'{script_path}').read(), r'{script_path}', 'exec'))
                 return False
             return True
         
+        # Drain stderr in a background thread to prevent pipe buffer deadlock.
+        # The subprocess may write log messages to stderr (e.g. SDK log_events).
+        # If stderr's OS pipe buffer (~64KB) fills up while we only read stdout,
+        # the subprocess blocks on stderr writes and appears to hang.
+        stderr_lines = []
+        def drain_stderr():
+            for line in iter(proc.stderr.readline, ''):
+                stderr_lines.append(line)
+        
+        import threading
+        stderr_thread = threading.Thread(target=drain_stderr, daemon=True)
+        stderr_thread.start()
+        
         # Stream stdout line by line
         try:
             for line in iter(proc.stdout.readline, ''):
@@ -586,9 +601,9 @@ exec(compile(open(r'{script_path}').read(), r'{script_path}', 'exec'))
                     break
             
             proc.wait()
+            stderr_thread.join(timeout=5)
             
-            # Grab any remaining stderr
-            stderr_output = proc.stderr.read()
+            stderr_output = ''.join(stderr_lines)
             
             # Clean up wrapper
             wrapper_path = info.get('wrapper_path')
@@ -1018,6 +1033,46 @@ if __name__ == '__main__':
             print(f'Error getting API keys status: {str(e)}')
             self.send_error_response('Error getting API keys status')
     
+    def handle_get_account_name(self):
+        """Get the first account name using NCM API v2 keys."""
+        try:
+            cp_api_id = os.environ.get('X_CP_API_ID')
+            cp_api_key = os.environ.get('X_CP_API_KEY')
+            ecm_api_id = os.environ.get('X_ECM_API_ID')
+            ecm_api_key = os.environ.get('X_ECM_API_KEY')
+
+            if not all([cp_api_id, cp_api_key, ecm_api_id, ecm_api_key]):
+                self.send_json_response({'account_name': None, 'error': 'V2 API keys not set'})
+                return
+
+            import sys
+            ncm_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'ncm')
+            if ncm_path not in sys.path:
+                sys.path.insert(0, ncm_path)
+
+            from ncm import ncm as ncm_module
+            api_keys = {
+                'X-CP-API-ID': cp_api_id,
+                'X-CP-API-KEY': cp_api_key,
+                'X-ECM-API-ID': ecm_api_id,
+                'X-ECM-API-KEY': ecm_api_key
+            }
+            client = ncm_module.NcmClientv2(api_keys=api_keys, log_events=False, retries=2)
+            accounts = client.get_accounts()
+
+            if isinstance(accounts, str) and accounts.startswith('ERROR'):
+                self.send_json_response({'account_name': None, 'error': 'API error'})
+                return
+
+            if accounts and isinstance(accounts, list) and len(accounts) > 0:
+                account_name = accounts[0].get('name', 'Unknown')
+                self.send_json_response({'account_name': account_name})
+            else:
+                self.send_json_response({'account_name': None})
+        except Exception as e:
+            print(f'Error getting account name: {str(e)}')
+            self.send_json_response({'account_name': None, 'error': str(e)})
+
     def handle_set_api_keys(self):
         """Set API keys as environment variables. Never returns or logs actual key values."""
         try:

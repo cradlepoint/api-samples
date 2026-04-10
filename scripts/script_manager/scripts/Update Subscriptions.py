@@ -32,9 +32,9 @@ Requirements:
 
 import csv
 import os
+import re
 import sys
 from ncm import ncm
-import ncm as ncm_v2
 
 if len(sys.argv) < 2:
     print("Error: CSV filename required")
@@ -76,35 +76,77 @@ with open(csv_filename, 'r') as f:
     
     devices = []
     for row in reader:
-        # Get device MAC
-        if id_col:
-            router_id = row[id_col].strip()
-            routers = ncm_v2.get_routers(id=router_id)
-        elif mac_col:
-            routers = ncm_v2.get_routers(mac=row[mac_col].strip())
-        else:
-            routers = ncm_v2.get_routers(serial_number=row[serial_col].strip())
-        
-        if routers:
-            mac = routers[0]['mac'].lower().replace(':', '')
-            sub_id = row[sub_col].strip()
+        sub_id = row[sub_col].strip()
+
+        # If CSV has MAC directly, use it without an API call
+        if not id_col and mac_col:
+            mac = row[mac_col].strip().upper().replace(':', '').replace('-', '')
+            if not mac:
+                print(f"Warning: Empty MAC in CSV row, skipping")
+                continue
             devices.append({'mac': mac, 'subscription_id': sub_id})
+            continue
+
+        # For serial or ID lookups, use the v3 client's get_asset_endpoints
+        if not id_col and serial_col:
+            assets = ncm_client.get_asset_endpoints(serial_number=row[serial_col].strip())
+        else:
+            assets = ncm_client.get_asset_endpoints(id=row[id_col].strip())
+
+        if assets:
+            # v3 asset_endpoints returns mac_address in bare uppercase hex (e.g. 0030441A2B3C)
+            mac = assets[0].get('attributes', {}).get('mac_address', '').upper().replace(':', '').replace('-', '')
+            if mac:
+                devices.append({'mac': mac, 'subscription_id': sub_id})
+            else:
+                print(f"Warning: No MAC found for device {row.get(id_col or serial_col, 'unknown')}")
+        else:
+            print(f"Warning: Device not found: {row.get(id_col or serial_col, 'unknown')}")
 
 print(f"Found {len(devices)} devices to regrade")
 
-# Group by subscription_id
+# Validate MAC format (must be exactly 12 hex digits)
+valid_mac = re.compile(r'^[0-9A-F]{12}$')
+invalid_count = 0
+
+# Group by subscription_id, deduplicating MACs within each group
 subscription_groups = {}
 for device in devices:
     sub_id = device['subscription_id']
+    mac = device['mac']
+    if not valid_mac.match(mac):
+        invalid_count += 1
+        print(f"Warning: Skipping invalid MAC '{mac}' (must be 12 hex digits)")
+        continue
     if sub_id not in subscription_groups:
-        subscription_groups[sub_id] = []
-    subscription_groups[sub_id].append(device['mac'])
+        subscription_groups[sub_id] = set()
+    subscription_groups[sub_id].add(mac)
 
-for subscription_id, mac_addresses in subscription_groups.items():
-    print(f"Processing {len(mac_addresses)} devices with subscription: {subscription_id}")
+if invalid_count:
+    print(f"Skipped {invalid_count} devices with invalid MACs")
+
+total_success = 0
+total_failed = 0
+total_chunks = 0
+
+for subscription_id, mac_set in subscription_groups.items():
+    mac_addresses = list(mac_set)
+    print(f"Processing {len(mac_addresses)} unique devices with subscription: {subscription_id}")
     for chunk in chunks(mac_addresses, 100):
+        total_chunks += 1
         try:
             result = ncm_client.regrade(subscription_id, chunk)
             print(f"Chunk result: {result}")
+            total_success += len(chunk)
         except Exception as e:
             print(f"Error: {e}")
+            total_failed += len(chunk)
+
+dupes = len(devices) - invalid_count - sum(len(s) for s in subscription_groups.values())
+print(f"\n--- Summary ---")
+print(f"CSV rows:     {len(devices)}")
+print(f"Invalid MACs: {invalid_count}")
+print(f"Duplicates:   {dupes}")
+print(f"Submitted:    {total_success + total_failed} in {total_chunks} chunks")
+print(f"Succeeded:    {total_success}")
+print(f"Failed:       {total_failed}")

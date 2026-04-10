@@ -1556,6 +1556,30 @@ if __name__ == '__main__':
                         }
                     }
                 });
+
+                // If all v2 keys are loaded, fetch the account name
+                const allV2Loaded = data['X_CP_API_ID'] === true &&
+                    data['X_CP_API_KEY'] === true &&
+                    data['X_ECM_API_ID'] === true &&
+                    data['X_ECM_API_KEY'] === true;
+
+                const accountRow = document.getElementById('accountNameRow');
+                const accountEl = document.getElementById('accountName');
+                if (allV2Loaded) {
+                    fetch('/api/account-name')
+                        .then(r => r.json())
+                        .then(result => {
+                            if (result.account_name) {
+                                accountEl.textContent = result.account_name;
+                                accountRow.style.display = '';
+                            } else {
+                                accountRow.style.display = 'none';
+                            }
+                        })
+                        .catch(() => { accountRow.style.display = 'none'; });
+                } else {
+                    accountRow.style.display = 'none';
+                }
             })
             .catch(error => {
                 // Security: Don't log any key-related information

@@ -88,3 +88,26 @@ automatically by the reflexion system.
 - Added known issue: POST modem_upgrades returns 200, not 201 as spec claims.
 - Added known issue: Request body `data.type` must be `"modem_upgrades"` (collection name), not `"modem_upgrade_parent"` as spec documents. Response still uses `"modem_upgrade_parent"`.
 - Added known issue: 409 Conflict is overloaded — rate limit (retryable) vs JSON:API validation error (not retryable). Check for `errors` array in body to distinguish.
+
+## 2026-04-07 — Documented SDK module-level delegation hang with v3-only credentials
+
+- Added known issue: calling v2 methods (e.g. `get_routers()`) via module-level SDK delegation (`import ncm; ncm.get_routers(...)`) silently hangs when only v3 credentials are set. The auto-initialized v3 singleton sends unauthenticated requests to the v2 base URL, and the retry adapter causes indefinite blocking. Use `NcmClientv3` directly with v3 equivalents instead.
+
+## 2026-04-07 — Documented v2 router ID vs v3 asset endpoint ID mismatch
+
+- Added known issue: v2 router IDs and v3 asset endpoint IDs are completely different ID spaces for the same physical device. Using a v2 router ID with `get_asset_endpoints(id=...)` returns wrong results or nothing. Use `mac_address` or `serial_number` as the cross-reference key instead.
+
+## 2026-04-07 — SDK review: error handling, regrade header bug, MAC normalization
+
+- Added known issue: SDK `_return_handler` returns error strings instead of raising exceptions. API errors are invisible to try/except. v2 `__get_json` silently returns empty/partial results on non-2xx; v3 returns a string where a list is expected.
+- Added known issue: SDK `regrade()` is missing the JSON:API atomic extension Content-Type/Accept headers that `unlicense_devices()` correctly sets. This can cause 400 errors even when the payload is correct.
+- Added known issue: SDK `regrade()` MAC normalization only strips colons for 17-char strings. Dash-separated, dot-separated, and lowercase MACs pass through malformed. Always pre-normalize to bare uppercase hex.
+
+## 2026-04-09 — Documented expand=group performance advantage over separate /groups/ fetch
+
+- Added known issue: on large accounts, fetching `/groups/` separately can return 4000+ groups across many paginated requests, taking minutes. Using `expand=group` on the `/routers/` call inlines group data directly and is dramatically faster. Always prefer `expand` over separate lookup fetches.
+
+## 2026-04-09 — Documented v3 regrades batch validation rules
+
+- Added known issue: v3 regrades endpoint rejects entire batch if duplicate MAC addresses appear in a single request. Deduplicate before sending.
+- Added known issue: v3 regrades endpoint requires MAC addresses to be exactly 12 hex digits with no separators. Validate format before sending.

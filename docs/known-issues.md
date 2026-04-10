@@ -65,6 +65,76 @@ This field still appears in responses but returns inaccurate data since 12/31/20
 ### Environment Variable Loading
 The SDK checks `CP_BASE_URL` for v2 and `CP_BASE_URL_V3` for v3 base URLs.
 
+### Module-Level SDK Delegation Hangs with v3-Only Credentials (discovered 2026-04-07)
+Using the SDK's module-level method delegation (`import ncm; ncm.get_routers(...)`)
+auto-initializes a singleton via `get_ncm_instance()`. If only a v3 token is set
+(no v2 API keys), the singleton is a `NcmClientv3`. Calling a v2-only method like
+`get_routers()` on it will not raise an error — instead, the v2 `__get_json`
+pagination loop sends requests to the v2 base URL without proper auth headers.
+The SDK's retry adapter (5 retries, exponential backoff on 408/503/504) causes
+the script to appear to hang indefinitely with no output.
+
+Workaround: in v3-only scripts, do NOT use module-level delegation for v2 methods.
+Either instantiate `NcmClientv3` directly and use v3 equivalents (e.g.
+`get_asset_endpoints()` instead of `get_routers()`), or ensure all four v2 API
+keys are set in the environment.
+
+### SDK `_return_handler` Returns Error Strings Instead of Raising Exceptions (discovered 2026-04-07)
+The SDK's `_return_handler` method returns error information as strings
+(e.g. `"ERROR: 400: {...}"`) for 400, 401, 404, and 500 status codes instead
+of raising exceptions. This means `try/except` blocks around SDK calls will
+NOT catch API errors. Callers must inspect the return value to detect failures.
+In v2's `__get_json`, non-2xx responses silently `break` out of the pagination
+loop and return partial (possibly empty) results with no error indication at all.
+In v3's `__get_json`, the error string is returned directly, so code expecting
+a list will receive a string instead.
+
+Workaround: check return values explicitly. For v3 methods, check if the result
+is a string starting with `"ERROR:"` or is not a list. For v2 GET methods,
+an unexpectedly empty list may indicate a silent error.
+
+### SDK `regrade()` Missing JSON:API Atomic Extension Header (discovered 2026-04-07)
+The `regrade()` method sends an `atomic:operations` payload but does not set
+the required JSON:API atomic extension Content-Type header. Compare with
+`unlicense_devices()`, which correctly sets:
+```
+Content-Type: application/vnd.api+json;ext="https://jsonapi.org/ext/atomic"
+Accept: application/vnd.api+json;ext="https://jsonapi.org/ext/atomic"
+```
+The missing header can cause the API to reject the request with a 400 error
+(e.g. `"mac_address must be specified"`) even when the field is present in
+the payload, because the server doesn't parse the atomic operations format
+without the extension header.
+
+### SDK `regrade()` MAC Normalization Only Handles Colons (discovered 2026-04-07)
+The `regrade()` method normalizes MAC addresses by stripping colons only when
+the input is exactly 17 characters (`len(smac) == 17`). This misses:
+- Dash-separated MACs (`00-30-44-1A-2B-3C`, 17 chars) — colons are stripped
+  (finding none), dashes pass through
+- Dot-separated Cisco format (`0030.441A.2B3C`, 14 chars) — passes through
+  with dots intact
+- Lowercase MACs — passed through as-is (API may expect uppercase)
+
+Workaround: always normalize MACs to bare uppercase hex before passing to
+`regrade()`: `mac.upper().replace(':', '').replace('-', '').replace('.', '')`
+
+### v3 Regrades Endpoint Rejects Duplicate MACs in a Single Batch (discovered 2026-04-09)
+The `POST /asset_endpoints/regrades` atomic operations endpoint rejects the
+entire batch with a `400 Bad Request` if the same `mac_address` value appears
+more than once across operations in a single request. The error message is:
+`"mac_address values must only occur once"`. This applies per-request, not
+globally — the same MAC can appear in separate requests. Always deduplicate
+MAC addresses within each batch before sending.
+
+### v3 Regrades Endpoint Requires Exactly 12 Hex Digits for MAC (discovered 2026-04-09)
+The `POST /asset_endpoints/regrades` endpoint strictly validates that
+`mac_address` is exactly 12 hexadecimal characters (uppercase or lowercase,
+no separators). Any other format — including MACs with colons, dashes, dots,
+or fewer/more than 12 characters — returns `400 Bad Request` with:
+`"mac_address must be 12 digit hexadecimal with optional colons"`. Despite
+the error message mentioning "optional colons", bare 12-digit hex is the
+safest format. Validate with `^[0-9A-Fa-f]{12}$` before sending.
+
 ---
 
 ## Discovered Issues Log
@@ -119,6 +189,15 @@ When fetching routers without the `fields` parameter, relational fields like `gr
 To get human-readable values, either use `expand=group` on the request, or build
 a lookup dict from a separate `get_groups()` call. The `full_product_name` field
 does return the model name directly (e.g. "AER1600").
+
+### Prefer `expand=group` Over Separate `/groups/` Fetch (discovered 2026-04-09)
+On large accounts the `/groups/` endpoint can return thousands of groups (4000+),
+requiring many paginated requests that take minutes to complete. Using
+`expand=group` on the `/routers/` call is dramatically faster because the API
+inlines the group object (with `name`, `id`, etc.) directly into each router
+response, eliminating the separate fetch entirely. The same applies to
+`expand=account`. Always prefer `expand` over a separate lookup fetch when you
+only need the related resource's name or ID.
 
 ### v3 Subscriptions Have No `status` Field (discovered 2026-04-01)
 The v3 `/subscriptions/` endpoint returns `attributes.start_time` and
@@ -180,6 +259,15 @@ forever. Use `params=None` instead of `params={}` on subsequent pagination
 requests where the query parameters are already embedded in the `next` URL.
 
 ### v3 asset_endpoint Subscription IDs Are Assignment-Level, Not Parent (discovered 2026-04-01)
+
+### v2 Router IDs and v3 Asset Endpoint IDs Are Different ID Spaces (discovered 2026-04-07)
+The v2 `/routers/` endpoint assigns numeric IDs (e.g. `1234567`) to devices.
+The v3 `/asset_endpoints` endpoint has its own `id` field that does NOT
+correspond to the v2 router ID. Passing a v2 router ID to
+`get_asset_endpoints(id=...)` (which becomes `filter[id]=1234567`) will
+return the wrong device or no results. To cross-reference between v2 and v3,
+use a shared natural key like `mac_address` or `serial_number` instead of
+either system's internal ID.
 The `subscription_ids` on v3 `/asset_endpoints` are per-device assignment IDs
 (e.g. `4c03Hj1hALlWWvK`), NOT the parent subscription IDs returned by an
 unfiltered `GET /subscriptions` (e.g. `55050000002xYV9`). These two ID spaces
