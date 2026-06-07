@@ -1,5 +1,6 @@
 ---
 inclusion: auto
+description: Reflexion workflow — the self-improving loop where the AI consults docs, builds code, reflects on discoveries, and updates docs/known-issues/patterns/CHANGELOG when new gotchas or reusable patterns are found.
 ---
 
 # Reflexion Workflow System

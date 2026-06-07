@@ -1,5 +1,6 @@
 ---
 inclusion: auto
+description: Code standards for NCM scripts — virtual environment usage, required environment variables, file structure template, authentication, error handling, and output conventions.
 ---
 
 # Code Standards for NCM Scripts
@@ -26,16 +27,20 @@ All scripts require these environment variables for API authentication:
 
 | Variable | Description |
 |----------|-------------|
-| `CP_API_ID` | Cradlepoint API ID |
-| `CP_API_KEY` | Cradlepoint API Key |
-| `ECM_API_ID` | ECM API ID |
-| `ECM_API_KEY` | ECM API Key |
+| `X_CP_API_ID` | Cradlepoint API ID |
+| `X_CP_API_KEY` | Cradlepoint API Key |
+| `X_ECM_API_ID` | ECM API ID |
+| `X_ECM_API_KEY` | ECM API Key |
 
 Optional (for v3 API):
 
 | Variable | Description |
 |----------|-------------|
-| `CP_API_TOKEN` | Bearer token for API v3 |
+| `NCM_API_TOKEN` | Bearer token for API v3 |
+
+**Important**: The env var names use the `X_` prefix (matching the HTTP header names
+`X-CP-API-ID`, etc. with dashes replaced by underscores). Do NOT use the unprefixed
+`CP_API_ID` form — that is incorrect.
 
 ### If env vars are not set, scripts must detect this and print setup instructions.
 
@@ -53,31 +58,31 @@ Run it again anytime to update credentials.
 
 **Manual setup — macOS / Linux (bash/zsh):**
 ```bash
-export CP_API_ID="your_cp_api_id"
-export CP_API_KEY="your_cp_api_key"
-export ECM_API_ID="your_ecm_api_id"
-export ECM_API_KEY="your_ecm_api_key"
-export CP_API_TOKEN="your_v3_token"  # optional, for v3 API
+export X_CP_API_ID="your_cp_api_id"
+export X_CP_API_KEY="your_cp_api_key"
+export X_ECM_API_ID="your_ecm_api_id"
+export X_ECM_API_KEY="your_ecm_api_key"
+export NCM_API_TOKEN="your_v3_token"  # optional, for v3 API
 ```
 To persist, add these to `~/.zshrc` (macOS) or `~/.bashrc` (Linux).
 
 **Windows (PowerShell):**
 ```powershell
-$env:CP_API_ID = "your_cp_api_id"
-$env:CP_API_KEY = "your_cp_api_key"
-$env:ECM_API_ID = "your_ecm_api_id"
-$env:ECM_API_KEY = "your_ecm_api_key"
-$env:CP_API_TOKEN = "your_v3_token"  # optional, for v3 API
+$env:X_CP_API_ID = "your_cp_api_id"
+$env:X_CP_API_KEY = "your_cp_api_key"
+$env:X_ECM_API_ID = "your_ecm_api_id"
+$env:X_ECM_API_KEY = "your_ecm_api_key"
+$env:NCM_API_TOKEN = "your_v3_token"  # optional, for v3 API
 ```
 To persist, use System Properties → Environment Variables, or add to your PowerShell profile.
 
 **Windows (Command Prompt):**
 ```cmd
-set CP_API_ID=your_cp_api_id
-set CP_API_KEY=your_cp_api_key
-set ECM_API_ID=your_ecm_api_id
-set ECM_API_KEY=your_ecm_api_key
-set CP_API_TOKEN=your_v3_token  &REM optional, for v3 API
+set X_CP_API_ID=your_cp_api_id
+set X_CP_API_KEY=your_cp_api_key
+set X_ECM_API_ID=your_ecm_api_id
+set X_ECM_API_KEY=your_ecm_api_key
+set NCM_API_TOKEN=your_v3_token  &REM optional, for v3 API
 ```
 
 ## File Structure
@@ -132,3 +137,16 @@ if __name__ == '__main__':
 - Core: `requests`, `ncm` (SDK)
 - Check `requirements.txt` before adding new dependencies
 - If a new dependency is needed, add it to `requirements.txt`
+
+## Web Servers (socketserver / http.server)
+
+When using Python's built-in `socketserver.TCPServer` for development web apps:
+- **Always set `allow_reuse_address = True`** before creating the server instance.
+  Without this, the port stays locked after Ctrl+C and the script fails with
+  "Port already in use" on restart.
+
+```python
+socketserver.TCPServer.allow_reuse_address = True
+with socketserver.TCPServer(("", PORT), MyHandler) as httpd:
+    httpd.serve_forever()
+```

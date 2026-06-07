@@ -131,7 +131,9 @@ GET /api/v2/net_devices/{id}/
 
 Key fields: `id`, `router`, `name`, `mode` (wan/lan/mdm), `carrier`, `type`, `is_connected`
 
-Filters: `router`, `router__in`, `mode`, `mode__in`, `id`, `id__in`
+Filters: `router`, `router__in`, `mode`, `mode__in`, `id`, `id__in`, `account`, `account__in`, `connection_state`, `connection_state__in`, `is_asset`, `ipv4_address`, `ipv4_address__in`
+
+Expand: `router`, `account`
 
 **Deprecated field**: `is_upgrade_available` (as of 12/31/2023)
 
@@ -141,7 +143,9 @@ Filters: `router`, `router__in`, `mode`, `mode__in`, `id`, `id__in`
 GET /api/v2/net_device_metrics/
 ```
 
-Filters: `net_device`, `net_device__in`, `created_at`, `created_at__gt`, `created_at__lt`
+Key fields: `id` (same as net_device ID), `net_device` (URL), `rsrp`, `rsrq`, `rssi`, `rssnr`, `sinr`, `dbm`, `cinr`, `ecio`, `signal_strength` (0–100), `service_type` (LTE/WiFi/Ethernet), `cell_id`, `mcc`, `mnc`, `tac`, `lac`, `bytes_in`, `bytes_out`, `update_ts`, `bmask_applied`
+
+Filters: `net_device`, `net_device__in`, `update_ts__gt`, `update_ts__lt`, `bmask_applied`
 
 ## net_device_signal_samples
 
@@ -164,6 +168,10 @@ Filters: `net_device`, `net_device__in`, `created_at`, `created_at__gt`, `create
 ```
 GET /api/v2/net_device_health/
 ```
+
+Key fields: `id`, `net_device` (URL), `cellular_health_category` (poor/fair/good/excellent), `cellular_health_score` (0–100), `resource_url`
+
+Filters: `net_device`, `id__gt`, `id__gte`, `id__lt`, `id__lte`
 
 ## alerts
 

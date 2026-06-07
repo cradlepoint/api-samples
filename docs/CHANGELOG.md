@@ -111,3 +111,61 @@ automatically by the reflexion system.
 
 - Added known issue: v3 regrades endpoint rejects entire batch if duplicate MAC addresses appear in a single request. Deduplicate before sending.
 - Added known issue: v3 regrades endpoint requires MAC addresses to be exactly 12 hex digits with no separators. Validate format before sending.
+
+## 2026-04-28 — Documented v2/v3 architectural separation (no cross-referencing)
+
+- Added known issue: v2 and v3 are fully separate API systems with different auth, ID types, specs, and relationship models. v3 relationships only reference other v3 resources — you cannot resolve them via v2 endpoints. When migrating, all related resource lookups must also move to v3.
+
+## 2026-05-13 — Documented Cradlepoint .bin file compression variance
+- Added known issue: Cradlepoint config .bin files use varying compression formats (zlib, raw deflate, gzip); must try multiple wbits values when decoding
+- Added known issue: Cradlepoint .bin config files contain both "config" and "state" top-level keys; only "config" is needed for templating
+- Added known issue: Cradlepoint config JSON contains raw control characters (newlines in YAML/PEM strings); use json.loads(strict=False)
+
+## 2026-05-14 — Documented v2 resource_url hostname variance and device_apps string IDs
+
+- Added known issue: v2 `resource_url` fields can use different base hostnames across regional shards (e.g. `www.us0.cradlepointecm.com` vs `www.cradlepointecm.com`). Match on extracted numeric ID, not full URL strings.
+- Added known issue: v2 `device_apps` endpoint returns `id` as a string, not an integer. Use string keys in lookup dictionaries.
+
+## 2026-05-14 — Corrected: expand=account IS supported on /groups/
+
+- Corrected known-issues.md: `expand=account` works on `/groups/` — inlines account object with `name`, `id`, etc. Updated list of endpoints known to support `expand`.
+
+## 2026-06-05 — Documented net_device_health returns all device types
+
+- Added known issue: `net_device_health` endpoint returns records for ALL net_device modes (wan, lan, mdm), not just cellular/WAN. Filtering `get_net_devices(mode='wan')` when joining causes silent data loss. Always fetch all net_devices when correlating with health data.
+
+## 2026-06-06 — Documented net_device_health, net_devices, and metrics relationship
+
+- Added known issue: `net_device_health` only returns `cellular_health_category` and `cellular_health_score` — no signal metrics. Use `net_device_metrics` for RSSI/RSRP/RSRQ/SINR.
+- Added known issue: `net_devices` do not contain signal fields; those are only on `net_device_metrics`.
+- Added known issue: `net_devices` `router` field can be null for orphaned/unassigned modems.
+- Added known issue: v2 API IDs are returned as strings, not integers. Normalize to strings for lookups.
+- Documented the correct 4-endpoint pattern for building cellular health dashboards.
+
+## 2026-06-06 — Corrected is_asset documentation, documented expand=router on net_devices
+
+- Corrected known-issues.md: `is_asset` on `/net_devices/` is officially documented in the Swagger spec, not "undocumented".
+- Added known issue: `/net_devices/` supports `expand=router` and `expand=account`, inlining the full router/account object. Eliminates separate fetch.
+
+## 2026-06-06 — Documented net_device_metrics response schema and expand limitations
+
+- Added known issue: `net_device_metrics` full response schema documented (signal_strength not signal_percent, cell info, usage fields). ID equals net_device ID.
+- Added known issue: `expand=router` on `/net_devices/` only expands one level — nested relations (group, account) remain as URLs. Must resolve separately.
+
+## 2026-06-06 — Full API documentation generated, documented 409 filter requirement
+
+- Generated `docs/api-v2-full-reference.md` — complete endpoint reference with query params and response fields for all 30 v2 endpoints.
+- Generated `docs/api-documentation-gaps.md` — documents endpoints that require filters, POST-only endpoints, and missing response schemas in Swagger specs.
+- Added known issue: v2 time-series endpoints (signal_samples, usage_samples, state_samples, logs, historical_locations) return 409 Conflict without a required `router` or `net_device` filter. This is a validation error, not a rate limit.
+
+## 2026-06-06 — Documented v3 token env var naming inconsistency
+
+- Added known issue: v3 bearer token env var name is not standardized across the project. Scripts use `TOKEN`, `NCM_API_TOKEN`, or `V3_BEARER_TOKEN` depending on the script. `CP_API_TOKEN` in env_check.py isn't used by any actual script.
+
+## 2026-06-06 — Standardized v3 token env var name to `NCM_API_TOKEN`
+
+- Refactored all scripts to use `NCM_API_TOKEN` as the single env var for the v3 bearer token.
+- Removed `TOKEN` fallback from: Create NCX Resources, Create NCX Sites, Unlicense Devices, Update Subscriptions, script_manager scripts.
+- Changed `V3_BEARER_TOKEN` to `NCM_API_TOKEN` in Inventory Dashboard files.
+- Changed `CP_API_TOKEN` to `NCM_API_TOKEN` in scripts/utils/env_check.py and steering files.
+- Updated known-issues.md to reflect the standardization.

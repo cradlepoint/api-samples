@@ -1,243 +1,136 @@
 # API Samples
 
-A collection of Python scripts for interacting with Ericsson NetCloud Manager APIs.
+A collection of Python scripts and web applications for interacting with Ericsson NetCloud Manager APIs.
 
 ## Getting Started
 
 ### Prerequisites
 
-- Python 3.7 or higher — Windows users, see the [Windows Python Setup Guide](WINDOWS_PYTHON_SETUP.md) if `python` isn't working in your terminal
+- Python 3.9 or higher — Windows users, see the [Windows Python Setup Guide](WINDOWS_PYTHON_SETUP.md)
 - Git (optional, for cloning the repository)
 
 ### Download and Extract the Repository
 
-**Using Git (Recommended):**
 ```bash
 git clone <repository-url>
 cd api-samples
 ```
 
-**Downloading as ZIP:**
-1. Download the repository as a ZIP file
-2. Extract the ZIP file to your desired location
-3. Navigate to the extracted `api-samples` folder
-
-```bash
-cd path/to/extracted/api-samples
-```
-
 ## Setup
 
-### 1. Create a Python Virtual Environment
+Run the setup script to create the virtual environment, install dependencies, and configure API credentials:
 
-Creating a virtual environment isolates project dependencies from your system Python installation.
-
-**Windows:**
-```cmd
-python -m venv .venv
-.venv\Scripts\activate
+```bash
+python3 setup_env.py
 ```
 
-**macOS (zsh):**
+This handles everything — venv creation, `pip install`, and credential configuration. After setup:
+
 ```bash
-python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-After activation, you should see `(.venv)` at the beginning of your command prompt, indicating the virtual environment is active.
+### Manual Setup (alternative)
 
-### 2. Install Dependencies
-
-With your virtual environment activated, install the required packages:
+If you prefer to set things up manually:
 
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-This will install all required dependencies including:
-- `ncm` - Ericsson NetCloud Manager Python library
-- `flask` - Web framework (for Script Manager)
-- `werkzeug` - WSGI utilities
-- `python-dateutil` - Date parsing utilities
+Set API keys:
 
-### 3. Set API Keys as Environment Variables
-
-You need to set your NCM API credentials as environment variables. The scripts will automatically use these when running.
-
-**Windows:**
-```cmd
-set X_CP_API_ID=your_api_id
-set X_CP_API_KEY=your_api_key
-set X_ECM_API_ID=your_ecm_api_id
-set X_ECM_API_KEY=your_ecm_api_key
-set TOKEN=your_ncm_api_v3_token
-```
-
-To make these persistent in Windows, go to System Properties > Environment Variables and add them there.
-
-**macOS (zsh):**
 ```bash
 export X_CP_API_ID="your_api_id"
 export X_CP_API_KEY="your_api_key"
 export X_ECM_API_ID="your_ecm_api_id"
 export X_ECM_API_KEY="your_ecm_api_key"
-export TOKEN="your_ncm_api_v3_token"
+export NCM_API_TOKEN="your_v3_bearer_token"  # optional, for v3 API
 ```
 
-To make these persistent, add them to your `~/.zshrc`:
+Dashboard apps also support configuring credentials via the Settings panel in the UI.
+
+## Project Structure
+
+```
+api-samples/
+├── web_apps/            # Web applications and dashboards
+├── scripts/             # Standalone Python scripts and utilities
+├── ncm/                 # NCM Python SDK source (also pip installable)
+├── ncm2/                # NCM Python SDK v2+v3 variant
+├── docs/                # API documentation and references
+└── postman-collection/  # Postman API collection
+```
+
+## Web Apps & Dashboards
+
+All web applications live in `web_apps/`. See [web_apps/README.md](web_apps/README.md) for full details.
+
+| App | Port | Description |
+|-----|------|-------------|
+| [inventory_dashboard](web_apps/inventory_dashboard/) | 8060 | Device inventory with license status, subscriptions, modem info |
+| [cellular_health_dashboard](web_apps/cellular_health_dashboard/) | 8055 | Cellular health scores and signal metrics |
+| [script_manager](web_apps/script_manager/) | 8000 | CSV editor and NCM script runner with web UI |
+| [config_builder](web_apps/config_builder/) | 8100 | Build JSON configurations from templates |
+| [assign_sdk](web_apps/assign_sdk/) | 9000 | Assign SDK app versions to router groups |
+| [cisco_to_cradlepoint_zfw_converter](web_apps/cisco_to_cradlepoint_zfw_converter/) | 5001 | Convert Cisco configs to Cradlepoint zone firewall |
+| [ncm_api_key_encryptor](web_apps/ncm_api_key_encryptor/) | 8000 | Encrypt API keys for SDK app configs |
+| [netcloud_router_lookup](web_apps/netcloud_router_lookup/) | 8000 | Look up router info by serial/MAC |
+
+### Running a Web App
+
 ```bash
-echo 'export X_CP_API_ID="your_api_id"' >> ~/.zshrc
-echo 'export X_CP_API_KEY="your_api_key"' >> ~/.zshrc
-echo 'export X_ECM_API_ID="your_ecm_api_id"' >> ~/.zshrc
-echo 'export X_ECM_API_KEY="your_ecm_api_key"' >> ~/.zshrc
-echo 'export TOKEN="your_ncm_api_v3_token"' >> ~/.zshrc
-source ~/.zshrc
+python web_apps/inventory_dashboard/serve.py
 ```
 
 ## Sample Scripts
 
-This repository contains many sample scripts in the `scripts/` folder that demonstrate various API interactions and use cases. These scripts cover a wide range of functionality including:
+The `scripts/` folder contains standalone Python scripts demonstrating various API interactions:
 
 - Router management and configuration
-- Alert creation and management
-- User management
-- Location tracking and historical data export
-- Device metrics and signal samples
-- Configuration backups and restoration
-- Subscription management
-- Device licensing operations
-- And much more
+- User management (v3 API)
+- Subscription management and regrades
+- Device licensing and unlicensing
+- Configuration backups
 
-Browse the [scripts](scripts/) folder to explore all available sample scripts.
-
-### Running Scripts
-
-Make sure your virtual environment is activated before running scripts.
-
-**Windows:**
-```cmd
-python script_name.py
-```
-
-**macOS:**
 ```bash
-python3 script_name.py
+python scripts/<script_name>.py
 ```
-
-Many scripts accept command-line arguments. Check the script's docstring or run it with `--help` (if supported) for usage information.
 
 ## Script Manager
 
-For a convenient web-based interface to manage CSV files, API keys, and run scripts, check out the Script Manager.
+Web-based interface for managing CSV files, API keys, and running scripts:
 
-The Script Manager provides:
-- Web-based CSV file editor
-- API key management interface
-- Script execution interface
-- Easy script management and organization
-- Displays script instructions from docstrings
+```bash
+python web_apps/script_manager/script_manager.py
+```
 
-### Using Script Manager
-
-1. Navigate to the Script Manager directory:
-   ```bash
-   cd scripts/script_manager
-   ```
-
-2. Make sure your virtual environment is activated
-
-3. Start the web server:
-
-   **Windows:**
-   ```cmd
-   python script_manager.py
-   ```
-
-   **macOS:**
-   ```bash
-   python3 script_manager.py
-   ```
-
-4. Open your browser to `http://localhost:8000`
-
-5. Use the web interface to:
-   - Load and edit CSV files
-   - Set API keys (stored in session)
-   - Select and run scripts
-   - View script documentation
-
-### Available Scripts in Script Manager
-
-The Script Manager includes several pre-configured scripts:
-
-- **Configure Devices.py** - Bulk configure multiple devices with custom configurations
-- **Create NCX Resources.py** - Create NCX resources from CSV data
-- **Create NCX Sites.py** - Create NCX sites from CSV data
-- **Create Users.py** - Create and manage users in NCM API v3
-- **Get Router Status.py** - Get router status and information using identifiers
-- **Set Router Fields.py** - Update router fields (name, description, asset_id, custom1, custom2)
-- **Unlicense Devices.py** - Unlicense devices
-- **Unregister Routers.py** - Unregister routers in batches with logging
-- **Update Subscriptions.py** - Apply or regrade device subscriptions
-
-Each script includes detailed documentation in its docstring explaining the required CSV format and usage.
+Open http://localhost:8000 in your browser.
 
 ## Postman Collection
 
-For a convenient way to test and explore the Ericsson NetCloud Manager APIs, you can use the **Ericsson NCM API Postman Collection**. This collection contains pre-configured API requests that you can use to interact with the APIs directly from Postman.
+Pre-configured API requests for testing NCM endpoints in Postman. Import `postman-collection/Ericsson NCM API Postman Collection.json` into Postman.
 
-### Downloading the Collection File from GitHub
+## Documentation
 
-If you only need the Postman collection file without cloning the entire repository:
+The `docs/` folder contains detailed API references:
 
-1. Navigate to the file on GitHub: `Ericsson NCM API Postman Collection.json`
-2. Click the **Download** button (or **Download raw file** icon) in the top right
-3. Save the file to your computer
-
-### Importing the Collection
-
-1. Open Postman
-2. Click **Import** in the top left corner
-3. Select **File** or **Upload Files**
-4. Navigate to and select the `Ericsson NCM API Postman Collection.json` file
-5. Click **Import**
-
-The collection will now appear in your Postman workspace. You can use it to explore and test the various API endpoints.
+- [API Overview](docs/api-overview.md) — auth, base URLs, pagination
+- [v2 Endpoints](docs/api-v2-endpoints.md) — routers, groups, net_devices, etc.
+- [v3 Endpoints](docs/api-v3-endpoints.md) — subscriptions, asset_endpoints, users
+- [SDK Reference](docs/ncm-sdk-reference.md) — Python SDK methods
+- [Known Issues](docs/known-issues.md) — API gotchas and workarounds
+- [Common Patterns](docs/common-patterns.md) — reusable code patterns
 
 ## Troubleshooting
 
-### Virtual Environment Issues
+**Missing API keys:** Verify environment variables are set, or use the Settings panel in dashboard apps.
 
-**Problem:** `python` or `python3` command not found
-- **Windows:** Make sure Python is installed and added to PATH
-- **macOS:** Use `python3` explicitly, or install Python via Homebrew
+**ModuleNotFoundError:** Make sure your venv is activated and `pip install -r requirements.txt` was run.
 
-**Problem:** Virtual environment activation fails
-- Make sure you're in the correct directory when creating the virtual environment
-
-### Windows Python PATH Issues
-
-**Problem:** `python` isn't recognized, or typing `python` opens the Microsoft Store
-- Follow the [Windows Python Setup Guide](WINDOWS_PYTHON_SETUP.md) for step-by-step instructions on installing Python correctly and configuring your PATH on Windows 11.
-
-### API Key Issues
-
-**Problem:** Scripts report missing API keys
-- Verify environment variables are set correctly
-- Make sure your virtual environment is activated
-- Check that variable names match exactly (case-sensitive on macOS)
-- For Script Manager, use the API Keys tab in the web interface
-
-### Import Errors
-
-**Problem:** `ModuleNotFoundError` when running scripts
-- Make sure your virtual environment is activated
-- Verify dependencies are installed: `pip install -r requirements.txt`
-- Some scripts may require additional dependencies - check the script's docstring
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+**Port already in use:** Kill the existing process (`lsof -ti:<port> | xargs kill`) or use a different port.
 
 ## License
 

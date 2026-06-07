@@ -150,6 +150,16 @@ conventions for credentials. Mixing them up causes silent auth failures.
 
 If using `get_credentials()` with the SDK, you must remap the keys to HTTP header names.
 
+### v3 Bearer Token Environment Variable Name Is Standardized as `NCM_API_TOKEN` (discovered 2026-06-06)
+The standard env var name for the v3 bearer token in this project is `NCM_API_TOKEN`.
+All scripts have been refactored to use this name. Historical names that may
+appear in older code or external references:
+- `TOKEN` — legacy name (removed from scripts)
+- `V3_BEARER_TOKEN` — Inventory Dashboard legacy (migrated to NCM_API_TOKEN)
+- `CP_API_TOKEN` — never used by any actual script
+
+When building new scripts/dashboards that need v3, use `NCM_API_TOKEN`.
+
 ### __in Filter 100-Value Limit (discovered 2026-03-31)
 The NCM API limits `__in` filter parameters to 100 comma-separated values per request.
 The SDK auto-chunks these transparently, but if you're making raw API calls with
@@ -228,11 +238,80 @@ these are beta endpoints, their contracts may change without notice. Always
 check the OpenAPI spec or release notes for the correct path prefix.
 
 ### net_devices `is_asset` Filter (discovered 2026-04-01)
-The v2 `/net_devices/` endpoint supports an undocumented `is_asset` boolean
+The v2 `/net_devices/` endpoint supports an `is_asset` boolean
 filter. Setting `is_asset=true` returns only the primary modem interfaces
 (the physical cellular modems), filtering out virtual/logical interfaces.
 This is useful when you only need modem-level details (IMEI, ICCID, carrier)
 and want to avoid processing hundreds of non-modem net_device records.
+
+### net_devices Supports `expand=router` and `expand=account` (discovered 2026-06-06)
+The v2 `/net_devices/` endpoint supports `expand=router` and `expand=account`.
+When using `expand=router`, the `router` field becomes an inline object with
+the full router record (id, name, state, mac, group URL, etc.) instead of a
+URL. This eliminates the need for a separate `/routers/` fetch when building
+per-modem views. Note: if the net_device has no associated router, the field
+remains `null` even with expand.
+
+### `net_device_health` Returns Records for All Net Device Types (discovered 2026-06-05)
+The `/net_device_health/` endpoint returns health records for net_devices of
+ALL modes (wan, lan, mdm), not just WAN or modem interfaces. When joining
+health data to net_devices, do NOT filter by `mode='wan'` or you will silently
+miss most records. Fetch all net_devices (no mode filter) and join by
+net_device ID to get complete results.
+
+### `net_device_health` Only Contains Score, Not Signal Metrics (discovered 2026-06-06)
+The `/net_device_health/` endpoint returns only:
+- `cellular_health_category` — string: "poor", "fair", "good", or "excellent"
+- `cellular_health_score` — integer: 0–100
+- `net_device` — URL reference to the net_device
+- `id`, `resource_url`
+
+It does NOT contain signal metrics (RSSI, RSRP, RSRQ, SINR, etc.). For actual
+signal data, use `/net_device_metrics/` filtered by the same net_device IDs.
+The typical pattern for a cellular health dashboard is:
+1. `GET /net_device_health/` → health scores + net_device URLs
+2. `GET /net_device_metrics/?net_device__in=id1,id2,...` → signal metrics
+3. `GET /net_devices/?id__in=id1,id2,...` → carrier, model, router ref
+4. `GET /routers/?expand=group` → device names, groups, state
+
+### `net_devices` Do Not Contain Signal Fields (discovered 2026-06-06)
+The `/net_devices/` endpoint does NOT return signal strength fields (rssi,
+rsrp, rsrq, sinr, signal_percent). These fields only exist on the
+`/net_device_metrics/` endpoint. The `/net_devices/` response includes modem
+hardware info: carrier, model, mfg_model, mfg_product, connection_state,
+imei, iccid, apn, modem_fw, etc.
+
+### `net_devices` `router` Field Can Be Null (discovered 2026-06-06)
+The `router` field on `/net_devices/` can be `null` for orphaned or
+unassigned modems. Code that assumes `router` is always a URL will fail.
+Always check for null before extracting the router ID. For display purposes,
+fall back to `hostname` or `name` from the net_device record.
+
+### v2 API IDs Are Returned as Strings (discovered 2026-06-06)
+Despite being numeric, v2 API responses return `id` fields as strings
+(e.g. `"67468693"` not `67468693`). When building lookup dictionaries for
+joining across endpoints, always normalize IDs to strings. Using `int()` for
+lookups will cause key mismatches if the dict was keyed with the raw string
+from the API response.
+
+### `net_device_metrics` Response Schema (discovered 2026-06-06)
+The `/net_device_metrics/` endpoint returns:
+- Signal: `rsrp`, `rsrq`, `rssi`, `rssnr`, `sinr`, `dbm`, `cinr`, `ecio`,
+  `signal_strength` (integer 0–100, NOT `signal_percent`)
+- Cell info: `cell_id`, `mcc`, `mnc`, `tac`, `lac`, `service_type`
+  (e.g. "LTE", "WiFi", "Ethernet", "Not Available")
+- Usage: `bytes_in`, `bytes_out`
+- Meta: `update_ts`, `bmask_applied`, `net_device` (URL), `id`, `resource_url`
+
+Note: `id` matches the net_device ID (same value), making joins trivial.
+Non-cellular interfaces (WiFi, Ethernet) have null signal fields.
+
+### `expand=router` on net_devices Does NOT Expand Nested Relations (discovered 2026-06-06)
+When using `expand=router` on `/net_devices/`, the inline router object's
+relational fields (like `group`, `account`, `product`, `actual_firmware`) are
+still URLs, not expanded objects. Only one level of expansion is supported.
+To resolve group names when using this pattern, you must still call
+`/groups/` separately and build a lookup by URL or ID.
 
 ### v3 API Returns 409 Conflict as a Rate Limit (discovered 2026-04-01)
 When making concurrent requests to v3 endpoints (e.g. `/asset_endpoints`),
@@ -259,6 +338,26 @@ forever. Use `params=None` instead of `params={}` on subsequent pagination
 requests where the query parameters are already embedded in the `next` URL.
 
 ### v3 asset_endpoint Subscription IDs Are Assignment-Level, Not Parent (discovered 2026-04-01)
+
+### v2 and v3 Are Fully Separate API Systems — No Cross-Referencing (discovered 2026-04-28)
+The v2 and v3 APIs are architecturally independent interfaces to the same
+underlying data. They do NOT cross-reference each other:
+- **Auth:** v2 uses 4 API key headers; v3 uses a single Bearer token.
+- **IDs:** v2 uses integers; v3 uses strings. They are different ID spaces.
+- **Spec:** v3 follows JSON:API; v2 does not.
+- **Relationships:** v2 embeds full URLs to other v2 resources. v3 uses
+  JSON:API `relationships` blocks with type/id references to other v3
+  resources only.
+- **Expand:** `?expand=` is v2-only. v3 uses JSON:API `?include=` (where
+  supported) or you follow the relationship type/id to the v3 endpoint.
+
+The key implication: v3 relationship references can only be resolved through
+v3 endpoints. If a related resource doesn't have a v3 endpoint yet, that
+relationship either won't appear in the v3 response or the data will be
+flattened into attributes. You cannot use a v2 endpoint to resolve a v3
+relationship reference (or vice versa). When migrating scripts from v2 to
+v3, all related resource lookups must also be migrated to their v3
+equivalents.
 
 ### v2 Router IDs and v3 Asset Endpoint IDs Are Different ID Spaces (discovered 2026-04-07)
 The v2 `/routers/` endpoint assigns numeric IDs (e.g. `1234567`) to devices.
@@ -300,7 +399,7 @@ except SystemExit:
 finally:
     sys.stderr = _stderr
 ```
-Then validate v3-specific vars (`V3_BEARER_TOKEN`, etc.) separately.
+Then validate v3-specific vars (`NCM_API_TOKEN`, etc.) separately.
 
 ### modem_upgrades POST Returns 200, Not 201 (discovered 2026-04-02)
 The OpenAPI spec for `POST /api/v3/beta/modem_upgrades` documents a `201
@@ -324,3 +423,80 @@ limit. However, 409 is also used for JSON:API validation errors (e.g. wrong
 `data.type`). To distinguish: if the 409 response body contains an `errors`
 array, it is a real validation error and should NOT be retried. If it does
 not contain `errors`, treat it as a rate limit and retry with backoff.
+
+### v2 Time-Series Endpoints Return 409 Without Required Filter (discovered 2026-06-06)
+Several v2 time-series endpoints return `409 Conflict` if called without a
+mandatory `router` or `net_device` filter. This is NOT a rate limit — it's a
+validation error requiring you to scope the query to specific device(s).
+
+| Endpoint | Required Filter |
+|----------|----------------|
+| `historical_locations` | `router` |
+| `net_device_signal_samples` | `net_device` or `net_device__in` |
+| `net_device_usage_samples` | `net_device` or `net_device__in` |
+| `router_logs` | `router` |
+| `router_state_samples` | `router` or `router__in` |
+| `router_stream_usage_samples` | `router` or `router__in` |
+
+These endpoints use TimeUUID-based pagination and are optimized for
+per-device queries. Always provide the filter or you'll get a 409.
+
+### Cradlepoint Config .bin Files Use Varying Compression (discovered 2026-05-13)
+Cradlepoint router configuration `.bin` files are compressed JSON, but the
+compression format varies. Some use standard zlib (wbits=15), others use raw
+deflate (no header, wbits=-15), and others use gzip (wbits=31). When decoding
+`.bin` files, try multiple `zlib.decompress(data, wbits)` values in sequence:
+`15`, `-15`, `31`, `47` (auto-detect). The first one that succeeds without a
+`zlib.error` is the correct format. The decompressed content is always UTF-8
+encoded JSON.
+
+### Cradlepoint .bin Config Files Contain Both "config" and "state" Keys (discovered 2026-05-13)
+When decompressing a Cradlepoint `.bin` configuration file, the resulting JSON
+is an **array** structured as `[{"config": {...}, "state": {...}, "fw_info": {...}}, [[...], ...]]`.
+The first element is an object containing `"config"` (the actual configuration),
+`"state"` (runtime state data), and `"fw_info"` (firmware version). The second
+element is an array of path references (e.g. `["config", "lan", 0, "devices", 2]`)
+that appear to be deletion/override markers for the config tree.
+
+When working with configs for templating or pushing to devices:
+- **Reading:** Extract only `parsed[0]["config"]`
+- **Writing:** Wrap config as `[{"config": <config_obj>}, []]` then zlib compress
+
+The `.bin` files use standard zlib compression (magic bytes `78 9c`, wbits=15).
+Config top-level keys include: certmgmt, container, ecm, identities, lan,
+routing, security, stats, system, wan, wlan.
+
+### Cradlepoint Config JSON Contains Raw Control Characters (discovered 2026-05-14)
+Cradlepoint configuration JSON (extracted from `.bin` files or via API) contains
+string values with raw newline characters (e.g. embedded YAML in container
+project configs, PEM certificates). Python's `json.loads()` in strict mode
+rejects these as "Invalid control character". Use `json.loads(content, strict=False)`
+when parsing Cradlepoint config JSON to allow control characters in strings.
+
+### v2 `device_apps` Returns IDs as Strings, Not Integers (discovered 2026-05-14)
+The `/device_apps/` endpoint returns the `id` field as a string (e.g. `"83"`)
+rather than an integer. This differs from most other v2 endpoints (like
+`/routers/` and `/groups/`) which return integer IDs. When building lookup
+dictionaries keyed by app ID — for example, to match `device_app_versions`
+back to their parent app — use string keys or cast consistently. Attempting
+`int()` conversion on the URL-extracted ID and comparing against the raw
+response ID will fail silently (lookup miss) if one side is a string and the
+other is an int.
+
+### v2 `resource_url` Base Hostnames Vary Across Endpoints (discovered 2026-05-14)
+The `resource_url` and relational URL fields in v2 API responses can use
+different base hostnames depending on the account's regional shard (e.g.
+`https://www.us0.cradlepointecm.com/api/v2/accounts/123/` vs
+`https://www.cradlepointecm.com/api/v2/accounts/123/`). This means matching
+a group's `account` URL against an account's `resource_url` by exact string
+comparison will fail if the hostnames differ. Always extract the numeric ID
+from the URL path (the last path segment before the trailing slash) and match
+on that instead of comparing full URLs.
+
+### `expand=account` IS Supported on `/groups/` Endpoint (discovered 2026-05-14)
+The v2 `/groups/` endpoint DOES support `expand=account`. When used, the
+`account` field becomes an inline object with `id`, `name`, `is_disabled`,
+`resource_uri`, and `account` (parent account URL). This eliminates the need
+for a separate `/accounts/` fetch to resolve group account names. Known
+endpoints that support `expand`: `/routers/` (group, account), `/groups/`
+(account).

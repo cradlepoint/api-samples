@@ -1,5 +1,6 @@
 ---
 inclusion: auto
+description: NetCloud Manager API development guide — required reading before building applications that call the NCM API. Covers documentation consultation, endpoint routing, SDK usage, and critical rules like trailing slashes.
 ---
 
 # NetCloud Manager API Development Guide
@@ -21,6 +22,7 @@ Before writing any code, read the relevant documentation in `docs/`:
 
 ### 2. Choose the Right Approach
 - Use the NCM SDK (`from ncm import ncm`) when possible — it handles pagination, retries, auth
+- **Always read the SDK source** at `ncm/ncm/ncm.py` to discover available methods before writing code. The SDK has many convenience methods (e.g. `get_net_device_health()`, `get_net_devices_metrics_for_wan()`, `get_net_devices_metrics_for_mdm()`) that combine multiple API calls. Don't reinvent what the SDK already provides.
 - Use `scripts/utils/session.py` for direct API calls with automatic retry/pagination
 - Use raw `requests` only when SDK/session don't cover the use case
 
@@ -52,6 +54,8 @@ Use this to quickly find which doc and SDK method to use for a given task:
 | Setup webhooks | api-webhooks.md | Direct API calls to `alert_push_destinations` |
 | Manage groups | api-v2-endpoints.md → groups | `get_groups()`, `create_group_by_parent_id()` |
 | Network device info | api-v2-endpoints.md → net_devices | `get_net_devices()`, `get_net_device_metrics()` |
+| Cellular health scores | api-v2-endpoints.md → net_device_health | `get_net_device_health()` |
+| Cellular metrics (WAN) | api-v2-endpoints.md → net_device_metrics | `get_net_devices_metrics_for_wan()`, `get_net_devices_metrics_for_mdm()` |
 | Signal/usage data | api-v2-endpoints.md → net_device_signal/usage | `get_net_device_signal_samples()`, `get_net_device_usage_samples()` |
 | Firmware info | api-v2-endpoints.md → firmwares | `get_firmwares()` |
 | Reboot devices | api-v2-endpoints.md → reboot_activity | `reboot_device()`, `reboot_group()` |

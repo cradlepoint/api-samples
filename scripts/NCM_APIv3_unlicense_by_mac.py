@@ -1,7 +1,7 @@
 # This script unlicenses devices by MAC address using the NCM library (pip install -U ncm)
 # It reads a CSV file with device details and unlicenses the devices in NCM in chunks of 100
 # Usage: python "NCM APIv3 unlicense by mac.py" <csv_file_path>
-# Token can be set via TOKEN environment variable
+# Token can be set via NCM_API_TOKEN environment variable
 # MAC address column is automatically detected (case-insensitive):
 #   "mac", "mac address", "mac_address", "MAC Address", etc.
 
@@ -19,11 +19,11 @@ if len(sys.argv) < 2:
 csv_filename = sys.argv[1]
 
 # Get token from environment variable
-token = os.environ.get('TOKEN') or os.environ.get('NCM_API_TOKEN')
+token = os.environ.get('NCM_API_TOKEN')
 
 if not token:
-    print("Error: Please set your NCM API v3 token as TOKEN environment variable")
-    print("Error: Please set your NCM API v3 token as TOKEN environment variable")
+    print("Error: Please set your NCM API v3 token as NCM_API_TOKEN environment variable")
+    print("Error: Please set your NCM API v3 token as NCM_API_TOKEN environment variable")
     sys.exit(1)
 
 # Possible MAC address column names (case-insensitive)

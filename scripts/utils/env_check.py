@@ -10,14 +10,14 @@ import platform
 
 
 REQUIRED_V2_VARS = [
-    ("CP_API_ID", "Cradlepoint API ID"),
-    ("CP_API_KEY", "Cradlepoint API Key"),
-    ("ECM_API_ID", "ECM API ID"),
-    ("ECM_API_KEY", "ECM API Key"),
+    ("X_CP_API_ID", "Cradlepoint API ID"),
+    ("X_CP_API_KEY", "Cradlepoint API Key"),
+    ("X_ECM_API_ID", "ECM API ID"),
+    ("X_ECM_API_KEY", "ECM API Key"),
 ]
 
 OPTIONAL_V3_VARS = [
-    ("CP_API_TOKEN", "Bearer token for API v3"),
+    ("NCM_API_TOKEN", "Bearer token for API v3"),
 ]
 
 
@@ -106,12 +106,12 @@ def get_api_keys_from_env():
     Returns a dict for v2, and optionally includes 'token' for v3.
     """
     keys = {
-        'X-CP-API-ID': os.environ.get('CP_API_ID', ''),
-        'X-CP-API-KEY': os.environ.get('CP_API_KEY', ''),
-        'X-ECM-API-ID': os.environ.get('ECM_API_ID', ''),
-        'X-ECM-API-KEY': os.environ.get('ECM_API_KEY', ''),
+        'X-CP-API-ID': os.environ.get('X_CP_API_ID', ''),
+        'X-CP-API-KEY': os.environ.get('X_CP_API_KEY', ''),
+        'X-ECM-API-ID': os.environ.get('X_ECM_API_ID', ''),
+        'X-ECM-API-KEY': os.environ.get('X_ECM_API_KEY', ''),
     }
-    token = os.environ.get('CP_API_TOKEN')
+    token = os.environ.get('NCM_API_TOKEN')
     if token:
         keys['token'] = token
     return keys

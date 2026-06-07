@@ -30,10 +30,10 @@ check_env()
 logger = get_logger('my_script')
 session = APISession(
     logger=logger,
-    cp_api_id=os.environ['CP_API_ID'],
-    cp_api_key=os.environ['CP_API_KEY'],
-    ecm_api_id=os.environ['ECM_API_ID'],
-    ecm_api_key=os.environ['ECM_API_KEY'],
+    cp_api_id=os.environ['X_CP_API_ID'],
+    cp_api_key=os.environ['X_CP_API_KEY'],
+    ecm_api_id=os.environ['X_ECM_API_ID'],
+    ecm_api_key=os.environ['X_ECM_API_KEY'],
 )
 ```
 
@@ -201,13 +201,13 @@ def batch_operation(items, batch_size=50, operation=None):
 ## Web UI Template
 
 When building any web interface in this project, use the `web_app_template` located at
-`scripts/script_manager/static/` as the style foundation. It provides a complete, consistent
+`web_apps/web_app_template/` as the style foundation. It provides a complete, consistent
 design system including layout, components, and theming.
 
 Reference files:
-- `scripts/script_manager/static/index.html` — HTML structure
-- `scripts/script_manager/static/css/style.css` — Full CSS with light/dark mode
-- `scripts/script_manager/static/js/app.js` — JS patterns (dark mode toggle, sidebar, etc.)
+- `web_apps/web_app_template/index.html` — HTML structure
+- `web_apps/script_manager/static/css/style.css` — Full CSS with light/dark mode
+- `web_apps/script_manager/static/js/app.js` — JS patterns (dark mode toggle, sidebar, etc.)
 
 All web apps must support light mode and dark mode:
 - Use CSS custom properties (`var(--*)`) for all colors

@@ -1,7 +1,7 @@
 # This script applies/regrades a subscription to devices by MAC address using the NCM library (pip install -U ncm)
 # It reads a CSV file with MAC addresses and subscriptions and applies/regrades subscriptions to the devices in NCM in chunks of 100
 # Usage: python NCM_APIv3_regrades_by_mac.py <csv_filename> [token]
-# Token can be set via command-line argument, token environment variable, or hardcoded in the script
+# Token can be set via command-line argument, NCM_API_TOKEN environment variable, or hardcoded in the script
 # CSV file must contain columns for MAC addresses and subscription (example subscription_id: BA-NCADV)
 # Column names are automatically detected (case-insensitive):
 #   MAC address: "mac", "mac address", or "mac_address"
@@ -24,7 +24,7 @@ csv_filename = sys.argv[1]
 if len(sys.argv) >= 3:
     token = sys.argv[2]
 else:
-    token = os.environ.get("token", "Put Your NCM APIv3 Token Here")
+    token = os.environ.get("NCM_API_TOKEN", "Put Your NCM APIv3 Token Here")
 
 # Possible MAC address column names (case-insensitive)
 mac_address_column_names = ["mac", "mac address", "mac_address"]
@@ -36,7 +36,7 @@ subscription_id_column_names = ["subscription_id", "subscription", "subscription
 if token == "Put Your NCM APIv3 Token Here":
     print("Error: Please set your NCM APIv3 token either:")
     print("  1. Pass it as a command-line argument: <csv_filename> <token>")
-    print("  2. Set token environment variable, or")
+    print("  2. Set NCM_API_TOKEN environment variable, or")
     print("  3. Hardcode it in the script")
     exit(1)
 

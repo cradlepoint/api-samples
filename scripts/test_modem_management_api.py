@@ -8,7 +8,7 @@ Exercises all endpoints from the OpenAPI spec:
   5. PUT  /api/v3/beta/modem_upgrades/{id}/
 
 Usage:
-  export V3_BEARER_TOKEN="your_token"
+  export NCM_API_TOKEN="your_token"
   export TEST_GROUP_ID="123"
   python scripts/test_modem_management_api.py
 """
@@ -40,12 +40,12 @@ except SystemExit:
 finally:
     sys.stderr = _stderr
 
-TOKEN = os.environ.get("V3_BEARER_TOKEN", "")
+TOKEN = os.environ.get("NCM_API_TOKEN", "")
 GROUP_ID = os.environ.get("TEST_GROUP_ID", "")
 
 _missing = []
 if not TOKEN:
-    _missing.append("V3_BEARER_TOKEN")
+    _missing.append("NCM_API_TOKEN")
 if not GROUP_ID:
     _missing.append("TEST_GROUP_ID")
 if _missing:

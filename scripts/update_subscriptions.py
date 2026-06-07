@@ -45,7 +45,7 @@ except ImportError:
 # CONFIGURATION - Set your API token here
 # ============================================================================
 
-TOKEN = ""  # APIv3 token (or set TOKEN / NCM_API_TOKEN env var, or pass as 2nd arg)
+TOKEN = ""  # APIv3 token (or set NCM_API_TOKEN env var, or pass as 2nd arg)
 
 CSV_FILENAME = "devices.csv"  # Default CSV filename
 
@@ -56,7 +56,7 @@ def load_token():
     """Load APIv3 token from arg, config, or environment variables."""
     if len(sys.argv) >= 3:
         return sys.argv[2]
-    return TOKEN or os.environ.get("TOKEN") or os.environ.get("NCM_API_TOKEN") or os.environ.get("token")
+    return TOKEN or os.environ.get("NCM_API_TOKEN") or os.environ.get("token")
 
 
 def find_column(fieldnames, candidates):
@@ -91,7 +91,7 @@ def main():
     # Load and validate APIv3 token
     token = load_token()
     if not token:
-        print("Error: No APIv3 token found. Set TOKEN in the script or as an environment variable.")
+        print("Error: No APIv3 token found. Set NCM_API_TOKEN in the script or as an environment variable.")
         input("Press Enter to exit...")
         sys.exit(1)
 

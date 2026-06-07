@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #4f46e5;
+            --primary-dark: #3730a3;
+            --secondary-color: #6b7280;
+            --success-color: #059669;
+            --warning-color: #d97706;
+            --danger-color: #dc2626;
+            --info-color: #0284c7;
+            --dark-bg: #111827;
+            --dark-surface: #1f2937;
+            --light-bg: #f9fafb;
+            --light-surface: #ffffff;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --text-light: #9ca3af;
+            --border-color: #d1d5db;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+            --radius-sm: 0.375rem;
+            --radius-md: 0.5rem;
+            --radius-lg: 0.75rem;
+            --radius-xl: 1rem;
+            --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); min-height: 100vh; color: var(--text-primary); line-height: 1.6; overflow: hidden; }
+        .app-container { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        .app-header { background: var(--light-bg); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border-color); box-shadow: var(--shadow-md); position: sticky; top: 0; z-index: 100; }
+        .header-content { max-width: 100%; margin: 0 auto; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; gap: 2rem; }
+        .logo-section { display: flex; align-items: center; gap: 1rem; }
+        .app-logo { height: 40px; width: auto; }
+        body.dark-mode .app-logo { content: url('/static/logo_dark.png'); }
+        #app-title { font-size: 1.875rem; font-weight: 700; margin: 0; background: linear-gradient(135deg, var(--primary-color), var(--info-color)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .header-actions { display: flex; align-items: center; gap: 1rem; }
+        .icon-btn { background: var(--light-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.75rem; cursor: pointer; transition: var(--transition); color: var(--text-primary); box-shadow: var(--shadow-sm); display: flex; align-items: center; justify-content: center; }
+        .icon-btn:hover { background: var(--light-bg); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+        .content-area { flex: 1; padding: 1.5rem 2rem; max-width: 100%; margin: 0 auto; width: 100%; overflow: hidden; display: flex; flex-direction: column; }
+        .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card { background: var(--light-surface); border: 2px solid var(--border-color); border-radius: var(--radius-lg); padding: 1.25rem; box-shadow: var(--shadow-sm); transition: var(--transition); cursor: pointer; user-select: none; }
+        .stat-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+        .stat-card.active { border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2); }
+        .stat-card .stat-label { font-size: 0.8125rem; color: var(--text-secondary); font-weight: 500; margin-bottom: 0.25rem; }
+        .stat-card .stat-value { font-size: 1.75rem; font-weight: 700; color: var(--text-primary); }
+        .stat-card .stat-value.online { color: var(--success-color); }
+        .stat-card .stat-value.offline { color: var(--danger-color); }
+        .stat-card .stat-value.warning { color: var(--warning-color); }
+        .controls-bar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+        .controls-left { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+        .controls-right { display: flex; align-items: center; gap: 0.75rem; }
+        .search-input { padding: 0.625rem 1rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 0.875rem; width: 450px; transition: var(--transition); background: var(--light-surface); font-family: inherit; }
+        .search-input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
+        .btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.625rem 1.25rem; border: none; border-radius: var(--radius-md); font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: var(--transition); box-shadow: var(--shadow-sm); font-family: inherit; }
+        .btn-primary { background: linear-gradient(135deg, var(--primary-color), var(--primary-dark)); color: white; }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--shadow-lg); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-secondary { background: var(--light-surface); color: var(--text-primary); border: 1px solid var(--border-color); }
+        .btn-secondary:hover { background: var(--light-bg); }
+        .table-panel { background: var(--light-surface); border: 1px solid var(--border-color); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); overflow: hidden; flex: 1; display: flex; flex-direction: column; min-height: 0; }
+        .panel-header { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-color); background: linear-gradient(135deg, var(--light-bg), rgba(255, 255, 255, 0.8)); display: flex; justify-content: space-between; align-items: center; }
+        .panel-header h2 { font-size: 1.125rem; font-weight: 600; color: var(--text-primary); }
+        .last-updated { font-size: 0.8125rem; color: var(--text-secondary); }
+        .table-container { overflow-x: auto; overflow-y: auto; flex: 1; min-height: 0; }
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table th, .data-table td { padding: 0.625rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 0.8125rem; white-space: nowrap; }
+        .data-table th { background: var(--light-bg); font-weight: 600; position: sticky; top: 0; z-index: 10; color: var(--text-secondary); text-transform: uppercase; font-size: 0.6875rem; letter-spacing: 0.05em; cursor: pointer; user-select: none; }
+        .data-table th:hover { background: var(--border-color); }
+        .data-table th .sort-arrow { margin-left: 4px; opacity: 0.4; }
+        .data-table th.sorted .sort-arrow { opacity: 1; }
+        .data-table tbody tr { transition: background 0.15s; }
+        .data-table tbody tr:hover { background: var(--light-bg); }
+        .data-table td.clickable-cell { cursor: pointer; }
+        .data-table td.clickable-cell:hover { text-decoration: underline; color: var(--primary-color); }
+        .status-badge { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.625rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; }
+        .status-badge.online { background: rgba(5, 150, 105, 0.1); color: var(--success-color); }
+        .status-badge.offline { background: rgba(220, 38, 38, 0.1); color: var(--danger-color); }
+        .status-badge.initialized { background: rgba(107, 114, 128, 0.1); color: var(--secondary-color); }
+        .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+        .license-badge { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.625rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; }
+        .license-badge.licensed { background: rgba(5, 150, 105, 0.1); color: var(--success-color); }
+        .license-badge.grace-period { background: rgba(217, 119, 6, 0.1); color: var(--warning-color); }
+        .license-badge.unlicensed { background: rgba(220, 38, 38, 0.1); color: var(--danger-color); }
+        .loading-overlay { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; color: var(--text-secondary); min-height: 200px; }
+        .spinner { display: inline-block; width: 32px; height: 32px; border: 3px solid var(--border-color); border-top-color: var(--primary-color); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 0.75rem; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .progress-steps { margin-top: 1rem; text-align: left; width: 100%; max-width: 320px; }
+        .progress-step { padding: 0.35rem 0; font-size: 0.8125rem; color: var(--text-light); display: flex; align-items: center; gap: 0.5rem; }
+        .progress-step.active { color: var(--primary-color); font-weight: 500; }
+        .progress-step.done { color: var(--success-color); }
+        .progress-step .step-icon { width: 16px; text-align: center; font-size: 0.75rem; }
+        .notification { position: fixed; bottom: 2rem; right: 2rem; padding: 1rem 1.5rem; background: var(--light-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-xl); display: none; z-index: 2000; max-width: 400px; animation: slideIn 0.3s ease-out; }
+        .notification.show { display: block; }
+        .notification.success { border-left: 4px solid var(--success-color); }
+        .notification.error { border-left: 4px solid var(--danger-color); }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        /* Dark mode */
+        body.dark-mode { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #f9fafb; }
+        body.dark-mode .app-header, body.dark-mode .stat-card, body.dark-mode .table-panel, body.dark-mode .panel-header { background: #1e293b; border-color: #4b5563; color: #f9fafb; }
+        body.dark-mode .stat-card.active { border-color: var(--primary-color); }
+        body.dark-mode .stat-card .stat-label { color: #9ca3af; }
+        body.dark-mode .stat-card .stat-value { color: #f9fafb; }
+        body.dark-mode .data-table th { background: #374151; color: #d1d5db; border-color: #4b5563; }
+        body.dark-mode .data-table th:hover { background: #4b5563; }
+        body.dark-mode .data-table td { border-color: #4b5563; color: #f9fafb; }
+        body.dark-mode .data-table tbody tr:hover { background: #374151; }
+        body.dark-mode .search-input { background: #374151; border-color: #4b5563; color: #f9fafb; }
+        body.dark-mode .btn-secondary { background: #374151; border-color: #4b5563; color: #f9fafb; }
+        body.dark-mode .icon-btn { background: #374151; border-color: #4b5563; color: #f9fafb; }
+        body.dark-mode .notification { background: #1e293b; border-color: #4b5563; color: #f9fafb; }
+        body.dark-mode .panel-header h2, body.dark-mode .last-updated { color: #d1d5db; }
+        body.dark-mode #settingsModal > div { background: #1e293b; border-color: #4b5563; color: #f9fafb; }
+        body.dark-mode #settingsModal input, body.dark-mode #settingsModal select { background: #374151; border-color: #4b5563; color: #f9fafb; }
+        body.dark-mode #settingsModal label, body.dark-mode #settingsModal h3 { color: #d1d5db; }
+        body.dark-mode #settingsModal h2 { color: #f9fafb; }
+        @media (max-width: 1024px) { .content-area { padding: 1.5rem; } .stats-row { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 768px) { .header-content { padding: 1rem; } #app-title { font-size: 1.25rem; } .content-area { padding: 1rem; } .stats-row { grid-template-columns: repeat(2, 1fr); } .controls-bar { flex-direction: column; align-items: stretch; } .search-input { width: 100%; } }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <img src="/static/logo.png" alt="Logo" class="app-logo">
+                    <h1 id="app-title">Inventory Dashboard</h1>
+                    <span id="accountName" style="margin-left:1rem;font-size:0.9375rem;color:var(--text-secondary);font-weight:500;"></span>
+                </div>
+                <div class="header-actions">
+                    <button class="icon-btn" id="settingsBtn" aria-label="Settings" title="API Settings">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    </button>
+                    <button class="icon-btn" id="darkModeToggle" aria-label="Toggle dark mode">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="content-area">
+            <div class="stats-row">
+                <div class="stat-card" data-filter="all"><div class="stat-label">Total Devices</div><div class="stat-value" id="statTotal">—</div></div>
+                <div class="stat-card" data-filter="online"><div class="stat-label">Online</div><div class="stat-value online" id="statOnline">—</div></div>
+                <div class="stat-card" data-filter="offline"><div class="stat-label">Offline</div><div class="stat-value offline" id="statOffline">—</div></div>
+                <div class="stat-card" data-filter="licensed"><div class="stat-label">Licensed</div><div class="stat-value online" id="statLicensed">—</div></div>
+                <div class="stat-card" data-filter="grace-period"><div class="stat-label">Grace Period</div><div class="stat-value warning" id="statGrace">—</div></div>
+                <div class="stat-card" data-filter="unlicensed"><div class="stat-label">Unlicensed</div><div class="stat-value offline" id="statUnlicensed">—</div></div>
+            </div>
+
+            <div class="controls-bar">
+                <div class="controls-left">
+                    <div style="position:relative;display:inline-block;">
+                        <input type="text" class="search-input" id="searchInput" placeholder="Search by name, MAC, group, carrier, product, serial..." style="padding-right:2rem;">
+                        <button id="clearSearchBtn" style="position:absolute;right:0.5rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-light);font-size:1.1rem;display:none;padding:0.25rem;" aria-label="Clear search">✕</button>
+                    </div>
+                    <button class="btn btn-secondary" id="exportCsvBtn">⬇ CSV</button>
+                    <button class="btn btn-secondary" id="exportPdfBtn">⬇ PDF</button>
+                </div>
+                <div class="controls-right">
+                    <span id="paginationInfo" style="font-size:0.8125rem;color:var(--text-secondary);"></span>
+                    <button class="btn btn-secondary" id="prevPageBtn" style="padding:0.5rem 0.75rem;" disabled>← Prev</button>
+                    <button class="btn btn-secondary" id="nextPageBtn" style="padding:0.5rem 0.75rem;" disabled>Next →</button>
+                </div>
+            </div>
+
+            <div class="table-panel">
+                <div class="panel-header">
+                    <h2>Device Inventory</h2>
+                    <span class="last-updated" id="lastUpdated"></span>
+                </div>
+                <div class="table-container" id="tableContainer">
+                    <div class="loading-overlay" id="loadingState">
+                        <div class="spinner"></div>
+                        <p id="loadingText">Loading inventory data...</p>
+                        <div class="progress-steps" id="progressSteps">
+                            <div class="progress-step active" id="pstep0"><span class="step-icon">◉</span> Fetching routers (v2)</div>
+                            <div class="progress-step active" id="pstep1"><span class="step-icon">◉</span> Fetching net devices (v2)</div>
+                            <div class="progress-step active" id="pstep2"><span class="step-icon">◉</span> Fetching groups & accounts (v2)</div>
+                            <div class="progress-step active" id="pstep3"><span class="step-icon">◉</span> Fetching asset endpoints (v3)</div>
+                            <div class="progress-step active" id="pstep4"><span class="step-icon">◉</span> Fetching subscriptions (v3)</div>
+                            <div class="progress-step" id="pstep5"><span class="step-icon">○</span> Resolving & joining data</div>
+                        </div>
+                    </div>
+                    <table class="data-table" id="dataTable" style="display:none;">
+                        <thead id="tableHead"></thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="notification" id="notification"></div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);z-index:1000;align-items:center;justify-content:center;">
+        <div style="background:var(--light-surface);border-radius:var(--radius-xl);box-shadow:var(--shadow-xl);width:90%;max-width:560px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:1.25rem 1.5rem;border-bottom:1px solid var(--border-color);background:var(--light-bg);">
+                <h2 style="font-size:1.125rem;font-weight:600;">Settings</h2>
+                <button id="closeSettingsBtn" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:var(--text-secondary);width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:var(--radius-sm);" aria-label="Close">×</button>
+            </div>
+            <div style="padding:1.5rem;overflow-y:auto;flex:1;">
+                <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:1.25rem;">
+                    <select id="profileSelect" style="flex:1;padding:0.5rem 0.75rem;border:1px solid var(--border-color);border-radius:var(--radius-md);font-size:0.875rem;font-family:inherit;background:var(--light-surface);" aria-label="Select profile"><option value="">— Select Profile —</option></select>
+                    <button class="btn btn-secondary" id="loadProfileBtn" style="padding:0.5rem 0.75rem;">Load</button>
+                    <button class="btn btn-secondary" id="deleteProfileBtn" style="padding:0.5rem 0.75rem;color:var(--danger-color);">Delete</button>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:1rem;">
+                    <div><label for="credCpApiId" style="display:block;font-size:0.8125rem;font-weight:500;margin-bottom:0.25rem;">X_CP_API_ID</label><input type="text" id="credCpApiId" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border-color);border-radius:var(--radius-md);font-size:0.875rem;font-family:monospace;background:var(--light-surface);"></div>
+                    <div><label for="credCpApiKey" style="display:block;font-size:0.8125rem;font-weight:500;margin-bottom:0.25rem;">X_CP_API_KEY</label><div style="position:relative;"><input type="password" id="credCpApiKey" style="width:100%;padding:0.5rem 0.75rem;padding-right:2.5rem;border:1px solid var(--border-color);border-radius:var(--radius-md);font-size:0.875rem;font-family:monospace;background:var(--light-surface);"><button type="button" class="eye-toggle" data-target="credCpApiKey" style="position:absolute;right:0.5rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-secondary);padding:0.25rem;" aria-label="Toggle visibility">👁</button></div></div>
+                    <div><label for="credEcmApiId" style="display:block;font-size:0.8125rem;font-weight:500;margin-bottom:0.25rem;">X_ECM_API_ID</label><input type="text" id="credEcmApiId" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border-color);border-radius:var(--radius-md);font-size:0.875rem;font-family:monospace;background:var(--light-surface);"></div>
+                    <div><label for="credEcmApiKey" style="display:block;font-size:0.8125rem;font-weight:500;margin-bottom:0.25rem;">X_ECM_API_KEY</label><div style="position:relative;"><input type="password" id="credEcmApiKey" style="width:100%;padding:0.5rem 0.75rem;padding-right:2.5rem;border:1px solid var(--border-color);border-radius:var(--radius-md);font-size:0.875rem;font-family:monospace;background:var(--light-surface);"><button type="button" class="eye-toggle" data-target="credEcmApiKey" style="position:absolute;right:0.5rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-secondary);padding:0.25rem;" aria-label="Toggle visibility">👁</button></div></div>
+                    <div><label for="credToken" style="display:block;font-size:0.8125rem;font-weight:500;margin-bottom:0.25rem;">NCM_API_TOKEN (v3)</label><div style="position:relative;"><input type="password" id="credToken" style="width:100%;padding:0.5rem 0.75rem;padding-right:2.5rem;border:1px solid var(--border-color);border-radius:var(--radius-md);font-size:0.875rem;font-family:monospace;background:var(--light-surface);"><button type="button" class="eye-toggle" data-target="credToken" style="position:absolute;right:0.5rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-secondary);padding:0.25rem;" aria-label="Toggle visibility">👁</button></div></div>
+                </div>
+                <div style="display:flex;gap:0.5rem;margin-top:1.5rem;flex-wrap:wrap;">
+                    <button class="btn btn-primary" id="applyCredsBtn">Apply & Refresh</button>
+                    <button class="btn btn-secondary" id="saveProfileBtn">Save Profile</button>
+                    <button class="btn btn-secondary" id="saveAsProfileBtn">Save As…</button>
+                </div>
+                <div style="margin-top:1.5rem;padding-top:1.25rem;border-top:1px solid var(--border-color);">
+                    <h3 style="font-size:0.875rem;font-weight:600;margin-bottom:0.75rem;">Display Options</h3>
+                    <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;cursor:pointer;margin-bottom:0.5rem;"><input type="checkbox" id="showModemCols" style="width:1rem;height:1rem;cursor:pointer;"> Show modem detail columns</label>
+                    <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;cursor:pointer;"><input type="checkbox" id="groupByAccountToggle" style="width:1rem;height:1rem;cursor:pointer;"> Group devices by account</label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // --- Settings Modal ---
+    (function() {
+        const modal = document.getElementById('settingsModal');
+        const profileSelect = document.getElementById('profileSelect');
+        document.getElementById('settingsBtn').addEventListener('click', () => { modal.style.display = 'flex'; refreshProfiles(); loadCurrentCreds(); });
+        document.getElementById('closeSettingsBtn').addEventListener('click', () => { modal.style.display = 'none'; });
+        modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+        document.querySelectorAll('.eye-toggle').forEach(btn => {
+            btn.addEventListener('click', () => { const input = document.getElementById(btn.dataset.target); if (input.type === 'password') { input.type = 'text'; btn.textContent = '🙈'; } else { input.type = 'password'; btn.textContent = '👁'; } });
+        });
+        function getCredFields() { return { X_CP_API_ID: document.getElementById('credCpApiId').value.trim(), X_CP_API_KEY: document.getElementById('credCpApiKey').value.trim(), X_ECM_API_ID: document.getElementById('credEcmApiId').value.trim(), X_ECM_API_KEY: document.getElementById('credEcmApiKey').value.trim(), NCM_API_TOKEN: document.getElementById('credToken').value.trim() }; }
+        async function refreshProfiles() { const resp = await fetch('/api/profiles'); const profiles = await resp.json(); profileSelect.innerHTML = '<option value="">— Select Profile —</option>'; Object.keys(profiles).sort().forEach(name => { profileSelect.innerHTML += `<option value="${name}">${name}</option>`; }); }
+        async function loadCurrentCreds() { const resp = await fetch('/api/profiles/current'); const data = await resp.json(); document.getElementById('credCpApiId').value = data.X_CP_API_ID?.value || ''; document.getElementById('credCpApiKey').value = data.X_CP_API_KEY?.value || ''; document.getElementById('credEcmApiId').value = data.X_ECM_API_ID?.value || ''; document.getElementById('credEcmApiKey').value = data.X_ECM_API_KEY?.value || ''; document.getElementById('credToken').value = data.NCM_API_TOKEN?.value || ''; }
+        document.getElementById('loadProfileBtn').addEventListener('click', async () => { const name = profileSelect.value; if (!name) return; const resp = await fetch('/api/profiles/load', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name}) }); if (resp.ok) { showNotification(`Profile "${name}" loaded — refreshing...`, 'success'); modal.style.display = 'none'; await fetchData(); } else { const err = await resp.json(); showNotification(err.error || 'Load failed', 'error'); } });
+        document.getElementById('deleteProfileBtn').addEventListener('click', async () => { const name = profileSelect.value; if (!name) return; if (!confirm(`Delete profile "${name}"?`)) return; const resp = await fetch(`/api/profiles/${encodeURIComponent(name)}`, { method: 'DELETE' }); if (resp.ok) { showNotification(`Deleted "${name}"`, 'success'); refreshProfiles(); } else { showNotification('Delete failed', 'error'); } });
+        document.getElementById('applyCredsBtn').addEventListener('click', async () => { const creds = getCredFields(); const resp = await fetch('/api/credentials/apply', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({credentials: creds}) }); if (!resp.ok) { showNotification('Failed to apply credentials', 'error'); return; } showNotification('Credentials applied — refreshing...', 'success'); modal.style.display = 'none'; await fetchData(); });
+        document.getElementById('saveProfileBtn').addEventListener('click', async () => { const name = profileSelect.value; if (!name) { document.getElementById('saveAsProfileBtn').click(); return; } if (!confirm(`Overwrite profile "${name}"?`)) return; const creds = getCredFields(); await fetch('/api/profiles', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name, credentials: creds, overwrite: true}) }); showNotification(`Profile "${name}" saved`, 'success'); refreshProfiles(); });
+        document.getElementById('saveAsProfileBtn').addEventListener('click', async () => { const name = prompt('Profile name:'); if (!name || !name.trim()) return; const creds = getCredFields(); const resp = await fetch('/api/profiles', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: name.trim(), credentials: creds, overwrite: false}) }); if (resp.status === 409) { if (confirm(`Profile "${name.trim()}" exists. Overwrite?`)) { await fetch('/api/profiles', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: name.trim(), credentials: creds, overwrite: true}) }); showNotification(`Profile "${name.trim()}" saved`, 'success'); } } else if (resp.ok) { showNotification(`Profile "${name.trim()}" created`, 'success'); } refreshProfiles(); });
+    })();
+    </script>
+    <script>
+    // --- Column definitions (matching original inventory dashboard) ---
+    const ALL_COLUMNS = [
+        { key: 'router_name', label: 'Device Name', clickable: true, core: true },
+        { key: 'state', label: 'Status', core: true },
+        { key: 'license_state', label: 'License', core: true },
+        { key: 'account', label: 'Account', clickable: true, core: true },
+        { key: 'group', label: 'Group', clickable: true, core: true },
+        { key: 'mac', label: 'MAC', core: true },
+        { key: 'serial_number', label: 'Serial Number', core: true },
+        { key: 'hardware_series', label: 'Hardware Series', core: true },
+        { key: 'product', label: 'Product', clickable: true, core: true },
+        { key: 'device_type', label: 'Device Type', core: true },
+        { key: 'config_status', label: 'Config Status', core: true },
+        { key: 'ip_address', label: 'IP Address', core: true },
+        { key: 'locality', label: 'Locality', core: true },
+        { key: 'firmware', label: 'Firmware', core: true },
+        { key: 'target_firmware', label: 'Target FW', core: true },
+        { key: 'upgrade_pending', label: 'Upgrade Pending', core: true },
+        { key: 'reboot_required', label: 'Reboot Req', core: true },
+        // Modem columns (hidden by default)
+        { key: 'imei', label: 'IMEI', modem: true },
+        { key: 'iccid', label: 'ICCID', modem: true },
+        { key: 'imsi', label: 'IMSI', modem: true },
+        { key: 'mdn', label: 'MDN', modem: true },
+        { key: 'meid', label: 'MEID', modem: true },
+        { key: 'carrier', label: 'Carrier', clickable: true, modem: true },
+        { key: 'carrier_id', label: 'Carrier ID', modem: true },
+        { key: 'modem_name', label: 'Modem Name', modem: true },
+        { key: 'modem_fw', label: 'Modem FW', modem: true },
+        { key: 'modem_model', label: 'Modem Model', modem: true },
+        { key: 'modem_product', label: 'Modem Product', modem: true },
+        { key: 'connection_state', label: 'Conn State', modem: true },
+        { key: 'service_type', label: 'Service Type', modem: true },
+        { key: 'rfband', label: 'RF Band', modem: true },
+        { key: 'ltebandwidth', label: 'LTE BW', modem: true },
+        { key: 'homecarrid', label: 'Home Carrier', modem: true },
+        // More core columns
+        { key: 'description', label: 'Description', core: true },
+        { key: 'custom1', label: 'Custom1', core: true },
+        { key: 'custom2', label: 'Custom2', core: true },
+        { key: 'license_state_date', label: 'License State Date', core: true },
+        { key: 'previous_license_state', label: 'Prev State', core: true },
+        { key: 'state_updated_at', label: 'Last State Change', core: true },
+        { key: 'subscription_type', label: 'Base Subscription', core: true },
+        { key: 'subscription_start', label: 'Sub Start', core: true },
+        { key: 'subscription_end', label: 'Sub Expiration', core: true },
+        { key: 'created_at', label: 'Created', core: true },
+        { key: 'updated_at', label: 'Updated', core: true },
+    ];
+
+    let inventoryData = [];
+    let filteredData = [];
+    let activeFilter = 'all';
+    let sortKey = null;
+    let sortDir = 1;
+    let groupByAccount = localStorage.getItem('inv2_groupByAccount') === 'true';
+    let showModemCols = localStorage.getItem('inv2_showModem') !== 'false'; // default true
+    let currentPage = 0;
+    const PAGE_SIZE = 100;
+
+    const searchInput = document.getElementById('searchInput');
+    const tableBody = document.getElementById('tableBody');
+    const tableHead = document.getElementById('tableHead');
+    const dataTable = document.getElementById('dataTable');
+    const loadingState = document.getElementById('loadingState');
+    const lastUpdated = document.getElementById('lastUpdated');
+
+    // --- Dark Mode ---
+    document.getElementById('darkModeToggle').addEventListener('click', () => { document.body.classList.toggle('dark-mode'); localStorage.setItem('inv2_darkMode', document.body.classList.contains('dark-mode')); });
+    if (localStorage.getItem('inv2_darkMode') === 'true') document.body.classList.add('dark-mode');
+
+    // --- Helpers ---
+    function escapeHtml(t) { if (!t) return ''; const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+    function fmt(val) { if (val === true) return 'Yes'; if (val === false) return 'No'; return (val == null || val === '') ? '—' : escapeHtml(String(val)); }
+
+    function renderStatusBadge(state) {
+        const s = (state || 'unknown').toLowerCase();
+        const cls = s === 'online' ? 'online' : s === 'offline' ? 'offline' : 'initialized';
+        return `<span class="status-badge ${cls}"><span class="status-dot"></span>${s.charAt(0).toUpperCase() + s.slice(1)}</span>`;
+    }
+    function renderLicenseBadge(ls) {
+        const s = (ls || 'unlicensed').toLowerCase();
+        const labels = { 'licensed': 'Licensed', 'grace-period': 'Grace Period', 'unlicensed': 'Unlicensed' };
+        return `<span class="license-badge ${s}">${labels[s] || s}</span>`;
+    }
+    function showNotification(msg, type) { const el = document.getElementById('notification'); el.textContent = msg; el.className = `notification ${type} show`; setTimeout(() => el.classList.remove('show'), 4000); }
+
+    // --- Visible Columns ---
+    function getVisibleColumns() { return ALL_COLUMNS.filter(c => c.core || (c.modem && showModemCols)); }
+
+    function buildTableHeader() {
+        const cols = getVisibleColumns();
+        tableHead.innerHTML = '<tr>' + cols.map(c => `<th data-key="${c.key}">${c.label} <span class="sort-arrow">↕</span></th>`).join('') + '</tr>';
+    }
+
+    // --- Stat Cards ---
+    document.querySelectorAll('.stat-card[data-filter]').forEach(card => {
+        card.addEventListener('click', () => { const f = card.dataset.filter; if (activeFilter === f) { activeFilter = 'all'; } else { activeFilter = f; } document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active')); if (activeFilter !== 'all') card.classList.add('active'); currentPage = 0; applyFilters(); });
+    });
+
+    // --- Filtering ---
+    function applyFilters() {
+        const search = searchInput.value.toLowerCase().trim();
+        filteredData = inventoryData.filter(row => {
+            if (search) {
+                const hay = [row.router_name, row.mac, row.group, row.carrier, row.product, row.serial_number, row.account, row.ip_address, row.subscription_type, row.description, row.imei, row.iccid].join(' ').toLowerCase();
+                if (!hay.includes(search)) return false;
+            }
+            if (activeFilter === 'all') return true;
+            if (activeFilter === 'online') return row.state === 'online';
+            if (activeFilter === 'offline') return row.state === 'offline';
+            return row.license_state === activeFilter;
+        });
+        doSort();
+        renderTable();
+    }
+
+    // --- Sorting ---
+    function doSort() {
+        const cmp = (a, b) => { let av = a[sortKey], bv = b[sortKey]; if (av == null) av = ''; if (bv == null) bv = ''; if (typeof av === 'boolean') { av = av ? 1 : 0; bv = bv ? 1 : 0; } if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * sortDir; return String(av).localeCompare(String(bv), undefined, {numeric: true}) * sortDir; };
+        if (groupByAccount && !sortKey) {
+            filteredData.sort((a, b) => (a.account || '').localeCompare(b.account || '') || (a.router_name || '').localeCompare(b.router_name || ''));
+        } else if (groupByAccount && sortKey) {
+            const groups = new Map();
+            filteredData.forEach(row => { const k = row.account || ''; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(row); });
+            groups.forEach(items => items.sort(cmp));
+            const ga = [...groups.values()];
+            ga.sort((a, b) => cmp(a[0], b[0]));
+            filteredData = ga.flat();
+        } else if (sortKey) {
+            filteredData.sort(cmp);
+        }
+    }
+
+    // Column sorting via event delegation
+    document.addEventListener('click', (e) => {
+        const th = e.target.closest('.data-table th[data-key]');
+        if (!th) return;
+        const key = th.dataset.key;
+        if (sortKey === key) { sortDir *= -1; } else { sortKey = key; sortDir = 1; }
+        document.querySelectorAll('.data-table th').forEach(t => { t.classList.remove('sorted'); const arrow = t.querySelector('.sort-arrow'); if (arrow) arrow.textContent = '↕'; });
+        th.classList.add('sorted');
+        const arrow = th.querySelector('.sort-arrow'); if (arrow) arrow.textContent = sortDir === 1 ? '↑' : '↓';
+        applyFilters();
+    });
+
+    // --- Render Table ---
+    function renderTable() {
+        const cols = getVisibleColumns();
+        const totalPages = Math.ceil(filteredData.length / PAGE_SIZE);
+        if (currentPage >= totalPages) currentPage = Math.max(0, totalPages - 1);
+        const start = currentPage * PAGE_SIZE;
+        const pageData = filteredData.slice(start, start + PAGE_SIZE);
+
+        // Update pagination controls
+        const info = document.getElementById('paginationInfo');
+        const prevBtn = document.getElementById('prevPageBtn');
+        const nextBtn = document.getElementById('nextPageBtn');
+        if (filteredData.length === 0) {
+            info.textContent = '0 devices';
+            prevBtn.disabled = true; nextBtn.disabled = true;
+        } else {
+            info.textContent = `${start + 1}–${Math.min(start + PAGE_SIZE, filteredData.length)} of ${filteredData.length}`;
+            prevBtn.disabled = currentPage === 0;
+            nextBtn.disabled = currentPage >= totalPages - 1;
+        }
+
+        if (pageData.length === 0) { tableBody.innerHTML = `<tr><td colspan="${cols.length}" style="text-align:center;padding:2rem;color:var(--text-secondary);">No devices match the current filters.</td></tr>`; return; }
+        let groupIdx = 0, lastAccount = null;
+        tableBody.innerHTML = pageData.map(row => {
+            if (groupByAccount) { const k = row.account || ''; if (k !== lastAccount) { if (lastAccount !== null) groupIdx++; lastAccount = k; } }
+            const bg = (groupByAccount && groupIdx % 2 === 1) ? ' style="background:rgba(79,70,229,0.03);"' : '';
+            return '<tr' + bg + '>' + cols.map(c => {
+                const val = row[c.key];
+                if (c.key === 'state') return `<td>${renderStatusBadge(val)}</td>`;
+                if (c.key === 'license_state') return `<td>${renderLicenseBadge(val)}</td>`;
+                const cls = c.clickable ? ' class="clickable-cell"' : '';
+                return `<td${cls}>${fmt(val)}</td>`;
+            }).join('') + '</tr>';
+        }).join('');
+    }
+
+    function updateStats() {
+        document.getElementById('statTotal').textContent = inventoryData.length;
+        document.getElementById('statOnline').textContent = inventoryData.filter(r => r.state === 'online').length;
+        document.getElementById('statOffline').textContent = inventoryData.filter(r => r.state === 'offline').length;
+        document.getElementById('statLicensed').textContent = inventoryData.filter(r => r.license_state === 'licensed').length;
+        document.getElementById('statGrace').textContent = inventoryData.filter(r => r.license_state === 'grace-period').length;
+        document.getElementById('statUnlicensed').textContent = inventoryData.filter(r => r.license_state === 'unlicensed').length;
+    }
+
+    // --- Progress indicator ---
+    const stepsDone = new Set();
+    function setProgress(step, message) {
+        if (message) {
+            const msg = message.toLowerCase();
+            // Only mark done when message contains a count (e.g. "1884 routers fetched")
+            // Pattern: number + space + keyword + " fetched"
+            if (/\d+\s.*router.*fetched/.test(msg)) stepsDone.add(0);
+            if (/\d+\s.*net device.*fetched/.test(msg)) stepsDone.add(1);
+            if (/\d+\s.*group.*fetched/.test(msg)) stepsDone.add(2);
+            if (/\d+\s.*asset endpoint.*fetched/.test(msg)) stepsDone.add(3);
+            if (/\d+\s.*subscription.*fetched/.test(msg)) stepsDone.add(4);
+            if (msg.includes('joining') || msg.includes('enriching') || msg.includes('building')) stepsDone.add(5);
+        }
+
+        for (let i = 0; i <= 5; i++) {
+            const el = document.getElementById('pstep' + i);
+            if (!el) continue;
+            const icon = el.querySelector('.step-icon');
+            if (stepsDone.has(i)) { el.className = 'progress-step done'; icon.textContent = '✓'; }
+            else if (!stepsDone.has(i) && stepsDone.size > 0) { el.className = 'progress-step active'; icon.textContent = '◉'; }
+            else { el.className = 'progress-step'; icon.textContent = '○'; }
+        }
+    }
+
+    // --- Fetch Data via SSE (streaming progress) ---
+    async function fetchData() {
+        // Reset loading UI fully (in case previous error replaced innerHTML)
+        loadingState.innerHTML = '<div class="spinner"></div><p id="loadingText">Fetching inventory data...</p><div class="progress-steps" id="progressSteps"><div class="progress-step active" id="pstep0"><span class="step-icon">◉</span> Fetching routers (v2)</div><div class="progress-step active" id="pstep1"><span class="step-icon">◉</span> Fetching net devices (v2)</div><div class="progress-step active" id="pstep2"><span class="step-icon">◉</span> Fetching groups & accounts (v2)</div><div class="progress-step active" id="pstep3"><span class="step-icon">◉</span> Fetching asset endpoints (v3)</div><div class="progress-step active" id="pstep4"><span class="step-icon">◉</span> Fetching subscriptions (v3)</div><div class="progress-step" id="pstep5"><span class="step-icon">○</span> Resolving & joining data</div></div>';
+        loadingState.style.display = 'flex';
+        dataTable.style.display = 'none';
+        stepsDone.clear();
+        setProgress(0, '');
+
+        return new Promise((resolve) => {
+            const evtSource = new EventSource('/api/data/stream');
+
+            evtSource.addEventListener('progress', (e) => {
+                try {
+                    const d = JSON.parse(e.data);
+                    setProgress(d.step || 0, d.message || '');
+                    if (d.message) document.getElementById('loadingText').textContent = d.message;
+                } catch {}
+            });
+
+            evtSource.addEventListener('data', (e) => {
+                evtSource.close();
+                try {
+                    const json = JSON.parse(e.data);
+                    if (json.status === 'error') {
+                        loadingState.innerHTML = `<p style="color:var(--danger-color);">Error: ${escapeHtml(json.message)}</p>`;
+                        showNotification('Failed: ' + json.message, 'error');
+                    } else {
+                        inventoryData = json.data || [];
+                        filteredData = [...inventoryData];
+                        if (json.account_name) document.getElementById('accountName').textContent = '— ' + json.account_name;
+                        updateStats();
+                        buildTableHeader();
+                        applyFilters();
+                        lastUpdated.textContent = `Updated: ${new Date(json.timestamp).toLocaleString()}`;
+                        dataTable.style.display = 'table';
+                        loadingState.style.display = 'none';
+                        showNotification(`Loaded ${inventoryData.length} device(s)`, 'success');
+                    }
+                } catch (err) {
+                    loadingState.innerHTML = `<p style="color:var(--danger-color);">Error parsing response</p>`;
+                    showNotification('Failed to parse response', 'error');
+                }
+                resolve();
+            });
+
+            evtSource.addEventListener('error', (e) => {
+                // SSE error could mean the connection was closed after data event
+                // Only show error if we haven't received data
+                if (loadingState.style.display !== 'none') {
+                    evtSource.close();
+                    loadingState.innerHTML = `<p style="color:var(--danger-color);">Error: Connection lost. Use the Settings panel (gear icon) to configure credentials, or set environment variables and reload.</p>`;
+                    showNotification('Connection lost', 'error');
+                }
+                resolve();
+            });
+
+            evtSource.onerror = () => {
+                // Fallback: try the regular endpoint if SSE fails
+                evtSource.close();
+                if (loadingState.style.display !== 'none') {
+                    fetchDataFallback().then(resolve);
+                } else {
+                    resolve();
+                }
+            };
+        });
+    }
+
+    // Fallback to regular fetch if SSE doesn't work
+    async function fetchDataFallback() {
+        document.getElementById('loadingText').textContent = 'Loading (this may take a while on large accounts)...';
+        try {
+            const resp = await fetch('/api/data');
+            const json = await resp.json();
+            if (json.status === 'error') throw new Error(json.message);
+            inventoryData = json.data || [];
+            filteredData = [...inventoryData];
+            if (json.account_name) document.getElementById('accountName').textContent = '— ' + json.account_name;
+            updateStats();
+            buildTableHeader();
+            applyFilters();
+            lastUpdated.textContent = `Updated: ${new Date(json.timestamp).toLocaleString()}`;
+            dataTable.style.display = 'table';
+            loadingState.style.display = 'none';
+            showNotification(`Loaded ${inventoryData.length} device(s)`, 'success');
+        } catch (err) {
+            loadingState.innerHTML = `<p style="color:var(--danger-color);">Error: ${escapeHtml(err.message)}</p>`;
+            showNotification('Failed: ' + err.message, 'error');
+        }
+    }
+
+    // --- CSV Export ---
+    document.getElementById('exportCsvBtn').addEventListener('click', () => {
+        if (!filteredData.length) return;
+        const cols = getVisibleColumns();
+        let csv = cols.map(c => c.label).join(',') + '\n';
+        filteredData.forEach(row => {
+            csv += cols.map(c => { let v = row[c.key] != null ? String(row[c.key]) : ''; if (v.includes(',') || v.includes('"') || v.includes('\n')) v = '"' + v.replace(/"/g, '""') + '"'; return v; }).join(',') + '\n';
+        });
+        const blob = new Blob([csv], {type: 'text/csv'});
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+        a.download = `inventory_${new Date().toISOString().slice(0,10)}.csv`;
+        a.click(); URL.revokeObjectURL(a.href);
+        showNotification('CSV exported', 'success');
+    });
+
+    // --- PDF Export ---
+    document.getElementById('exportPdfBtn').addEventListener('click', () => {
+        if (!filteredData.length) return;
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        doc.setFontSize(16); doc.setTextColor(79, 70, 229);
+        doc.text('Inventory Report', 14, 15);
+        doc.setFontSize(9); doc.setTextColor(107, 114, 128);
+        const acct = document.getElementById('accountName').textContent.replace('— ', '');
+        doc.text(`Account: ${acct}  |  Generated: ${new Date().toLocaleString()}  |  Devices: ${filteredData.length}`, 14, 22);
+        const licensed = filteredData.filter(r => r.license_state === 'licensed').length;
+        const grace = filteredData.filter(r => r.license_state === 'grace-period').length;
+        const unlicensed = filteredData.filter(r => r.license_state === 'unlicensed').length;
+        const online = filteredData.filter(r => r.state === 'online').length;
+        doc.text(`Online: ${online}  |  Licensed: ${licensed}  |  Grace: ${grace}  |  Unlicensed: ${unlicensed}`, 14, 27);
+        const pdfCols = ['router_name','state','license_state','account','group','product','mac','carrier','subscription_type','subscription_end'];
+        const pdfHeaders = ['Device','Status','License','Account','Group','Product','MAC','Carrier','Subscription','Expires'];
+        const rows = filteredData.map(r => pdfCols.map(c => r[c] != null ? String(r[c]) : ''));
+        doc.autoTable({ head: [pdfHeaders], body: rows, startY: 32, theme: 'grid', headStyles: { fillColor: [79, 70, 229], textColor: 255, fontSize: 7, fontStyle: 'bold', halign: 'center' }, bodyStyles: { fontSize: 6.5, cellPadding: 1.5 }, alternateRowStyles: { fillColor: [245, 247, 250] },
+            didParseCell: function(data) { if (data.section === 'body' && data.column.index === 1) { const v = (data.cell.raw || '').toLowerCase(); if (v === 'online') data.cell.styles.textColor = [5, 150, 105]; else if (v === 'offline') data.cell.styles.textColor = [220, 38, 38]; } if (data.section === 'body' && data.column.index === 2) { const v = (data.cell.raw || '').toLowerCase(); if (v === 'licensed') data.cell.styles.textColor = [5, 150, 105]; else if (v === 'grace-period') data.cell.styles.textColor = [217, 119, 6]; else if (v === 'unlicensed') data.cell.styles.textColor = [220, 38, 38]; } },
+            margin: { left: 14, right: 14 } });
+        const pageCount = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) { doc.setPage(i); doc.setFontSize(7); doc.setTextColor(156, 163, 175); doc.text(`Page ${i} of ${pageCount}`, doc.internal.pageSize.width - 25, doc.internal.pageSize.height - 8); doc.text('Inventory Dashboard', 14, doc.internal.pageSize.height - 8); }
+        doc.save(`inventory_${new Date().toISOString().slice(0,10)}.pdf`);
+        showNotification('PDF exported', 'success');
+    });
+
+    // --- Click cell to search ---
+    document.getElementById('tableBody').addEventListener('click', (e) => { const cell = e.target.closest('.clickable-cell'); if (!cell) return; const text = cell.textContent.trim(); if (text && text !== '—') { searchInput.value = text; toggleClearBtn(); applyFilters(); } });
+
+    // --- Clear search ---
+    const clearSearchBtn = document.getElementById('clearSearchBtn');
+    function toggleClearBtn() { clearSearchBtn.style.display = searchInput.value ? 'block' : 'none'; }
+    searchInput.addEventListener('input', () => { toggleClearBtn(); currentPage = 0; applyFilters(); });
+    clearSearchBtn.addEventListener('click', () => { searchInput.value = ''; toggleClearBtn(); currentPage = 0; applyFilters(); searchInput.focus(); });
+
+    // --- Pagination ---
+    document.getElementById('prevPageBtn').addEventListener('click', () => { if (currentPage > 0) { currentPage--; renderTable(); document.getElementById('tableContainer').scrollTop = 0; } });
+    document.getElementById('nextPageBtn').addEventListener('click', () => { const totalPages = Math.ceil(filteredData.length / PAGE_SIZE); if (currentPage < totalPages - 1) { currentPage++; renderTable(); document.getElementById('tableContainer').scrollTop = 0; } });
+
+    // --- Display options ---
+    const groupToggle = document.getElementById('groupByAccountToggle');
+    groupToggle.checked = groupByAccount;
+    groupToggle.addEventListener('change', () => { groupByAccount = groupToggle.checked; localStorage.setItem('inv2_groupByAccount', groupByAccount); applyFilters(); });
+
+    const modemToggle = document.getElementById('showModemCols');
+    modemToggle.checked = showModemCols;
+    modemToggle.addEventListener('change', () => { showModemCols = modemToggle.checked; localStorage.setItem('inv2_showModem', showModemCols); buildTableHeader(); renderTable(); });
+
+    // --- Init ---
+    buildTableHeader();
+
+    // Auto-load first saved profile on startup
+    (async function autoLoadProfile() {
+        try {
+            const resp = await fetch('/api/profiles');
+            const profiles = await resp.json();
+            const names = Object.keys(profiles).sort();
+            if (names.length > 0) {
+                const firstName = names[0];
+                const loadResp = await fetch('/api/profiles/load', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: firstName}) });
+                if (loadResp.ok) {
+                    showNotification(`Profile "${firstName}" auto-loaded. Configure in Settings (gear icon).`, 'success');
+                }
+            }
+        } catch (e) { /* ignore — profiles may not exist yet */ }
+        fetchData();
+    })();
+    </script>
+</body>
+</html>

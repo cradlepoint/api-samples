@@ -16,7 +16,7 @@ import time
 from datetime import datetime, timedelta, timezone
 import ncm
 
-# Optional: Set your NCM API v3 token here, or use NCM_API_TOKEN/TOKEN environment variable
+# Optional: Set your NCM API v3 token here, or use NCM_API_TOKEN environment variable
 NCM_API_TOKEN = None  # Set to your token string if you want to hardcode it
 
 def get_yesterday_iso():
@@ -32,7 +32,7 @@ def _get_v3_client():
         return client.v3
     if isinstance(client, ncm.NcmClientv3):
         return client
-    raise RuntimeError("NCM v3 client not available. Please set NCM_API_TOKEN or TOKEN environment variable.")
+    raise RuntimeError("NCM v3 client not available. Please set NCM_API_TOKEN environment variable.")
 
 
 def get_subscriptions_with_asset_endpoints(end_time_gt):

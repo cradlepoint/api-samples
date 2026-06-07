@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cellular Health Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #4f46e5;
+            --primary-dark: #3730a3;
+            --secondary-color: #6b7280;
+            --success-color: #059669;
+            --warning-color: #d97706;
+            --danger-color: #dc2626;
+            --info-color: #0284c7;
+            --dark-bg: #111827;
+            --dark-surface: #1f2937;
+            --light-bg: #f9fafb;
+            --light-surface: #ffffff;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --text-light: #9ca3af;
+            --border-color: #d1d5db;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+            --radius-sm: 0.375rem;
+            --radius-md: 0.5rem;
+            --radius-lg: 0.75rem;
+            --radius-xl: 1rem;
+            --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            height: 100vh;
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow: hidden;
+        }
+        .app-container { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        .app-header { background: var(--light-bg); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border-color); box-shadow: var(--shadow-md); position: sticky; top: 0; z-index: 100; }
+        .header-content { max-width: 100%; margin: 0 auto; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; gap: 2rem; }
+        .logo-section { display: flex; align-items: center; gap: 1rem; }
+        .app-logo { height: 40px; width: auto; }
+        body.dark-mode .app-logo { content: url('/static/logo_dark.png'); }
+        #app-title { font-size: 1.875rem; font-weight: 700; margin: 0; background: linear-gradient(135deg, var(--primary-color), var(--info-color)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .header-actions { display: flex; align-items: center; gap: 1rem; }
+        .dark-mode-toggle { background: var(--light-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.75rem; cursor: pointer; transition: var(--transition); color: var(--text-primary); box-shadow: var(--shadow-sm); display: flex; align-items: center; justify-content: center; }
+        .dark-mode-toggle:hover { background: var(--light-bg); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+        .content-area { flex: 1; padding: 1.5rem 2rem; max-width: 1600px; margin: 0 auto; width: 100%; overflow: hidden; display: flex; flex-direction: column; }
+        .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card { background: var(--light-surface); border: 2px solid var(--border-color); border-radius: var(--radius-lg); padding: 1.25rem; box-shadow: var(--shadow-sm); transition: var(--transition); cursor: pointer; user-select: none; }
+        .stat-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+        .stat-card.active { border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2); }
+        .stat-card .stat-label { font-size: 0.8125rem; color: var(--text-secondary); font-weight: 500; margin-bottom: 0.25rem; }
+        .stat-card .stat-value { font-size: 1.75rem; font-weight: 700; color: var(--text-primary); }
+        .stat-card .stat-value.online { color: var(--success-color); }
+        .stat-card .stat-value.offline { color: var(--danger-color); }
+        .stat-card .stat-value.warning { color: var(--warning-color); }
+        .controls-bar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+        .controls-left { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+        .controls-right { display: flex; align-items: center; gap: 0.75rem; }
+        .search-input { padding: 0.625rem 1rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 0.875rem; width: 420px; transition: var(--transition); background: var(--light-surface); font-family: inherit; }
+        .search-input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
+        .btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.625rem 1.25rem; border: none; border-radius: var(--radius-md); font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: var(--transition); box-shadow: var(--shadow-sm); font-family: inherit; }
+        .btn-primary { background: linear-gradient(135deg, var(--primary-color), var(--primary-dark)); color: white; }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--shadow-lg); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-secondary { background: var(--light-surface); color: var(--text-primary); border: 1px solid var(--border-color); }
+        .btn-secondary:hover { background: var(--light-bg); }
+        .table-panel { background: var(--light-surface); border: 1px solid var(--border-color); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); overflow: hidden; flex: 1; display: flex; flex-direction: column; min-height: 0; }
+        .panel-header { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-color); background: linear-gradient(135deg, var(--light-bg), rgba(255, 255, 255, 0.8)); display: flex; justify-content: space-between; align-items: center; }
+        .panel-header h2 { font-size: 1.125rem; font-weight: 600; color: var(--text-primary); }
+        .last-updated { font-size: 0.8125rem; color: var(--text-secondary); }
+        .table-container { overflow-x: auto; overflow-y: auto; flex: 1; min-height: 0; }
+        .health-table { width: 100%; border-collapse: collapse; min-width: 1100px; }
+        .health-table th, .health-table td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 0.8125rem; white-space: nowrap; }
+        .health-table th { background: var(--light-bg); font-weight: 600; position: sticky; top: 0; z-index: 10; color: var(--text-secondary); text-transform: uppercase; font-size: 0.6875rem; letter-spacing: 0.05em; cursor: pointer; user-select: none; }
+        .health-table th:hover { background: var(--border-color); }
+        .health-table th .sort-arrow { margin-left: 4px; opacity: 0.4; }
+        .health-table th.sorted .sort-arrow { opacity: 1; }
+        .health-table tbody tr { transition: var(--transition); }
+        .health-table tbody tr:hover { background: var(--light-bg); }
+        .health-table tbody tr.group-even { background: rgba(79, 70, 229, 0.03); }
+        .health-table tbody tr.group-even:hover { background: rgba(79, 70, 229, 0.08); }
+        .health-table td.clickable-cell:hover { text-decoration: underline; color: var(--primary-color); }
+        .status-badge { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.625rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; }
+        .status-badge.online { background: rgba(5, 150, 105, 0.1); color: var(--success-color); }
+        .status-badge.offline { background: rgba(220, 38, 38, 0.1); color: var(--danger-color); }
+        .status-badge.unplugged { background: rgba(107, 114, 128, 0.1); color: var(--secondary-color); }
+        .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+        .signal-bar { display: inline-flex; align-items: flex-end; gap: 2px; height: 16px; vertical-align: middle; }
+        .signal-bar .bar { width: 3px; border-radius: 1px; background: var(--border-color); transition: var(--transition); }
+        .signal-bar .bar:nth-child(1) { height: 4px; } .signal-bar .bar:nth-child(2) { height: 7px; } .signal-bar .bar:nth-child(3) { height: 10px; } .signal-bar .bar:nth-child(4) { height: 13px; } .signal-bar .bar:nth-child(5) { height: 16px; }
+        .signal-bar.excellent .bar { background: var(--success-color); }
+        .signal-bar.good .bar:nth-child(-n+4) { background: var(--success-color); }
+        .signal-bar.fair .bar:nth-child(-n+3) { background: var(--warning-color); }
+        .signal-bar.poor .bar:nth-child(-n+2) { background: var(--danger-color); }
+        .signal-bar.none .bar:nth-child(-n+1) { background: var(--danger-color); }
+        .signal-text { margin-left: 0.5rem; } .signal-text.excellent { color: var(--success-color); } .signal-text.good { color: var(--success-color); } .signal-text.fair { color: var(--warning-color); } .signal-text.poor { color: var(--danger-color); } .signal-text.none { color: var(--text-light); }
+        .loading-overlay { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4rem 2rem; color: var(--text-secondary); }
+        .spinner { display: inline-block; width: 32px; height: 32px; border: 3px solid var(--border-color); border-top-color: var(--primary-color); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 1rem; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .notification { position: fixed; bottom: 2rem; right: 2rem; padding: 1rem 1.5rem; background: var(--light-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-xl); display: none; z-index: 2000; max-width: 400px; animation: slideIn 0.3s ease-out; }
+        .notification.show { display: block; } .notification.success { border-left: 4px solid var(--success-color); } .notification.error { border-left: 4px solid var(--danger-color); }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        body.dark-mode { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #f9fafb; }
+        body.dark-mode .app-header, body.dark-mode .stat-card, body.dark-mode .table-panel, body.dark-mode .panel-header { background: #1e293b; border-color: #4b5563; color: #f9fafb; }
+        body.dark-mode .stat-card.active { border-color: var(--primary-color); }
+        body.dark-mode #app-title { color: #f9fafb; }
+        body.dark-mode .stat-card .stat-label { color: #9ca3af; } body.dark-mode .stat-card .stat-value { color: #f9fafb; }
+        body.dark-mode .health-table th { background: #374151; color: #d1d5db; border-color: #4b5563; }
+        body.dark-mode .health-table th:hover { background: #4b5563; }
+        body.dark-mode .health-table td { border-color: #4b5563; color: #f9fafb; }
+        body.dark-mode .health-table tbody tr:hover { background: #374151; }
+        body.dark-mode .health-table tbody tr.group-even { background: rgba(79, 70, 229, 0.08); }
+        body.dark-mode .health-table tbody tr.group-even:hover { background: rgba(79, 70, 229, 0.15); }
+        body.dark-mode .search-input { background: #374151; border-color: #4b5563; color: #f9fafb; }
+        body.dark-mode .btn-secondary { background: #374151; border-color: #4b5563; color: #f9fafb; }
+        body.dark-mode .dark-mode-toggle { background: #374151; border-color: #4b5563; color: #f9fafb; }
+        body.dark-mode .notification { background: #1e293b; border-color: #4b5563; color: #f9fafb; }
+        body.dark-mode .panel-header h2, body.dark-mode .last-updated { color: #d1d5db; }
+        body.dark-mode .signal-bar .bar { background: #4b5563; }
+        body.dark-mode #settingsModal > div { background: #1e293b; border-color: #4b5563; color: #f9fafb; }
+        body.dark-mode #settingsModal input, body.dark-mode #settingsModal select { background: #374151; border-color: #4b5563; color: #f9fafb; }
+        body.dark-mode #settingsModal label { color: #d1d5db; }
+        body.dark-mode #settingsModal h2 { color: #f9fafb; }
+        @media (max-width: 1024px) { .content-area { padding: 1.5rem; } .stats-row { grid-template-columns: repeat(4, 1fr); } }
+        @media (max-width: 768px) { .header-content { padding: 1rem; } #app-title { font-size: 1.25rem; } .content-area { padding: 1rem; } .stats-row { grid-template-columns: repeat(2, 1fr); } .controls-bar { flex-direction: column; align-items: stretch; } .search-input { width: 100%; } }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <img src="/static/logo.png" alt="Logo" class="app-logo">
+                    <h1 id="app-title">Cellular Health Dashboard</h1>
+                    <span id="accountName" style="margin-left:1rem;font-size:0.9375rem;color:var(--text-secondary);font-weight:500;"></span>
+                </div>
+                <div class="header-actions">
+                    <button class="dark-mode-toggle" id="settingsBtn" aria-label="Settings" title="API Settings">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    </button>
+                    <button class="dark-mode-toggle" id="darkModeToggle" aria-label="Toggle dark mode">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                    </button>
+                </div>
+            </div>
+        </header>
+        <main class="content-area">
+            <div class="stats-row">
+                <div class="stat-card" data-filter="all"><div class="stat-label">Total Devices</div><div class="stat-value" id="statTotal">—</div></div>
+                <div class="stat-card" data-filter="online"><div class="stat-label">Online</div><div class="stat-value online" id="statOnline">—</div></div>
+                <div class="stat-card" data-filter="offline"><div class="stat-label">Offline</div><div class="stat-value offline" id="statOffline">—</div></div>
+                <div class="stat-card" data-filter="excellent"><div class="stat-label">Excellent</div><div class="stat-value online" id="statExcellent">—</div></div>
+                <div class="stat-card" data-filter="good"><div class="stat-label">Good</div><div class="stat-value online" id="statGood">—</div></div>
+                <div class="stat-card" data-filter="fair"><div class="stat-label">Fair</div><div class="stat-value warning" id="statFair">—</div></div>
+                <div class="stat-card" data-filter="poor"><div class="stat-label">Poor</div><div class="stat-value offline" id="statPoor">—</div></div>
+            </div>
+            <div class="controls-bar">
+                <div class="controls-left">
+                    <div style="position:relative;display:inline-block;">
+                        <input type="text" class="search-input" id="searchInput" placeholder="Search by name, carrier, model, MAC..." style="padding-right:2rem;">
+                        <button id="clearSearchBtn" style="position:absolute;right:0.5rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-light);font-size:1.1rem;display:none;padding:0.25rem;" aria-label="Clear search">✕</button>
+                    </div>
+                    <button class="btn btn-secondary" id="exportCsvBtn">⬇ CSV</button>
+                    <button class="btn btn-secondary" id="exportPdfBtn">⬇ PDF</button>
+                </div>
+                <div class="controls-right">
+                    <span id="paginationInfo" style="font-size:0.8125rem;color:var(--text-secondary);"></span>
+                    <button class="btn btn-secondary" id="prevPageBtn" style="padding:0.5rem 0.75rem;" disabled>← Prev</button>
+                    <button class="btn btn-secondary" id="nextPageBtn" style="padding:0.5rem 0.75rem;" disabled>Next →</button>
+                </div>
+            </div>
+            <div class="table-panel">
+                <div class="panel-header">
+                    <h2>Device Cellular Health</h2>
+                    <span class="last-updated" id="lastUpdated"></span>
+                </div>
+                <div class="table-container" id="tableContainer">
+                    <div class="loading-overlay" id="loadingState"><div class="spinner"></div><p>Loading cellular health data...</p></div>
+                    <table class="health-table" id="healthTable" style="display:none;">
+                        <thead><tr>
+                            <th data-key="router_name">Device Name <span class="sort-arrow">↕</span></th>
+                            <th data-key="router_state">Status <span class="sort-arrow">↕</span></th>
+                            <th data-key="model">Model <span class="sort-arrow">↕</span></th>
+                            <th data-key="interface_name">Interface <span class="sort-arrow">↕</span></th>
+                            <th data-key="carrier">Carrier <span class="sort-arrow">↕</span></th>
+                            <th data-key="health_category">Health <span class="sort-arrow">↕</span></th>
+                            <th data-key="health_score">Score <span class="sort-arrow">↕</span></th>
+                            <th data-key="dbm">RSSI (dBm) <span class="sort-arrow">↕</span></th>
+                            <th data-key="rsrp">RSRP (dBm) <span class="sort-arrow">↕</span></th>
+                            <th data-key="rsrq">RSRQ (dB) <span class="sort-arrow">↕</span></th>
+                            <th data-key="sinr">SINR (dB) <span class="sort-arrow">↕</span></th>
+                            <th data-key="signal_strength">Signal % <span class="sort-arrow">↕</span></th>
+                            <th data-key="updated_at">Last Updated <span class="sort-arrow">↕</span></th>
+                        </tr></thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+    <div class="notification" id="notification"></div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);z-index:1000;align-items:center;justify-content:center;">
+        <div style="background:var(--light-surface);border-radius:var(--radius-xl);box-shadow:var(--shadow-xl);width:90%;max-width:560px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:1.25rem 1.5rem;border-bottom:1px solid var(--border-color);background:var(--light-bg);">
+                <h2 style="font-size:1.125rem;font-weight:600;">Settings</h2>
+                <button id="closeSettingsBtn" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:var(--text-secondary);width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:var(--radius-sm);">×</button>
+            </div>
+            <div style="padding:1.5rem;overflow-y:auto;flex:1;">
+                <!-- Profile selector -->
+                <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:1.25rem;">
+                    <select id="profileSelect" style="flex:1;padding:0.5rem 0.75rem;border:1px solid var(--border-color);border-radius:var(--radius-md);font-size:0.875rem;font-family:inherit;background:var(--light-surface);">
+                        <option value="">— Select Profile —</option>
+                    </select>
+                    <button class="btn btn-secondary" id="loadProfileBtn" style="padding:0.5rem 0.75rem;">Load</button>
+                    <button class="btn btn-secondary" id="deleteProfileBtn" style="padding:0.5rem 0.75rem;color:var(--danger-color);">Delete</button>
+                </div>
+                <!-- Credential fields -->
+                <div style="display:flex;flex-direction:column;gap:1rem;">
+                    <div><label style="display:block;font-size:0.8125rem;font-weight:500;margin-bottom:0.25rem;">X_CP_API_ID</label><input type="text" id="credCpApiId" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border-color);border-radius:var(--radius-md);font-size:0.875rem;font-family:monospace;background:var(--light-surface);"></div>
+                    <div><label style="display:block;font-size:0.8125rem;font-weight:500;margin-bottom:0.25rem;">X_CP_API_KEY</label><div style="position:relative;"><input type="password" id="credCpApiKey" style="width:100%;padding:0.5rem 0.75rem;padding-right:2.5rem;border:1px solid var(--border-color);border-radius:var(--radius-md);font-size:0.875rem;font-family:monospace;background:var(--light-surface);"><button type="button" class="eye-toggle" data-target="credCpApiKey" style="position:absolute;right:0.5rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-secondary);padding:0.25rem;" aria-label="Toggle visibility">👁</button></div></div>
+                    <div><label style="display:block;font-size:0.8125rem;font-weight:500;margin-bottom:0.25rem;">X_ECM_API_ID</label><input type="text" id="credEcmApiId" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border-color);border-radius:var(--radius-md);font-size:0.875rem;font-family:monospace;background:var(--light-surface);"></div>
+                    <div><label style="display:block;font-size:0.8125rem;font-weight:500;margin-bottom:0.25rem;">X_ECM_API_KEY</label><div style="position:relative;"><input type="password" id="credEcmApiKey" style="width:100%;padding:0.5rem 0.75rem;padding-right:2.5rem;border:1px solid var(--border-color);border-radius:var(--radius-md);font-size:0.875rem;font-family:monospace;background:var(--light-surface);"><button type="button" class="eye-toggle" data-target="credEcmApiKey" style="position:absolute;right:0.5rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-secondary);padding:0.25rem;" aria-label="Toggle visibility">👁</button></div></div>
+                </div>
+                <!-- Actions -->
+                <div style="display:flex;gap:0.5rem;margin-top:1.5rem;flex-wrap:wrap;">
+                    <button class="btn btn-primary" id="applyCredsBtn">Apply & Refresh</button>
+                    <button class="btn btn-secondary" id="saveProfileBtn">Save Profile</button>
+                    <button class="btn btn-secondary" id="saveAsProfileBtn">Save As…</button>
+                </div>
+                <!-- Display Options -->
+                <div style="margin-top:1.5rem;padding-top:1.25rem;border-top:1px solid var(--border-color);">
+                    <h3 style="font-size:0.875rem;font-weight:600;margin-bottom:0.75rem;">Display Options</h3>
+                    <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;cursor:pointer;">
+                        <input type="checkbox" id="groupByRouterToggle" style="width:1rem;height:1rem;cursor:pointer;">
+                        Group interfaces by device (shade rows)
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // Settings modal logic
+    (function() {
+        const modal = document.getElementById('settingsModal');
+        const profileSelect = document.getElementById('profileSelect');
+
+        document.getElementById('settingsBtn').addEventListener('click', () => { modal.style.display = 'flex'; refreshProfiles(); loadCurrentCreds(); });
+        document.getElementById('closeSettingsBtn').addEventListener('click', () => { modal.style.display = 'none'; });
+        modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+
+        // Eye toggle for password fields
+        document.querySelectorAll('.eye-toggle').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const input = document.getElementById(btn.dataset.target);
+                if (input.type === 'password') { input.type = 'text'; btn.textContent = '🙈'; }
+                else { input.type = 'password'; btn.textContent = '👁'; }
+            });
+        });
+
+        function getCredFields() {
+            return {
+                X_CP_API_ID: document.getElementById('credCpApiId').value.trim(),
+                X_CP_API_KEY: document.getElementById('credCpApiKey').value.trim(),
+                X_ECM_API_ID: document.getElementById('credEcmApiId').value.trim(),
+                X_ECM_API_KEY: document.getElementById('credEcmApiKey').value.trim(),
+            };
+        }
+
+        function setCredFields(creds) {
+            document.getElementById('credCpApiId').value = creds.X_CP_API_ID || '';
+            document.getElementById('credCpApiKey').value = creds.X_CP_API_KEY || '';
+            document.getElementById('credEcmApiId').value = creds.X_ECM_API_ID || '';
+            document.getElementById('credEcmApiKey').value = creds.X_ECM_API_KEY || '';
+        }
+
+        async function refreshProfiles() {
+            const resp = await fetch('/api/profiles');
+            const profiles = await resp.json();
+            profileSelect.innerHTML = '<option value="">— Select Profile —</option>';
+            Object.keys(profiles).sort().forEach(name => {
+                profileSelect.innerHTML += `<option value="${name}">${name}</option>`;
+            });
+        }
+
+        async function loadCurrentCreds() {
+            const resp = await fetch('/api/profiles/current');
+            const data = await resp.json();
+            // Populate fields with actual values so user can save as profile
+            document.getElementById('credCpApiId').value = data.X_CP_API_ID?.value || '';
+            document.getElementById('credCpApiKey').value = data.X_CP_API_KEY?.value || '';
+            document.getElementById('credEcmApiId').value = data.X_ECM_API_ID?.value || '';
+            document.getElementById('credEcmApiKey').value = data.X_ECM_API_KEY?.value || '';
+        }
+
+        // Load profile
+        document.getElementById('loadProfileBtn').addEventListener('click', async () => {
+            const name = profileSelect.value;
+            if (!name) return;
+            const resp = await fetch('/api/profiles/load', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name}) });
+            if (resp.ok) {
+                showNotification(`Profile "${name}" loaded — refreshing data...`, 'success');
+                modal.style.display = 'none';
+                await fetchHealth();
+            } else {
+                const err = await resp.json();
+                showNotification(err.error || 'Load failed', 'error');
+            }
+        });
+
+        // Delete profile
+        document.getElementById('deleteProfileBtn').addEventListener('click', async () => {
+            const name = profileSelect.value;
+            if (!name) return;
+            if (!confirm(`Delete profile "${name}"?`)) return;
+            const resp = await fetch(`/api/profiles/${encodeURIComponent(name)}`, { method: 'DELETE' });
+            if (resp.ok) { showNotification(`Deleted "${name}"`, 'success'); refreshProfiles(); }
+            else { showNotification('Delete failed', 'error'); }
+        });
+
+        // Apply credentials
+        document.getElementById('applyCredsBtn').addEventListener('click', async () => {
+            const creds = getCredFields();
+            const resp = await fetch('/api/credentials/apply', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({credentials: creds}) });
+            if (!resp.ok) {
+                showNotification('Failed to apply credentials', 'error');
+                return;
+            }
+            showNotification('Credentials applied — refreshing data...', 'success');
+            modal.style.display = 'none';
+            await fetchHealth();
+        });
+
+        // Save profile (overwrite current selection)
+        document.getElementById('saveProfileBtn').addEventListener('click', async () => {
+            const name = profileSelect.value;
+            if (!name) { document.getElementById('saveAsProfileBtn').click(); return; }
+            if (!confirm(`Overwrite profile "${name}"?`)) return;
+            const creds = getCredFields();
+            await fetch('/api/profiles', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name, credentials: creds, overwrite: true}) });
+            showNotification(`Profile "${name}" saved`, 'success');
+            refreshProfiles();
+        });
+
+        // Save As
+        document.getElementById('saveAsProfileBtn').addEventListener('click', async () => {
+            const name = prompt('Profile name:');
+            if (!name || !name.trim()) return;
+            const creds = getCredFields();
+            const resp = await fetch('/api/profiles', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: name.trim(), credentials: creds, overwrite: false}) });
+            if (resp.status === 409) {
+                if (confirm(`Profile "${name.trim()}" exists. Overwrite?`)) {
+                    await fetch('/api/profiles', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: name.trim(), credentials: creds, overwrite: true}) });
+                    showNotification(`Profile "${name.trim()}" saved`, 'success');
+                }
+            } else if (resp.ok) {
+                showNotification(`Profile "${name.trim()}" created`, 'success');
+            }
+            refreshProfiles();
+        });
+    })();
+    </script>
+    <script>
+        let healthData = [];
+        let filteredData = [];
+        let activeFilter = 'all';
+        let sortKey = null;
+        let sortDir = 1; // 1 = asc, -1 = desc
+        let groupByRouter = localStorage.getItem('groupByRouter') !== 'false'; // default true
+        let currentPage = 0;
+        const PAGE_SIZE = 100;
+
+        const searchInput = document.getElementById('searchInput');
+        const tableBody = document.getElementById('tableBody');
+        const healthTable = document.getElementById('healthTable');
+        const loadingState = document.getElementById('loadingState');
+        const lastUpdated = document.getElementById('lastUpdated');
+
+        // Dark mode
+        document.getElementById('darkModeToggle').addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            localStorage.setItem('darkMode', document.body.classList.contains('dark-mode'));
+        });
+        if (localStorage.getItem('darkMode') === 'true') document.body.classList.add('dark-mode');
+
+        // Signal quality from health_category
+        function getSignalQuality(row) {
+            const cat = (row.health_category || '').toLowerCase();
+            if (cat === 'excellent' || cat === 'good' || cat === 'fair' || cat === 'poor') return cat;
+            const pct = row.signal_strength;
+            if (pct != null) { if (pct >= 75) return 'excellent'; if (pct >= 50) return 'good'; if (pct >= 25) return 'fair'; return 'poor'; }
+            return 'none';
+        }
+
+        function getSignalLabel(q) { return {excellent:'Excellent',good:'Good',fair:'Fair',poor:'Poor',none:'N/A'}[q]||'N/A'; }
+
+        function renderSignalBars(q) {
+            return `<span class="signal-bar ${q}"><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span></span><span class="signal-text ${q}">${getSignalLabel(q)}</span>`;
+        }
+
+        function renderStatusBadge(state) {
+            const s = (state || 'unknown').toLowerCase();
+            return `<span class="status-badge ${s}"><span class="status-dot"></span>${s.charAt(0).toUpperCase()+s.slice(1)}</span>`;
+        }
+
+        function fmt(val) { return (val == null || val === '') ? '—' : val; }
+        function fmtDate(d) { if (!d) return '—'; try { return new Date(d).toLocaleString(); } catch { return d; } }
+        function escapeHtml(t) { if (!t) return ''; const d=document.createElement('div'); d.textContent=t; return d.innerHTML; }
+
+        // Stat card click filtering
+        document.querySelectorAll('.stat-card[data-filter]').forEach(card => {
+            card.addEventListener('click', () => {
+                const f = card.dataset.filter;
+                if (activeFilter === f) { activeFilter = 'all'; } else { activeFilter = f; }
+                document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active'));
+                if (activeFilter !== 'all') card.classList.add('active');
+                currentPage = 0;
+                applyFilters();
+            });
+        });
+
+        // Filtering
+        function applyFilters() {
+            const search = searchInput.value.toLowerCase().trim();
+            filteredData = healthData.filter(row => {
+                if (search) {
+                    const hay = [row.router_name, row.carrier, row.mac, row.model, row.interface_name].join(' ').toLowerCase();
+                    if (!hay.includes(search)) return false;
+                }
+                if (activeFilter === 'all') return true;
+                if (activeFilter === 'online') return row.router_state === 'online';
+                if (activeFilter === 'offline') return row.router_state === 'offline';
+                return getSignalQuality(row) === activeFilter;
+            });
+            if (sortKey || groupByRouter) doSort();
+            renderTable();
+        }
+
+        // Sorting
+        function doSort() {
+            if (groupByRouter && !sortKey) {
+                // Default grouping: sort by router_name only
+                filteredData.sort((a, b) => {
+                    const ra = (a.router_name || '').toLowerCase();
+                    const rb = (b.router_name || '').toLowerCase();
+                    return ra.localeCompare(rb);
+                });
+            } else if (groupByRouter && sortKey) {
+                // User clicked a column: primary sort by that column, but keep same-router items adjacent
+                // Sort by clicked column first, then router_name as tiebreaker
+                filteredData.sort((a, b) => {
+                    const ra = (a.router_name || '').toLowerCase();
+                    const rb = (b.router_name || '').toLowerCase();
+                    if (ra !== rb) return ra.localeCompare(rb);
+                    let av = a[sortKey], bv = b[sortKey];
+                    if (av == null) av = '';
+                    if (bv == null) bv = '';
+                    if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * sortDir;
+                    return String(av).localeCompare(String(bv), undefined, {numeric: true}) * sortDir;
+                });
+                // Now sort the groups themselves by the worst/best value in the group
+                // Group by router, get representative value, sort groups
+                const groups = new Map();
+                filteredData.forEach(row => {
+                    const key = row.router_id || row.router_name || '';
+                    if (!groups.has(key)) groups.set(key, []);
+                    groups.get(key).push(row);
+                });
+                const groupArr = [...groups.values()];
+                groupArr.sort((ga, gb) => {
+                    // Use first item's sort key value as representative
+                    let av = ga[0][sortKey], bv = gb[0][sortKey];
+                    if (av == null) av = '';
+                    if (bv == null) bv = '';
+                    if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * sortDir;
+                    return String(av).localeCompare(String(bv), undefined, {numeric: true}) * sortDir;
+                });
+                filteredData = groupArr.flat();
+            } else if (sortKey) {
+                // No grouping: simple sort by column
+                filteredData.sort((a, b) => {
+                    let av = a[sortKey], bv = b[sortKey];
+                    if (av == null) av = '';
+                    if (bv == null) bv = '';
+                    if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * sortDir;
+                    return String(av).localeCompare(String(bv), undefined, {numeric: true}) * sortDir;
+                });
+            }
+        }
+
+        // Column sorting via event delegation on thead
+        document.addEventListener('click', (e) => {
+            const th = e.target.closest('.health-table th[data-key]');
+            if (!th) return;
+            const key = th.dataset.key;
+            if (sortKey === key) { sortDir *= -1; } else { sortKey = key; sortDir = 1; }
+            document.querySelectorAll('.health-table th').forEach(t => { t.classList.remove('sorted'); const arrow = t.querySelector('.sort-arrow'); if (arrow) arrow.textContent = '↕'; });
+            th.classList.add('sorted');
+            const arrow = th.querySelector('.sort-arrow');
+            if (arrow) arrow.textContent = sortDir === 1 ? '↑' : '↓';
+            applyFilters();
+        });
+
+        function renderTable() {
+            const totalPages = Math.ceil(filteredData.length / PAGE_SIZE);
+            if (currentPage >= totalPages) currentPage = Math.max(0, totalPages - 1);
+            const start = currentPage * PAGE_SIZE;
+            const pageData = filteredData.slice(start, start + PAGE_SIZE);
+
+            // Update pagination controls
+            const info = document.getElementById('paginationInfo');
+            const prevBtn = document.getElementById('prevPageBtn');
+            const nextBtn = document.getElementById('nextPageBtn');
+            if (filteredData.length === 0) {
+                info.textContent = '0 devices';
+                prevBtn.disabled = true; nextBtn.disabled = true;
+            } else {
+                info.textContent = `${start + 1}–${Math.min(start + PAGE_SIZE, filteredData.length)} of ${filteredData.length}`;
+                prevBtn.disabled = currentPage === 0;
+                nextBtn.disabled = currentPage >= totalPages - 1;
+            }
+
+            if (pageData.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="13" style="text-align:center;padding:2rem;color:var(--text-secondary);">No devices match the current filters.</td></tr>`;
+                return;
+            }
+
+            let data = pageData;
+
+            // Track group alternation
+            let groupIdx = 0;
+            let lastRouter = null;
+
+            tableBody.innerHTML = data.map(row => {
+                if (groupByRouter) {
+                    const routerKey = row.router_id || row.router_name || '';
+                    if (routerKey !== lastRouter) {
+                        if (lastRouter !== null) groupIdx++;
+                        lastRouter = routerKey;
+                    }
+                }
+                const groupClass = (groupByRouter && groupIdx % 2 === 1) ? ' class="group-even"' : '';
+                const q = getSignalQuality(row);
+                return `<tr${groupClass}>
+                    <td class="clickable-cell" style="cursor:pointer;"><strong>${escapeHtml(row.router_name)}</strong></td>
+                    <td>${renderStatusBadge(row.router_state)}</td>
+                    <td class="clickable-cell" style="cursor:pointer;">${escapeHtml(row.model||'—')}</td>
+                    <td>${escapeHtml(row.interface_name||'—')}</td>
+                    <td class="clickable-cell" style="cursor:pointer;">${escapeHtml(row.carrier||'—')}</td>
+                    <td>${renderSignalBars(q)}</td>
+                    <td>${fmt(row.health_score)}</td>
+                    <td>${fmt(row.dbm)}</td>
+                    <td>${fmt(row.rsrp)}</td>
+                    <td>${fmt(row.rsrq)}</td>
+                    <td>${fmt(row.sinr)}</td>
+                    <td>${fmt(row.signal_strength)}</td>
+                    <td>${fmtDate(row.updated_at)}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        function updateStats() {
+            document.getElementById('statTotal').textContent = healthData.length;
+            document.getElementById('statOnline').textContent = healthData.filter(r => r.router_state === 'online').length;
+            document.getElementById('statOffline').textContent = healthData.filter(r => r.router_state === 'offline').length;
+            document.getElementById('statExcellent').textContent = healthData.filter(r => getSignalQuality(r) === 'excellent').length;
+            document.getElementById('statGood').textContent = healthData.filter(r => getSignalQuality(r) === 'good').length;
+            document.getElementById('statFair').textContent = healthData.filter(r => getSignalQuality(r) === 'fair').length;
+            document.getElementById('statPoor').textContent = healthData.filter(r => getSignalQuality(r) === 'poor').length;
+        }
+
+        function showNotification(msg, type) {
+            const el = document.getElementById('notification');
+            el.textContent = msg; el.className = `notification ${type} show`;
+            setTimeout(() => el.classList.remove('show'), 4000);
+        }
+
+        // Export CSV
+        document.getElementById('exportCsvBtn').addEventListener('click', () => {
+            if (!filteredData.length) return;
+            const cols = ['router_name','router_state','model','interface_name','carrier','health_category','dbm','rsrp','rsrq','sinr','signal_strength','updated_at'];
+            const headers = ['Device Name','Status','Model','Interface','Carrier','Health','RSSI (dBm)','RSRP (dBm)','RSRQ (dB)','SINR (dB)','Signal %','Last Updated'];
+            let csv = headers.join(',') + '\n';
+            filteredData.forEach(row => {
+                csv += cols.map(c => { let v = row[c] != null ? String(row[c]) : ''; if (v.includes(',') || v.includes('"')) v = '"' + v.replace(/"/g, '""') + '"'; return v; }).join(',') + '\n';
+            });
+            const blob = new Blob([csv], {type: 'text/csv'});
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+            a.download = `cellular_health_${new Date().toISOString().slice(0,10)}.csv`;
+            a.click(); URL.revokeObjectURL(a.href);
+            showNotification('CSV exported', 'success');
+        });
+
+        // Export PDF using jsPDF + AutoTable
+        document.getElementById('exportPdfBtn').addEventListener('click', () => {
+            if (!filteredData.length) return;
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+            // Title
+            doc.setFontSize(16);
+            doc.setTextColor(79, 70, 229);
+            doc.text('Cellular Health Report', 14, 15);
+
+            // Subtitle
+            doc.setFontSize(9);
+            doc.setTextColor(107, 114, 128);
+            const acct = document.getElementById('accountName').textContent.replace('— ', '');
+            doc.text(`Account: ${acct}  |  Generated: ${new Date().toLocaleString()}  |  Devices: ${filteredData.length}`, 14, 22);
+
+            // Summary stats
+            const online = filteredData.filter(r => r.router_state === 'online').length;
+            const offline = filteredData.filter(r => r.router_state === 'offline').length;
+            const excellent = filteredData.filter(r => getSignalQuality(r) === 'excellent').length;
+            const good = filteredData.filter(r => getSignalQuality(r) === 'good').length;
+            const fair = filteredData.filter(r => getSignalQuality(r) === 'fair').length;
+            const poor = filteredData.filter(r => getSignalQuality(r) === 'poor').length;
+            doc.text(`Online: ${online}  |  Offline: ${offline}  |  Excellent: ${excellent}  |  Good: ${good}  |  Fair: ${fair}  |  Poor: ${poor}`, 14, 27);
+
+            // Table
+            const headers = ['Device Name', 'Status', 'Model', 'Carrier', 'Health', 'Score', 'RSSI', 'RSRP', 'RSRQ', 'SINR', 'Sig%'];
+            const rows = filteredData.map(r => [
+                r.router_name || '',
+                r.router_state || '',
+                r.model || '',
+                r.carrier || '',
+                r.health_category || '',
+                r.health_score != null ? r.health_score : '',
+                r.dbm != null ? r.dbm : '',
+                r.rsrp != null ? r.rsrp : '',
+                r.rsrq != null ? r.rsrq : '',
+                r.sinr != null ? r.sinr : '',
+                r.signal_strength != null ? r.signal_strength : '',
+            ]);
+
+            doc.autoTable({
+                head: [headers],
+                body: rows,
+                startY: 32,
+                theme: 'grid',
+                headStyles: {
+                    fillColor: [79, 70, 229],
+                    textColor: 255,
+                    fontSize: 7,
+                    fontStyle: 'bold',
+                    halign: 'center',
+                },
+                bodyStyles: {
+                    fontSize: 7,
+                    cellPadding: 2,
+                },
+                alternateRowStyles: {
+                    fillColor: [245, 247, 250],
+                },
+                columnStyles: {
+                    0: { cellWidth: 35 },
+                    1: { cellWidth: 18, halign: 'center' },
+                    2: { cellWidth: 35 },
+                    3: { cellWidth: 28 },
+                    4: { cellWidth: 18, halign: 'center' },
+                    5: { cellWidth: 14, halign: 'center' },
+                    6: { cellWidth: 14, halign: 'center' },
+                    7: { cellWidth: 14, halign: 'center' },
+                    8: { cellWidth: 14, halign: 'center' },
+                    9: { cellWidth: 14, halign: 'center' },
+                    10: { cellWidth: 12, halign: 'center' },
+                },
+                didParseCell: function(data) {
+                    // Color-code health column
+                    if (data.section === 'body' && data.column.index === 4) {
+                        const val = (data.cell.raw || '').toLowerCase();
+                        if (val === 'excellent' || val === 'good') data.cell.styles.textColor = [5, 150, 105];
+                        else if (val === 'fair') data.cell.styles.textColor = [217, 119, 6];
+                        else if (val === 'poor') data.cell.styles.textColor = [220, 38, 38];
+                    }
+                    // Color-code status column
+                    if (data.section === 'body' && data.column.index === 1) {
+                        const val = (data.cell.raw || '').toLowerCase();
+                        if (val === 'online') data.cell.styles.textColor = [5, 150, 105];
+                        else if (val === 'offline') data.cell.styles.textColor = [220, 38, 38];
+                    }
+                },
+                margin: { left: 14, right: 14 },
+            });
+
+            // Footer
+            const pageCount = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.setFontSize(7);
+                doc.setTextColor(156, 163, 175);
+                doc.text(`Page ${i} of ${pageCount}`, doc.internal.pageSize.width - 25, doc.internal.pageSize.height - 8);
+                doc.text('Cellular Health Dashboard', 14, doc.internal.pageSize.height - 8);
+            }
+
+            doc.save(`cellular_health_${new Date().toISOString().slice(0,10)}.pdf`);
+            showNotification('PDF exported', 'success');
+        });
+
+        // Fetch
+        async function fetchHealth() {
+            loadingState.innerHTML = '<div class="spinner"></div><p>Loading cellular health data...</p>';
+            loadingState.style.display = 'flex'; healthTable.style.display = 'none';
+            try {
+                const resp = await fetch('/api/health'); const json = await resp.json();
+                if (json.status === 'error') throw new Error(json.message);
+                healthData = json.data || []; filteredData = [...healthData];
+                if (json.account_name) document.getElementById('accountName').textContent = '— ' + json.account_name;
+                updateStats(); applyFilters();
+                lastUpdated.textContent = `Updated: ${new Date(json.timestamp).toLocaleString()}`;
+                healthTable.style.display = 'table'; loadingState.style.display = 'none';
+                showNotification(`Loaded ${healthData.length} device(s)`, 'success');
+            } catch (err) {
+                loadingState.innerHTML = `<p style="color:var(--danger-color);">Error: ${escapeHtml(err.message)}</p>`;
+                showNotification('Failed: ' + err.message, 'error');
+            }
+        }
+
+        // Click cell to search
+        document.getElementById('tableBody').addEventListener('click', (e) => {
+            const cell = e.target.closest('.clickable-cell');
+            if (!cell) return;
+            const text = cell.textContent.trim();
+            if (text && text !== '—') {
+                searchInput.value = text;
+                toggleClearBtn();
+                applyFilters();
+            }
+        });
+
+        // Clear search button
+        const clearSearchBtn = document.getElementById('clearSearchBtn');
+        function toggleClearBtn() { clearSearchBtn.style.display = searchInput.value ? 'block' : 'none'; }
+        searchInput.addEventListener('input', () => { toggleClearBtn(); currentPage = 0; applyFilters(); });
+        clearSearchBtn.addEventListener('click', () => { searchInput.value = ''; toggleClearBtn(); currentPage = 0; applyFilters(); searchInput.focus(); });
+
+        // Pagination
+        document.getElementById('prevPageBtn').addEventListener('click', () => { if (currentPage > 0) { currentPage--; renderTable(); document.querySelector('.table-container').scrollTop = 0; } });
+        document.getElementById('nextPageBtn').addEventListener('click', () => { const totalPages = Math.ceil(filteredData.length / PAGE_SIZE); if (currentPage < totalPages - 1) { currentPage++; renderTable(); document.querySelector('.table-container').scrollTop = 0; } });
+
+        // Group by router toggle
+        const groupToggle = document.getElementById('groupByRouterToggle');
+        groupToggle.checked = groupByRouter;
+        groupToggle.addEventListener('change', () => {
+            groupByRouter = groupToggle.checked;
+            localStorage.setItem('groupByRouter', groupByRouter);
+            applyFilters();
+        });
+
+        // Auto-load first saved profile on startup
+        (async function autoLoadProfile() {
+            try {
+                const resp = await fetch('/api/profiles');
+                const profiles = await resp.json();
+                const names = Object.keys(profiles).sort();
+                if (names.length > 0) {
+                    const firstName = names[0];
+                    const loadResp = await fetch('/api/profiles/load', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: firstName}) });
+                    if (loadResp.ok) {
+                        showNotification(`Profile "${firstName}" auto-loaded. Configure in Settings (gear icon).`, 'success');
+                    }
+                }
+            } catch (e) { /* ignore */ }
+            fetchHealth();
+        })();
+    </script>
+</body>
+</html>
