@@ -5,7 +5,8 @@ A web-based tool for assigning SDK application versions to router groups via the
 ## Quick Start
 
 ```bash
-python serve.py
+python3 serve.py    # macOS/Linux
+python serve.py     # Windows
 ```
 
 That's it. On first run the script will:

@@ -34,19 +34,22 @@ pip install netaddr ipaddress
 
 ### Basic Usage
 ```bash
-python cisco_to_cradlepoint_converter.py <cisco_config_file> [output_file]
+python3 cisco_to_cradlepoint_converter.py <cisco_config_file> [output_file]    # macOS/Linux
+python cisco_to_cradlepoint_converter.py <cisco_config_file> [output_file]     # Windows
 ```
 
 ### Examples
 
 #### Convert a Cisco configuration file
 ```bash
-python cisco_to_cradlepoint_converter.py example_cisco_config.txt
+python3 cisco_to_cradlepoint_converter.py example_cisco_config.txt    # macOS/Linux
+python cisco_to_cradlepoint_converter.py example_cisco_config.txt     # Windows
 ```
 
 #### Specify output file
 ```bash
-python cisco_to_cradlepoint_converter.py example_cisco_config.txt cradlepoint_config.json
+python3 cisco_to_cradlepoint_converter.py example_cisco_config.txt cradlepoint_config.json    # macOS/Linux
+python cisco_to_cradlepoint_converter.py example_cisco_config.txt cradlepoint_config.json     # Windows
 ```
 
 ### Command Line Options

@@ -33,7 +33,8 @@ If all four keys are present and valid, admin authentication is applied automati
 
 1. Run the application:
 ```bash
-python3 ncm_api_key_encryptor.py
+python3 ncm_api_key_encryptor.py    # macOS/Linux
+python ncm_api_key_encryptor.py     # Windows
 ```
 
 2. Open your browser and navigate to:

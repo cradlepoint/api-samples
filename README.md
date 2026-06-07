@@ -21,7 +21,8 @@ cd api-samples
 Run the setup script to create the virtual environment, install dependencies, and configure API credentials:
 
 ```bash
-python3 setup_env.py
+python3 setup_env.py        # macOS/Linux
+python setup_env.py         # Windows
 ```
 
 This handles everything — venv creation, `pip install`, and credential configuration. After setup:
@@ -35,8 +36,10 @@ source .venv/bin/activate
 If you prefer to set things up manually:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+python3 -m venv .venv                   # macOS/Linux
+# or: python -m venv .venv             # Windows
+source .venv/bin/activate               # macOS/Linux
+# or: .venv\Scripts\activate            # Windows
 pip install -r requirements.txt
 ```
 
@@ -82,7 +85,8 @@ All web applications live in `web_apps/`. See [web_apps/README.md](web_apps/READ
 ### Running a Web App
 
 ```bash
-python web_apps/inventory_dashboard/serve.py
+python3 web_apps/inventory_dashboard/serve.py    # macOS/Linux
+python web_apps/inventory_dashboard/serve.py     # Windows
 ```
 
 ## Sample Scripts
@@ -96,7 +100,8 @@ The `scripts/` folder contains standalone Python scripts demonstrating various A
 - Configuration backups
 
 ```bash
-python scripts/<script_name>.py
+python3 scripts/<script_name>.py    # macOS/Linux
+python scripts/<script_name>.py     # Windows
 ```
 
 ## Script Manager
@@ -104,7 +109,8 @@ python scripts/<script_name>.py
 Web-based interface for managing CSV files, API keys, and running scripts:
 
 ```bash
-python web_apps/script_manager/script_manager.py
+python3 web_apps/script_manager/script_manager.py    # macOS/Linux
+python web_apps/script_manager/script_manager.py     # Windows
 ```
 
 Open http://localhost:8000 in your browser.

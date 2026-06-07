@@ -31,12 +31,14 @@ A web dashboard that displays cellular health metrics for all devices in your NC
 
 2. Install dependencies (if not already):
    ```bash
-   .venv/bin/python -m pip install -r requirements.txt
+   .venv/bin/python -m pip install -r requirements.txt       # macOS/Linux
+   .venv\Scripts\python -m pip install -r requirements.txt   # Windows
    ```
 
 3. Run the dashboard:
    ```bash
-   .venv/bin/python scripts/cellular_health_dashboard/serve.py
+   .venv/bin/python scripts/cellular_health_dashboard/serve.py       # macOS/Linux
+   .venv\Scripts\python scripts/cellular_health_dashboard/serve.py   # Windows
    ```
 
 4. Open http://localhost:8055 in your browser.

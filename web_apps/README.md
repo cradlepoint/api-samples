@@ -18,7 +18,8 @@ Interactive web applications for managing, configuring, and monitoring Cradlepoi
 ## Running a Web App
 
 ```bash
-python web_apps/<app_name>/serve.py
+python3 web_apps/<app_name>/serve.py    # macOS/Linux
+python web_apps/<app_name>/serve.py     # Windows
 ```
 
 Make sure your API credentials are set (via environment variables or the Settings panel in dashboard apps):

@@ -33,7 +33,8 @@ pip install ncm fastapi uvicorn httpx
 ## Usage
 
 ```bash
-python web_apps/inventory_dashboard/serve.py
+python3 web_apps/inventory_dashboard/serve.py    # macOS/Linux
+python web_apps/inventory_dashboard/serve.py     # Windows
 ```
 
 Then open http://localhost:8060 in your browser.
