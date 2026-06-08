@@ -240,6 +240,24 @@ When appending to `docs/CHANGELOG.md`:
 - [What changed and why]
 ```
 
+## Official API Documentation
+
+The full Cradlepoint NCM API documentation is available at:
+- **Documentation portal**: https://developer.cradlepoint.com/documentation
+
+Most endpoints have an OpenAPI spec available at:
+- **OpenAPI spec URL pattern**: `https://developer.cradlepoint.com/swagger/spec/ENDPOINT.json`
+
+For example:
+- `https://developer.cradlepoint.com/swagger/spec/routers.json`
+- `https://developer.cradlepoint.com/swagger/spec/net_devices.json`
+- `https://developer.cradlepoint.com/swagger/spec/groups.json`
+- `https://developer.cradlepoint.com/swagger/spec/accounts.json`
+
+When working with an unfamiliar endpoint, fetch the OpenAPI spec to get the full schema, available filters, allowed methods, and response formats. Replace `ENDPOINT` with the endpoint name (e.g. `routers`, `net_devices`, `alerts`, `configuration_managers`, etc.).
+
+---
+
 ## Quality Gates
 
 Before considering any NCM application complete:
