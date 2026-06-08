@@ -5,7 +5,8 @@ A lightweight, self-contained component library and style guide for building das
 ## Quick Start
 
 ```bash
-python3 serve.py
+python3 serve.py    # macOS/Linux
+python serve.py     # Windows
 # Open http://localhost:8000
 ```
 

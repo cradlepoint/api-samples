@@ -166,17 +166,15 @@
         <h1>🔑 NCM API Key Encryptor</h1>
         <p class="caption">For encrypting NCM API keys into group or device configurations for use in SDK applications.</p>
         
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    {% if 'Error setting API keys' not in message and 'Please fill in all 4 APIv2' not in message and 'Please enter a' not in message or 'Please enter a Group' in message or 'Please enter a Device' in message %}
-                    <div class="{{ 'success-box' if category == 'success' else 'error-box' if category == 'error' else 'info-box' }}">
-                        {{ message }}
-                    </div>
-                    {% endif %}
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+        {% if messages %}
+            {% for msg in messages %}
+                {% if 'Error setting API keys' not in msg.message and 'Please fill in all 4 APIv2' not in msg.message and 'Please enter a' not in msg.message or 'Please enter a Group' in msg.message or 'Please enter a Device' in msg.message %}
+                <div class="{{ 'success-box' if msg.category == 'success' else 'error-box' if msg.category == 'error' else 'info-box' }}">
+                    {{ msg.message }}
+                </div>
+                {% endif %}
+            {% endfor %}
+        {% endif %}
                 
         <h2>Step 1: Admin NCM APIv2 Keys</h2>
         <div class="info-box">

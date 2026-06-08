@@ -1,3 +1,5 @@
-requests
-flask
+fastapi
+uvicorn
+jinja2
+itsdangerous
 ncm

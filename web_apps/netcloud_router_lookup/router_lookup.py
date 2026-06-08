@@ -1,8 +1,16 @@
-from flask import Flask, request, jsonify, send_from_directory
-import requests
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+import httpx
 import os
+from pathlib import Path
+import uvicorn
 
-app = Flask("router_lookup")
+app = FastAPI(title="Router Lookup")
+
+# Serve static files (index.html)
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # Dictionary of named keys
 named_keys = {
@@ -26,34 +34,39 @@ named_keys = {
     }
 }
 
-@app.route('/')
-def serve_index():
-    return send_from_directory(os.path.join(app.root_path, 'static'), 'index.html')
 
-@app.route('/router', methods=['GET'])
-def get_router_info():
-    user_input = request.args.get('input')
-    if not user_input:
-        return jsonify({"error": "No input provided"}), 400
+@app.get("/")
+async def serve_index():
+    return FileResponse(STATIC_DIR / "index.html")
 
+
+@app.get("/router")
+async def get_router_info(input: str = ""):
+    if not input:
+        return JSONResponse({"error": "No input provided"}, status_code=400)
+
+    user_input = input
     if len(user_input) == 14:
         filter_type = 'serial_number'
     else:
         filter_type = 'mac'
         user_input = user_input.replace(':', '')
         if len(user_input) != 12:
-            return jsonify({"result": "Invalid serial number or MAC address"}), 200
+            return JSONResponse({"result": "Invalid serial number or MAC address"})
 
-    results = {}
-    for account_name, api_keys in named_keys.items():
-        url = f'https://www.cradlepointecm.com/api/v2/routers/?{filter_type}={user_input}'
-        response = requests.get(url, headers=api_keys)
-        if response.status_code == 200:
-            response_json = response.json()
-            if response_json.get("data"):
-                return jsonify({"result": f"Account Name: {account_name}"}), 200
+    async with httpx.AsyncClient() as client:
+        for account_name, api_keys in named_keys.items():
+            url = f'https://www.cradlepointecm.com/api/v2/routers/?{filter_type}={user_input}'
+            response = await client.get(url, headers=api_keys)
+            if response.status_code == 200:
+                response_json = response.json()
+                if response_json.get("data"):
+                    return JSONResponse({"result": f"Account Name: {account_name}"})
 
-    return jsonify({"result": "No router found"}), 200
+    return JSONResponse({"result": "No router found"})
+
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8000)
+    print("Router Lookup starting...")
+    print("Open http://localhost:8000 in your browser")
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")

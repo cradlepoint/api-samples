@@ -1,4 +1,8 @@
 ncm
-flask
-werkzeug
+fastapi
+uvicorn
+httpx
 python-dateutil
+python-multipart
+jinja2
+itsdangerous
