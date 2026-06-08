@@ -248,6 +248,14 @@
                         <input type="checkbox" id="groupByRouterToggle" style="width:1rem;height:1rem;cursor:pointer;">
                         Group interfaces by device (shade rows)
                     </label>
+                    <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;cursor:pointer;margin-top:0.75rem;">
+                        <input type="checkbox" id="autoRefreshToggle" style="width:1rem;height:1rem;cursor:pointer;">
+                        Auto Refresh
+                    </label>
+                    <div style="display:flex;align-items:center;gap:0.5rem;margin-top:0.75rem;">
+                        <label for="refreshTimeInput" style="font-size:0.875rem;white-space:nowrap;">Refresh Time (minutes)</label>
+                        <input type="number" id="refreshTimeInput" min="1" max="1440" value="60" style="width:5rem;padding:0.4rem 0.6rem;border:1px solid var(--border-color);border-radius:var(--radius-md);font-size:0.875rem;font-family:inherit;background:var(--light-surface);">
+                    </div>
                 </div>
             </div>
         </div>
@@ -760,6 +768,55 @@
             localStorage.setItem('groupByRouter', groupByRouter);
             applyFilters();
         });
+
+        // Auto Refresh
+        let autoRefreshInterval = null;
+        const autoRefreshToggle = document.getElementById('autoRefreshToggle');
+        const refreshTimeInput = document.getElementById('refreshTimeInput');
+
+        // Load saved preferences
+        const savedAutoRefresh = localStorage.getItem('autoRefresh') === 'true';
+        const savedRefreshTime = parseInt(localStorage.getItem('refreshTime'), 10) || 60;
+        autoRefreshToggle.checked = savedAutoRefresh;
+        refreshTimeInput.value = savedRefreshTime;
+
+        function startAutoRefresh() {
+            stopAutoRefresh();
+            const minutes = parseInt(refreshTimeInput.value, 10) || 60;
+            autoRefreshInterval = setInterval(() => {
+                fetchHealth();
+            }, minutes * 60 * 1000);
+        }
+
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
+        }
+
+        autoRefreshToggle.addEventListener('change', () => {
+            localStorage.setItem('autoRefresh', autoRefreshToggle.checked);
+            if (autoRefreshToggle.checked) {
+                startAutoRefresh();
+            } else {
+                stopAutoRefresh();
+            }
+        });
+
+        refreshTimeInput.addEventListener('change', () => {
+            const val = Math.max(1, Math.min(1440, parseInt(refreshTimeInput.value, 10) || 60));
+            refreshTimeInput.value = val;
+            localStorage.setItem('refreshTime', val);
+            if (autoRefreshToggle.checked) {
+                startAutoRefresh();
+            }
+        });
+
+        // Start auto-refresh if previously enabled
+        if (savedAutoRefresh) {
+            startAutoRefresh();
+        }
 
         // Auto-load first saved profile on startup
         (async function autoLoadProfile() {
