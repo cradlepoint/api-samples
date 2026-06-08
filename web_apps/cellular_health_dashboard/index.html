@@ -724,7 +724,21 @@
             loadingState.innerHTML = '<div class="spinner"></div><p>Loading cellular health data...</p>';
             loadingState.style.display = 'flex'; healthTable.style.display = 'none';
             try {
-                const resp = await fetch('/api/health'); const json = await resp.json();
+                const resp = await fetch('/api/health');
+                const json = await resp.json();
+                if (json.error_type === 'ssl_error') {
+                    loadingState.innerHTML = `<p style="color:var(--danger-color);">SSL Error: ${escapeHtml(json.message)}</p>`;
+                    if (confirm('SSL certificate verification failed (common behind corporate proxies).\n\nDisable SSL verification for this session?')) {
+                        const sslResp = await fetch('/api/ssl-noverify', { method: 'POST' });
+                        if (sslResp.ok) {
+                            showNotification('SSL verification disabled — retrying...', 'success');
+                            return fetchHealth();
+                        } else {
+                            showNotification('Failed to disable SSL verification', 'error');
+                        }
+                    }
+                    return;
+                }
                 if (json.status === 'error') throw new Error(json.message);
                 healthData = json.data || []; filteredData = [...healthData];
                 if (json.account_name) document.getElementById('accountName').textContent = '— ' + json.account_name;

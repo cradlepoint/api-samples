@@ -11,6 +11,7 @@ Then open http://localhost:8055 in your browser.
 import os
 import sys
 import json
+import ssl
 
 from datetime import datetime, timezone
 from pathlib import Path
@@ -28,6 +29,10 @@ from fastapi.staticfiles import StaticFiles
 import uvicorn
 
 import ncm
+
+
+# --- SSL verification state ---
+_ssl_verify = True
 
 
 # --- Credential helpers (replaces scripts.utils.env_check dependency) ---
@@ -87,6 +92,7 @@ def _save_profiles(profiles):
 
 def _build_client():
     """Create an NCM SDK client from environment variables."""
+    global _ssl_verify
     api_keys = get_api_keys_from_env()
     if not api_keys.get('X-CP-API-ID') or not api_keys.get('X-ECM-API-ID'):
         raise RuntimeError(
@@ -94,7 +100,10 @@ def _build_client():
             "to configure credentials, or set X_CP_API_ID, X_CP_API_KEY, "
             "X_ECM_API_ID, X_ECM_API_KEY environment variables."
         )
-    return ncm.NcmClient(api_keys=api_keys)
+    client = ncm.NcmClient(api_keys=api_keys)
+    if not _ssl_verify:
+        client.session.verify = False
+    return client
 
 
 def _extract_id_from_url(url):
@@ -237,8 +246,29 @@ async def get_health():
     except Exception as e:
         import traceback
         traceback.print_exc()
+        # Detect SSL verification errors
+        err_str = str(e)
+        is_ssl_error = False
+        cause = e.__cause__ or e.__context__
+        while cause:
+            if isinstance(cause, ssl.SSLCertVerificationError) or 'CERTIFICATE_VERIFY_FAILED' in str(cause):
+                is_ssl_error = True
+                break
+            cause = getattr(cause, '__cause__', None) or getattr(cause, '__context__', None)
+        if not is_ssl_error and 'CERTIFICATE_VERIFY_FAILED' in err_str:
+            is_ssl_error = True
+        if not is_ssl_error and 'SSL' in err_str.upper() and 'VERIFY' in err_str.upper():
+            is_ssl_error = True
+
+        if is_ssl_error:
+            return JSONResponse(
+                {"status": "error", "error_type": "ssl_error",
+                 "message": "SSL certificate verification failed. This often happens behind a corporate proxy. "
+                            "You can disable SSL verification for this session."},
+                status_code=502,
+            )
         return JSONResponse(
-            {"status": "error", "message": str(e)},
+            {"status": "error", "message": err_str},
             status_code=500,
         )
 
@@ -247,6 +277,17 @@ async def get_health():
 async def status():
     """Quick health check."""
     return {"status": "ok", "time": datetime.now(timezone.utc).isoformat()}
+
+
+@app.post("/api/ssl-noverify")
+async def disable_ssl_verify():
+    """Disable SSL certificate verification for the running session."""
+    global _ssl_verify
+    _ssl_verify = False
+    # Also suppress urllib3 InsecureRequestWarning
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    return JSONResponse({"status": "ok", "ssl_verify": False})
 
 
 @app.get("/api/debug")
