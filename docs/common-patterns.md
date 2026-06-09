@@ -216,3 +216,39 @@ All web apps must support light mode and dark mode:
 - Include both `logo.png` and `logo_dark.png` with automatic swap
 
 See `.kiro/steering/web-ui-standards.md` for the full checklist and CSS variable reference.
+
+## NCM SDK with FastAPI (async) — Avoiding Event Loop Blocking
+
+The NCM SDK uses synchronous `requests.Session` internally. Calling SDK methods
+directly from `async def` FastAPI endpoints blocks the entire event loop, making
+the server unresponsive to all requests (including health checks, static files,
+and Ctrl+C) for the duration of the API call (often 10–30 seconds for large accounts).
+
+**Always wrap SDK calls in `run_in_executor`:**
+
+```python
+import asyncio
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+
+app = FastAPI()
+
+def _fetch_data():
+    """Synchronous function that calls the NCM SDK."""
+    client = ncm.NcmClient(api_keys=api_keys)
+    return client.get_routers()
+
+@app.get("/api/data")
+async def get_data():
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(None, _fetch_data)
+    return JSONResponse({"data": result})
+```
+
+This runs the blocking SDK call in a thread pool, keeping the event loop free
+to serve other requests, handle WebSocket connections, and respond to shutdown
+signals. Apply this pattern to ALL endpoints that call `_get_cellular_health()`
+or any other function using the NCM SDK.
+
+**Also applies to:** SQLite writes, file I/O on large files, or any other
+blocking operation inside an async handler.

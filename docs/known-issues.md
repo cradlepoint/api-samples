@@ -473,6 +473,33 @@ project configs, PEM certificates). Python's `json.loads()` in strict mode
 rejects these as "Invalid control character". Use `json.loads(content, strict=False)`
 when parsing Cradlepoint config JSON to allow control characters in strings.
 
+### NCM SDK SSL Verification Fails Behind Corporate Proxies (discovered 2026-06-08)
+The NCM SDK uses `requests.Session()` with default SSL verification. Behind
+corporate proxies that use TLS interception (MITM with custom CA certificates),
+all API calls fail with `SSLCertVerificationError: CERTIFICATE_VERIFY_FAILED`.
+The SDK does not expose a `verify` parameter, so callers must patch the session
+directly after constructing the client:
+
+```python
+client = ncm.NcmClient(api_keys=api_keys)
+client.session.verify = False  # Disable SSL verification
+```
+
+To also suppress the `InsecureRequestWarning` that `urllib3` emits on every
+request when verify is disabled:
+```python
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+```
+
+Alternative (proper fix): set the `REQUESTS_CA_BUNDLE` env var to the path of
+the proxy's CA certificate bundle:
+```bash
+export REQUESTS_CA_BUNDLE=/path/to/corporate-ca-bundle.crt
+```
+
+This affects ALL scripts and dashboards using the SDK, not just specific apps.
+
 ### v2 `device_apps` Returns IDs as Strings, Not Integers (discovered 2026-05-14)
 The `/device_apps/` endpoint returns the `id` field as a string (e.g. `"83"`)
 rather than an integer. This differs from most other v2 endpoints (like

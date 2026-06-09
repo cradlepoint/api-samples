@@ -9,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
     <style>
         :root {
             --primary-color: #4f46e5;
@@ -129,12 +130,46 @@
         body.dark-mode .notification { background: #1e293b; border-color: #4b5563; color: #f9fafb; }
         body.dark-mode .panel-header h2, body.dark-mode .last-updated { color: #d1d5db; }
         body.dark-mode .signal-bar .bar { background: #4b5563; }
-        body.dark-mode #settingsModal > div { background: #1e293b; border-color: #4b5563; color: #f9fafb; }
-        body.dark-mode #settingsModal input, body.dark-mode #settingsModal select { background: #374151; border-color: #4b5563; color: #f9fafb; }
+        body.dark-mode #settingsModal { color: #f9fafb; }
+        body.dark-mode #settingsModal > div > div { background: #1e293b !important; border-color: #4b5563 !important; color: #f9fafb !important; }
+        body.dark-mode #settingsModal > div > div > div { background: #374151 !important; border-color: #4b5563 !important; }
+        body.dark-mode #settingsModal input, body.dark-mode #settingsModal select { background: #374151 !important; border-color: #4b5563 !important; color: #f9fafb !important; }
         body.dark-mode #settingsModal label { color: #d1d5db; }
-        body.dark-mode #settingsModal h2 { color: #f9fafb; }
+        body.dark-mode #settingsModal h2, body.dark-mode #settingsModal h3 { color: #f9fafb !important; }
+        body.dark-mode #settingsModal .btn-secondary { background: #374151; border-color: #4b5563; color: #f9fafb; }
+        body.dark-mode #settingsModal .btn-primary { background: linear-gradient(135deg, var(--primary-color), var(--primary-dark)); color: white; }
+        body.dark-mode #settingsModal button[id="closeSettingsBtn"] { color: #9ca3af; }
         @media (max-width: 1024px) { .content-area { padding: 1.5rem; } .stats-row { grid-template-columns: repeat(4, 1fr); } }
         @media (max-width: 768px) { .header-content { padding: 1rem; } #app-title { font-size: 1.25rem; } .content-area { padding: 1rem; } .stats-row { grid-template-columns: repeat(2, 1fr); } .controls-bar { flex-direction: column; align-items: stretch; } .search-input { width: 100%; } }
+        /* History modal */
+        .history-btn { background: none; border: none; cursor: pointer; padding: 0.25rem; color: var(--text-secondary); transition: var(--transition); border-radius: var(--radius-sm); display: inline-flex; align-items: center; }
+        .history-btn:hover { color: var(--primary-color); background: rgba(79, 70, 229, 0.08); }
+        #historyModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 1000; align-items: center; justify-content: center; }
+        #historyModal.show { display: flex; }
+        .history-modal-content { background: var(--light-surface); border-radius: var(--radius-xl); box-shadow: var(--shadow-xl); width: 90%; max-width: 800px; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; }
+        .history-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-color); background: var(--light-bg); }
+        .history-modal-header h2 { font-size: 1.125rem; font-weight: 600; margin: 0; }
+        .history-modal-body { padding: 1.5rem; overflow-y: auto; flex: 1; }
+        .history-tabs { display: flex; gap: 0; margin-bottom: 1.25rem; border-bottom: 2px solid var(--border-color); }
+        .history-tab { padding: 0.625rem 1.25rem; font-size: 0.875rem; font-weight: 500; cursor: pointer; border: none; background: none; color: var(--text-secondary); border-bottom: 2px solid transparent; margin-bottom: -2px; transition: var(--transition); font-family: inherit; }
+        .history-tab.active { color: var(--primary-color); border-bottom-color: var(--primary-color); }
+        .history-tab:hover:not(.active) { color: var(--text-primary); }
+        .history-controls { display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
+        .history-controls select, .history-controls input { padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 0.875rem; font-family: inherit; background: var(--light-surface); }
+        .history-chart-container { position: relative; width: 100%; height: 320px; }
+        .history-empty { text-align: center; padding: 3rem; color: var(--text-secondary); }
+        body.dark-mode #historyModal .history-modal-content { background: #1e293b; border-color: #4b5563; color: #f9fafb; }
+        body.dark-mode #historyModal .history-modal-header { background: #374151; border-color: #4b5563; }
+        body.dark-mode #historyModal .history-modal-header h2 { color: #f9fafb; }
+        body.dark-mode #historyModal .history-tab { color: #9ca3af; }
+        body.dark-mode #historyModal .history-tab.active { color: var(--primary-color); }
+        body.dark-mode #historyModal select, body.dark-mode #historyModal input { background: #374151; border-color: #4b5563; color: #f9fafb; }
+        body.dark-mode #helpModal > div { background: #1e293b !important; border-color: #4b5563 !important; color: #f9fafb !important; }
+        body.dark-mode #helpModal > div > div:first-child { background: #374151 !important; border-color: #4b5563 !important; }
+        body.dark-mode #helpModal > div > div { color: #f9fafb !important; }
+        body.dark-mode #helpModal h2, body.dark-mode #helpModal h3 { color: #f9fafb !important; }
+        body.dark-mode #helpModal code { background: #374151; color: #d1d5db; padding: 0.125rem 0.375rem; border-radius: 3px; }
+        body.dark-mode #helpModal button { color: #9ca3af; }
     </style>
 </head>
 <body>
@@ -147,6 +182,7 @@
                     <span id="accountName" style="margin-left:1rem;font-size:0.9375rem;color:var(--text-secondary);font-weight:500;"></span>
                 </div>
                 <div class="header-actions">
+                    <button class="dark-mode-toggle" id="helpBtn" aria-label="User Guide" title="User Guide" style="font-size:1.25rem;font-weight:700;">?</button>
                     <button class="dark-mode-toggle" id="settingsBtn" aria-label="Settings" title="API Settings">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                     </button>
@@ -190,6 +226,7 @@
                     <div class="loading-overlay" id="loadingState"><div class="spinner"></div><p>Loading cellular health data...</p></div>
                     <table class="health-table" id="healthTable" style="display:none;">
                         <thead><tr>
+                            <th style="width:36px;cursor:default;"></th>
                             <th data-key="router_name">Device Name <span class="sort-arrow">↕</span></th>
                             <th data-key="router_state">Status <span class="sort-arrow">↕</span></th>
                             <th data-key="model">Model <span class="sort-arrow">↕</span></th>
@@ -226,6 +263,7 @@
                         <option value="">— Select Profile —</option>
                     </select>
                     <button class="btn btn-secondary" id="loadProfileBtn" style="padding:0.5rem 0.75rem;">Load</button>
+                    <button class="btn btn-secondary" id="setDefaultProfileBtn" style="padding:0.5rem 0.75rem;" title="Set as startup profile for -ro mode">★ Default</button>
                     <button class="btn btn-secondary" id="deleteProfileBtn" style="padding:0.5rem 0.75rem;color:var(--danger-color);">Delete</button>
                 </div>
                 <!-- Credential fields -->
@@ -256,7 +294,95 @@
                         <label for="refreshTimeInput" style="font-size:0.875rem;white-space:nowrap;">Refresh Time (minutes)</label>
                         <input type="number" id="refreshTimeInput" min="1" max="1440" value="60" style="width:5rem;padding:0.4rem 0.6rem;border:1px solid var(--border-color);border-radius:var(--radius-md);font-size:0.875rem;font-family:inherit;background:var(--light-surface);">
                     </div>
+                    <div style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--border-color);">
+                        <button class="btn btn-secondary" id="clearHistoryBtn" style="color:var(--danger-color);border-color:var(--danger-color);">Clear History Data</button>
+                    </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Modal -->
+    <div id="historyModal">
+        <div class="history-modal-content">
+            <div class="history-modal-header">
+                <h2 id="historyModalTitle">Device History</h2>
+                <button id="closeHistoryBtn" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:var(--text-secondary);width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:var(--radius-sm);">×</button>
+            </div>
+            <div class="history-modal-body">
+                <div class="history-tabs">
+                    <button class="history-tab active" data-tab="hourly">Recent</button>
+                    <button class="history-tab" data-tab="daily">Daily</button>
+                </div>
+                <div class="history-controls">
+                    <label style="font-size:0.8125rem;font-weight:500;">Metric:</label>
+                    <select id="historyMetricSelect">
+                        <option value="health_score">Health Score</option>
+                        <option value="dbm">RSSI (dBm)</option>
+                        <option value="rsrp">RSRP (dBm)</option>
+                        <option value="rsrq">RSRQ (dB)</option>
+                        <option value="sinr">SINR (dB)</option>
+                        <option value="signal_strength">Signal %</option>
+                    </select>
+                    <div id="dailyRangeControls" style="display:none;align-items:center;gap:0.5rem;">
+                        <label style="font-size:0.8125rem;font-weight:500;">Range:</label>
+                        <select id="historyRangeSelect">
+                            <option value="7">Last 7 days</option>
+                            <option value="30" selected>Last 30 days</option>
+                            <option value="90">Last 90 days</option>
+                            <option value="180">Last 6 months</option>
+                            <option value="365">Last year</option>
+                            <option value="730">Max (2 years)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="history-chart-container">
+                    <canvas id="historyChart"></canvas>
+                </div>
+                <div class="history-empty" id="historyEmpty" style="display:none;">
+                    <p>No history data available yet.</p>
+                    <p style="font-size:0.8125rem;margin-top:0.5rem;">History is collected on each data refresh. Enable Auto Refresh in Settings to collect samples automatically.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="helpModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);z-index:1000;align-items:center;justify-content:center;">
+        <div style="background:var(--light-surface);border-radius:var(--radius-xl);box-shadow:var(--shadow-xl);width:90%;max-width:600px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:1.25rem 1.5rem;border-bottom:1px solid var(--border-color);background:var(--light-bg);">
+                <h2 style="font-size:1.125rem;font-weight:600;">User Guide</h2>
+                <button id="closeHelpBtn" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:var(--text-secondary);width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:var(--radius-sm);">×</button>
+            </div>
+            <div style="padding:1.5rem;overflow-y:auto;flex:1;font-size:0.875rem;line-height:1.7;">
+                <div class="help-admin-only">
+                <h3 style="margin-bottom:0.5rem;">Getting Started</h3>
+                <p>Click the <strong>gear icon</strong> to open Settings. Enter your NCM API credentials or load a saved profile, then click <strong>Apply &amp; Refresh</strong>.</p>
+                </div>
+                <h3 style="margin-top:1.25rem;margin-bottom:0.5rem;">Dashboard Features</h3>
+                <ul style="padding-left:1.25rem;margin:0.5rem 0;">
+                    <li><strong>Stat cards</strong> — click to filter the table by status or health category</li>
+                    <li><strong>Search</strong> — type to filter by name, carrier, model, or MAC. Click a cell to auto-search that value</li>
+                    <li><strong>Sort</strong> — click any column header to sort. Default: lowest health score first</li>
+                    <li><strong>History chart</strong> — click the 📈 icon on any row to view signal trends over time</li>
+                    <li><strong>Export</strong> — download filtered data as CSV or PDF</li>
+                </ul>
+                <h3 style="margin-top:1.25rem;margin-bottom:0.5rem;">Auto Refresh &amp; History</h3>
+                <p><span class="help-admin-only">Enable <strong>Auto Refresh</strong> in Settings to collect data at regular intervals. </span>History samples are recorded on each scheduled refresh. The <strong>Recent</strong> tab shows the last 24 hours; the <strong>Daily</strong> tab shows long-term averages.</p>
+                <div class="help-admin-only">
+                <h3 style="margin-top:1.25rem;margin-bottom:0.5rem;">Profiles</h3>
+                <p>Save multiple credential sets as named profiles. Each profile maintains its own history data. Switch profiles via the Settings panel.</p>
+                <h3 style="margin-top:1.25rem;margin-bottom:0.5rem;">Read-Only Mode</h3>
+                <p>Launch with <code>-ro</code> flag to hide the Settings panel. Credential resolution:</p>
+                <ol style="padding-left:1.25rem;margin:0.5rem 0;">
+                    <li>If only one saved profile exists, it is used automatically</li>
+                    <li>If multiple profiles exist, the ★ Default profile is required</li>
+                    <li>If no profiles exist, environment variables are used</li>
+                </ol>
+                <p style="margin-top:0.5rem;">Use <code>-p "Name"</code> to override and specify a profile directly.</p>
+                </div>
+                <h3 style="margin-top:1.25rem;margin-bottom:0.5rem;">Dark Mode</h3>
+                <p>Click the moon icon to toggle. Your preference is saved automatically.</p>
             </div>
         </div>
     </div>
@@ -299,9 +425,17 @@
         async function refreshProfiles() {
             const resp = await fetch('/api/profiles');
             const profiles = await resp.json();
+            // Fetch default profile name
+            let defaultProfile = '';
+            try {
+                const dfResp = await fetch('/api/default-profile');
+                const dfData = await dfResp.json();
+                defaultProfile = dfData.default_profile || '';
+            } catch (e) {}
             profileSelect.innerHTML = '<option value="">— Select Profile —</option>';
             Object.keys(profiles).sort().forEach(name => {
-                profileSelect.innerHTML += `<option value="${name}">${name}</option>`;
+                const star = (name === defaultProfile) ? ' ★' : '';
+                profileSelect.innerHTML += `<option value="${name}">${name}${star}</option>`;
             });
         }
 
@@ -323,7 +457,7 @@
             if (resp.ok) {
                 showNotification(`Profile "${name}" loaded — refreshing data...`, 'success');
                 modal.style.display = 'none';
-                await fetchHealth();
+                await fetchHealth(true);
             } else {
                 const err = await resp.json();
                 showNotification(err.error || 'Load failed', 'error');
@@ -340,6 +474,15 @@
             else { showNotification('Delete failed', 'error'); }
         });
 
+        // Set default profile (for -ro startup)
+        document.getElementById('setDefaultProfileBtn').addEventListener('click', async () => {
+            const name = profileSelect.value;
+            if (!name) { showNotification('Select a profile first', 'error'); return; }
+            const resp = await fetch('/api/default-profile', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name}) });
+            if (resp.ok) { showNotification(`"${name}" set as default startup profile`, 'success'); refreshProfiles(); }
+            else { showNotification('Failed to set default', 'error'); }
+        });
+
         // Apply credentials
         document.getElementById('applyCredsBtn').addEventListener('click', async () => {
             const creds = getCredFields();
@@ -350,7 +493,7 @@
             }
             showNotification('Credentials applied — refreshing data...', 'success');
             modal.style.display = 'none';
-            await fetchHealth();
+            await fetchHealth(true);
         });
 
         // Save profile (overwrite current selection)
@@ -380,14 +523,31 @@
             }
             refreshProfiles();
         });
+
+        // Clear history
+        document.getElementById('clearHistoryBtn').addEventListener('click', async () => {
+            if (!confirm('Clear all history data? This cannot be undone.')) return;
+            const resp = await fetch('/api/history-clear', { method: 'POST' });
+            if (resp.ok) {
+                showNotification('History cleared', 'success');
+            } else {
+                showNotification('Failed to clear history', 'error');
+            }
+        });
+
+        // Help modal
+        const helpModal = document.getElementById('helpModal');
+        document.getElementById('helpBtn').addEventListener('click', () => { helpModal.style.display = 'flex'; });
+        document.getElementById('closeHelpBtn').addEventListener('click', () => { helpModal.style.display = 'none'; });
+        helpModal.addEventListener('click', (e) => { if (e.target === helpModal) helpModal.style.display = 'none'; });
     })();
     </script>
     <script>
         let healthData = [];
         let filteredData = [];
         let activeFilter = 'all';
-        let sortKey = null;
-        let sortDir = 1; // 1 = asc, -1 = desc
+        let sortKey = 'health_score';
+        let sortDir = 1; // 1 = asc (lowest first), -1 = desc
         let groupByRouter = localStorage.getItem('groupByRouter') !== 'false'; // default true
         let currentPage = 0;
         const PAGE_SIZE = 100;
@@ -543,7 +703,7 @@
             }
 
             if (pageData.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="13" style="text-align:center;padding:2rem;color:var(--text-secondary);">No devices match the current filters.</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="14" style="text-align:center;padding:2rem;color:var(--text-secondary);">No devices match the current filters.</td></tr>`;
                 return;
             }
 
@@ -564,6 +724,7 @@
                 const groupClass = (groupByRouter && groupIdx % 2 === 1) ? ' class="group-even"' : '';
                 const q = getSignalQuality(row);
                 return `<tr${groupClass}>
+                    <td style="text-align:center;"><button class="history-btn" data-router-id="${escapeHtml(row.router_id || row.router_name)}" data-router-name="${escapeHtml(row.router_name)}" data-interface="${escapeHtml(row.interface_name || '')}" title="View history"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg></button></td>
                     <td class="clickable-cell" style="cursor:pointer;"><strong>${escapeHtml(row.router_name)}</strong></td>
                     <td>${renderStatusBadge(row.router_state)}</td>
                     <td class="clickable-cell" style="cursor:pointer;">${escapeHtml(row.model||'—')}</td>
@@ -720,11 +881,18 @@
         });
 
         // Fetch
-        async function fetchHealth() {
-            loadingState.innerHTML = '<div class="spinner"></div><p>Loading cellular health data...</p>';
-            loadingState.style.display = 'flex'; healthTable.style.display = 'none';
+        async function fetchHealth(forceRefresh = false, silent = false, record = false) {
+            if (!silent) {
+                loadingState.innerHTML = '<div class="spinner"></div><p>Loading cellular health data...</p>';
+                loadingState.style.display = 'flex'; healthTable.style.display = 'none';
+            }
             try {
-                const resp = await fetch('/api/health');
+                let url = '/api/health';
+                if (forceRefresh) {
+                    url += '?refresh=true';
+                    if (record) url += '&record=true';
+                }
+                const resp = await fetch(url);
                 const json = await resp.json();
                 if (json.error_type === 'ssl_error') {
                     loadingState.innerHTML = `<p style="color:var(--danger-color);">SSL Error: ${escapeHtml(json.message)}</p>`;
@@ -732,7 +900,7 @@
                         const sslResp = await fetch('/api/ssl-noverify', { method: 'POST' });
                         if (sslResp.ok) {
                             showNotification('SSL verification disabled — retrying...', 'success');
-                            return fetchHealth();
+                            return fetchHealth(true);
                         } else {
                             showNotification('Failed to disable SSL verification', 'error');
                         }
@@ -745,10 +913,19 @@
                 updateStats(); applyFilters();
                 lastUpdated.textContent = `Updated: ${new Date(json.timestamp).toLocaleString()}`;
                 healthTable.style.display = 'table'; loadingState.style.display = 'none';
-                showNotification(`Loaded ${healthData.length} device(s)`, 'success');
+                if (!silent) {
+                    showNotification(`Loaded ${healthData.length} device(s)`, 'success');
+                }
+
+                // If this was a cached load, trigger a silent background refresh
+                if (!forceRefresh && !silent) {
+                    setTimeout(() => fetchHealth(true, true), 500);
+                }
             } catch (err) {
-                loadingState.innerHTML = `<p style="color:var(--danger-color);">Error: ${escapeHtml(err.message)}</p>`;
-                showNotification('Failed: ' + err.message, 'error');
+                if (!silent) {
+                    loadingState.innerHTML = `<p style="color:var(--danger-color);">Error: ${escapeHtml(err.message)}</p>`;
+                    showNotification('Failed: ' + err.message, 'error');
+                }
             }
         }
 
@@ -798,7 +975,7 @@
             stopAutoRefresh();
             const minutes = parseInt(refreshTimeInput.value, 10) || 60;
             autoRefreshInterval = setInterval(() => {
-                fetchHealth();
+                fetchHealth(true, true, true);
             }, minutes * 60 * 1000);
         }
 
@@ -832,8 +1009,242 @@
             startAutoRefresh();
         }
 
+        // --- History Modal ---
+        (function() {
+            const historyModal = document.getElementById('historyModal');
+            const historyTitle = document.getElementById('historyModalTitle');
+            const historyEmpty = document.getElementById('historyEmpty');
+            const chartCanvas = document.getElementById('historyChart');
+            const metricSelect = document.getElementById('historyMetricSelect');
+            const rangeSelect = document.getElementById('historyRangeSelect');
+            const dailyRangeControls = document.getElementById('dailyRangeControls');
+            let historyChart = null;
+            let currentRouterId = null;
+            let currentRouterName = '';
+            let currentInterface = '';
+            let currentTab = 'hourly';
+            let cachedData = { hourly: null, daily: null };
+
+            // Close modal
+            document.getElementById('closeHistoryBtn').addEventListener('click', () => {
+                historyModal.classList.remove('show');
+                if (historyChart) { historyChart.destroy(); historyChart = null; }
+            });
+            historyModal.addEventListener('click', (e) => {
+                if (e.target === historyModal) {
+                    historyModal.classList.remove('show');
+                    if (historyChart) { historyChart.destroy(); historyChart = null; }
+                }
+            });
+
+            // Tab switching
+            document.querySelectorAll('.history-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.history-tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    currentTab = tab.dataset.tab;
+                    dailyRangeControls.style.display = currentTab === 'daily' ? 'flex' : 'none';
+                    loadHistory();
+                });
+            });
+
+            // Metric change
+            metricSelect.addEventListener('change', () => renderChart());
+
+            // Range change (daily tab)
+            rangeSelect.addEventListener('change', () => {
+                cachedData.daily = null;
+                loadHistory();
+            });
+
+            // Open modal via history button click (event delegation)
+            document.getElementById('tableBody').addEventListener('click', (e) => {
+                const btn = e.target.closest('.history-btn');
+                if (!btn) return;
+                e.stopPropagation();
+                currentRouterId = btn.dataset.routerId;
+                currentRouterName = btn.dataset.routerName;
+                currentInterface = btn.dataset.interface || '';
+                historyTitle.textContent = `History — ${currentRouterName}${currentInterface ? ' (' + currentInterface + ')' : ''}`;
+                cachedData = { hourly: null, daily: null };
+                currentTab = 'hourly';
+                document.querySelectorAll('.history-tab').forEach(t => t.classList.remove('active'));
+                document.querySelector('.history-tab[data-tab="hourly"]').classList.add('active');
+                dailyRangeControls.style.display = 'none';
+                historyModal.classList.add('show');
+                loadHistory();
+            });
+
+            async function loadHistory() {
+                if (!currentRouterId) return;
+
+                const cacheKey = currentTab;
+                if (cachedData[cacheKey]) {
+                    renderChart();
+                    return;
+                }
+
+                let params = currentTab === 'daily'
+                    ? `?tab=daily&days=${rangeSelect.value}`
+                    : '?tab=hourly';
+                if (currentInterface) {
+                    params += `&interface=${encodeURIComponent(currentInterface)}`;
+                }
+
+                try {
+                    const resp = await fetch(`/api/history/${encodeURIComponent(currentRouterId)}${params}`);
+                    const json = await resp.json();
+                    if (json.status === 'ok') {
+                        cachedData[cacheKey] = json.data;
+                    } else {
+                        cachedData[cacheKey] = [];
+                    }
+                } catch (err) {
+                    cachedData[cacheKey] = [];
+                }
+                renderChart();
+            }
+
+            function renderChart() {
+                const data = cachedData[currentTab] || [];
+                const metric = metricSelect.value;
+                const chartContainer = chartCanvas.parentElement;
+
+                if (historyChart) { historyChart.destroy(); historyChart = null; }
+
+                if (data.length === 0) {
+                    historyEmpty.style.display = 'block';
+                    chartCanvas.style.display = 'none';
+                    return;
+                }
+                historyEmpty.style.display = 'none';
+                chartCanvas.style.display = 'block';
+
+                const labels = data.map(d => {
+                    if (currentTab === 'hourly') {
+                        const dt = new Date(d.timestamp);
+                        return dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    } else {
+                        return d.date;
+                    }
+                });
+
+                const values = data.map(d => d[metric]);
+
+                // Color coding for health_score
+                let borderColor = 'rgb(79, 70, 229)';
+                let backgroundColor = 'rgba(79, 70, 229, 0.1)';
+                let pointColors = null;
+
+                if (metric === 'health_score') {
+                    pointColors = values.map(v => {
+                        if (v == null) return '#9ca3af';
+                        if (v >= 75) return '#059669';
+                        if (v >= 50) return '#059669';
+                        if (v >= 25) return '#d97706';
+                        return '#dc2626';
+                    });
+                    borderColor = 'rgb(107, 114, 128)';
+                    backgroundColor = 'rgba(107, 114, 128, 0.05)';
+                }
+
+                const metricLabels = {
+                    health_score: 'Health Score (0–100)',
+                    dbm: 'RSSI (dBm)',
+                    rsrp: 'RSRP (dBm)',
+                    rsrq: 'RSRQ (dB)',
+                    sinr: 'SINR (dB)',
+                    signal_strength: 'Signal %',
+                };
+
+                // Health score threshold bands
+                const annotations = [];
+                if (metric === 'health_score') {
+                    annotations.push(
+                        { type: 'box', yMin: 75, yMax: 100, backgroundColor: 'rgba(5, 150, 105, 0.06)', borderWidth: 0 },
+                        { type: 'box', yMin: 50, yMax: 75, backgroundColor: 'rgba(5, 150, 105, 0.03)', borderWidth: 0 },
+                        { type: 'box', yMin: 25, yMax: 50, backgroundColor: 'rgba(217, 119, 6, 0.04)', borderWidth: 0 },
+                        { type: 'box', yMin: 0, yMax: 25, backgroundColor: 'rgba(220, 38, 38, 0.04)', borderWidth: 0 }
+                    );
+                }
+
+                const isDark = document.body.classList.contains('dark-mode');
+                const gridColor = isDark ? 'rgba(75, 85, 99, 0.5)' : 'rgba(209, 213, 219, 0.5)';
+                const textColor = isDark ? '#d1d5db' : '#6b7280';
+
+                historyChart = new Chart(chartCanvas, {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets: [{
+                            label: metricLabels[metric] || metric,
+                            data: values,
+                            borderColor: borderColor,
+                            backgroundColor: backgroundColor,
+                            pointBackgroundColor: pointColors || borderColor,
+                            pointBorderColor: pointColors || borderColor,
+                            pointRadius: data.length > 60 ? 2 : 4,
+                            pointHoverRadius: 6,
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.3,
+                            spanGaps: true,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { intersect: false, mode: 'index' },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    afterLabel: function(ctx) {
+                                        if (metric === 'health_score') {
+                                            const v = ctx.raw;
+                                            if (v >= 75) return '(Excellent)';
+                                            if (v >= 50) return '(Good)';
+                                            if (v >= 25) return '(Fair)';
+                                            return '(Poor)';
+                                        }
+                                        return '';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                ticks: {
+                                    color: textColor,
+                                    maxRotation: 45,
+                                    maxTicksLimit: data.length > 60 ? 20 : undefined,
+                                },
+                                grid: { color: gridColor }
+                            },
+                            y: {
+                                ticks: { color: textColor },
+                                grid: { color: gridColor },
+                                ...(metric === 'health_score' ? { min: 0, max: 100 } : {}),
+                                ...(metric === 'signal_strength' ? { min: 0, max: 100 } : {}),
+                            }
+                        }
+                    }
+                });
+            }
+        })();
+
         // Auto-load first saved profile on startup
         (async function autoLoadProfile() {
+            // Check readonly mode
+            try {
+                const cfgResp = await fetch('/api/config');
+                const cfg = await cfgResp.json();
+                if (cfg.readonly) {
+                    document.getElementById('settingsBtn').style.display = 'none';
+                    document.querySelectorAll('.help-admin-only').forEach(el => el.style.display = 'none');
+                }
+            } catch (e) { /* ignore */ }
+
             try {
                 const resp = await fetch('/api/profiles');
                 const profiles = await resp.json();

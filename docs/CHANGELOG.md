@@ -169,3 +169,11 @@ automatically by the reflexion system.
 - Changed `V3_BEARER_TOKEN` to `NCM_API_TOKEN` in Inventory Dashboard files.
 - Changed `CP_API_TOKEN` to `NCM_API_TOKEN` in scripts/utils/env_check.py and steering files.
 - Updated known-issues.md to reflect the standardization.
+
+## 2026-06-08 — Documented NCM SDK SSL verification failure behind proxies
+
+- Added known issue: NCM SDK's `requests.Session` uses default SSL verification, which fails behind corporate TLS-intercepting proxies. Workaround: set `client.session.verify = False` after constructing the client, or set `REQUESTS_CA_BUNDLE` env var to the proxy CA bundle path.
+
+## 2026-06-09 — Documented NCM SDK + FastAPI event loop blocking pattern
+
+- Added common pattern: NCM SDK uses synchronous `requests.Session` which blocks the async event loop when called from FastAPI `async def` handlers. Must wrap in `run_in_executor()` to keep the server responsive. Applies to all dashboard apps using FastAPI + NCM SDK.
