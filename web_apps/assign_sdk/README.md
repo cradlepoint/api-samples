@@ -2,6 +2,8 @@
 
 A web-based tool for assigning SDK application versions to router groups via the NCM API v2.
 
+<img width="1532" height="843" alt="image" src="https://github.com/user-attachments/assets/7d2ad7aa-3983-48b9-9291-f02119d53f10" />
+
 ## Quick Start
 
 ```bash
