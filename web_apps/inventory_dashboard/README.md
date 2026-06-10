@@ -4,6 +4,8 @@ Live web dashboard for Ericsson NetCloud Manager device inventory and license st
 
 Combines v2 API (routers, net devices, groups, accounts) with v3 API (asset endpoints, subscriptions) into a single unified view showing license state, modem details, and subscription information for every device.
 
+<img width="1532" height="843" alt="image" src="https://github.com/user-attachments/assets/12c68386-97c0-463d-b304-863bfca9406c" />
+
 ## Features
 
 - Full device inventory with license state (licensed, grace-period, unlicensed)
