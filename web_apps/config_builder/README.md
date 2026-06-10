@@ -2,6 +2,10 @@
 
 A local web-based tool for building Cradlepoint .bin configuration files from templates with per-site variable substitution. No cloud or NCM API calls — everything runs on your machine.
 
+<img width="1532" height="843" alt="image" src="https://github.com/user-attachments/assets/0efa4770-10b6-461d-b871-8f2b9e206317" />
+<img width="1532" height="843" alt="image" src="https://github.com/user-attachments/assets/c48195bf-73c0-4367-af3b-70b4adc230e9" />
+<img width="1532" height="843" alt="image" src="https://github.com/user-attachments/assets/cb9f3279-aeb0-4106-8e58-6d7938612ffd" />
+
 ## Features
 
 - **Config Templates** — named pairs of Base + Full JSON configs with `{{variable_name}}` placeholders
