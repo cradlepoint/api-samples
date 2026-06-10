@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Config Builder</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <img src="/static/logo.png" alt="Ericsson" class="app-logo" id="appLogo">
+                    <h1 id="app-title">Config Builder</h1>
+                </div>
+                <div class="header-actions">
+                    <button class="header-btn-square" id="helpGuideBtn" title="User Guide">?</button>
+                    <button class="dark-mode-toggle" id="darkModeToggle" title="Toggle Dark Mode">
+                        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="app-main">
+            <!-- Sidebar -->
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-header">
+                    <button class="sidebar-toggle" id="sidebarToggle" title="Toggle Sidebar">
+                        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="15 18 9 12 15 6"></polyline>
+                        </svg>
+                    </button>
+                    <h2 class="sidebar-title">Navigation</h2>
+                </div>
+                <nav class="sidebar-nav">
+                    <ul class="nav-list">
+                        <li>
+                            <a href="#" class="nav-item active" data-tab="templates" title="Config Templates">
+                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                </svg>
+                                <span class="nav-text">Config Templates</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="nav-item" data-tab="build" title="Build">
+                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                                </svg>
+                                <span class="nav-text">Build</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="nav-item" data-tab="sites" title="Saved Sites">
+                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                    <circle cx="12" cy="10" r="3"></circle>
+                                </svg>
+                                <span class="nav-text">Saved Sites</span>
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+            </aside>
+
+            <!-- Content Area -->
+            <div class="content-area">
+
+                <!-- Help Panel -->
+                <aside class="help-panel" id="helpPanel">
+                    <div class="help-panel-header">
+                        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                        <span>Help</span>
+                    </div>
+                    <div class="help-panel-content" id="helpContent"></div>
+                </aside>
+
+                <!-- Config Templates Tab -->
+                <div class="tab-content active" id="templatesTab">
+                    <div class="control-panel">
+                        <div class="panel-header">
+                            <h2>
+                                <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                </svg>
+                                Config Templates
+                            </h2>
+                        </div>
+                        <div class="panel-content">
+                            <p class="info-note">
+                                📋 A Config Template is a named pair of <strong>Base</strong> and <strong>Full</strong> JSON configs. Base configs set up connectivity on install; Full configs are applied by a remote admin. Use <code>{{variable_name|type}}</code> placeholders for per-site values.
+                            </p>
+                            <div class="csv-actions-bar">
+                                <button id="addTemplateBtn" class="btn btn-primary">
+                                    <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    </svg> Add Config Template
+                                </button>
+                            </div>
+                            <div class="config-list" id="templateList">
+                                <div class="loading-message">Loading templates...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Build Tab -->
+                <div class="tab-content" id="buildTab">
+                    <div class="control-panel">
+                        <div class="panel-header">
+                            <h2>
+                                <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                                </svg>
+                                Build Configuration
+                            </h2>
+                        </div>
+                        <div class="panel-content">
+                            <!-- Select Template -->
+                            <div class="build-section">
+                                <h3>Config Template</h3>
+                                <select id="buildTemplateSelect" class="input-field">
+                                    <option value="">-- Select a Config Template --</option>
+                                </select>
+                            </div>
+
+                            <!-- Site Mode -->
+                            <div class="build-section" id="siteModeSection" style="display:none;">
+                                <h3>Site</h3>
+                                <div class="site-mode-toggle">
+                                    <label class="radio-label">
+                                        <input type="radio" name="siteMode" value="create" checked> Create New Site
+                                    </label>
+                                    <label class="radio-label">
+                                        <input type="radio" name="siteMode" value="load"> Load Saved Site
+                                    </label>
+                                </div>
+
+                                <!-- Load Saved Site -->
+                                <div id="loadSitePanel" style="display:none;">
+                                    <select id="loadSiteFileSelect" class="input-field" style="margin-bottom:0.75rem;">
+                                        <option value="">-- Select a site file --</option>
+                                    </select>
+                                    <div id="loadSiteSearchContainer" style="display:none;">
+                                        <input type="text" id="loadSiteSearch" class="input-field" placeholder="Search sites...">
+                                        <div class="location-results" id="loadSiteResults"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Site Form (shared for create/load) -->
+                                <div id="siteFormContainer" style="display:none;">
+                                    <div class="site-form-fields" id="siteFormFields"></div>
+                                </div>
+                            </div>
+
+                            <!-- Save Site -->
+                            <div class="build-section" id="saveSiteSection" style="display:none;">
+                                <h3>Save Site</h3>
+                                <div class="save-site-row">
+                                    <input type="text" id="saveSiteFilename" class="input-field" value="sites.csv" placeholder="sites.csv">
+                                    <button id="saveSiteBtn" class="btn btn-secondary" disabled title="Complete all fields to enable">
+                                        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                                            <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                            <polyline points="7 3 7 8 15 8"></polyline>
+                                        </svg> Save Site
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Download Configs -->
+                            <div class="build-section" id="downloadSection" style="display:none;">
+                                <h3>Download Configs</h3>
+                                <div class="csv-actions-bar">
+                                    <button id="downloadBaseBtn" class="btn btn-primary" disabled title="Complete all fields to enable">
+                                        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                            <polyline points="7 10 12 15 17 10"></polyline>
+                                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                                        </svg> Download Base Config
+                                    </button>
+                                    <button id="downloadFullBtn" class="btn btn-primary" disabled title="Complete all fields to enable">
+                                        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                            <polyline points="7 10 12 15 17 10"></polyline>
+                                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                                        </svg> Download Full Config
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Saved Sites Tab -->
+                <div class="tab-content" id="sitesTab">
+                    <div class="control-panel">
+                        <div class="panel-header">
+                            <h2>
+                                <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                    <circle cx="12" cy="10" r="3"></circle>
+                                </svg>
+                                Saved Sites
+                            </h2>
+                        </div>
+                        <div class="panel-content">
+                            <p class="info-note">
+                                📍 Manage saved site CSV files. Upload a CSV or delete existing files.
+                            </p>
+                            <div class="csv-actions-bar">
+                                <button id="uploadSitesBtn" class="btn btn-primary">
+                                    <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="17 8 12 3 7 8"></polyline>
+                                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                                    </svg> Upload Sites CSV
+                                </button>
+                                <input type="file" id="sitesFileInput" accept=".csv" style="display:none;">
+                            </div>
+                            <div class="config-list" id="siteFilesList">
+                                <div class="loading-message">Loading site files...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+
+        <!-- Add/Edit Template Modal -->
+        <div class="modal" id="templateModal">
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h2 id="templateModalTitle">Add Config Template</h2>
+                    <button class="modal-close" id="closeTemplateModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="templateName">Template Name:</label>
+                        <input type="text" id="templateName" class="input-field" placeholder="e.g. E3000 Standard Deploy">
+                    </div>
+
+                    <!-- Step 1: Base Config -->
+                    <div id="templateStepBase">
+                        <div class="form-group">
+                            <label>Base Config (connectivity on install):</label>
+                            <div class="file-btn-row">
+                                <button type="button" class="btn btn-secondary btn-sm" id="loadBaseFileBtn">
+                                    <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="17 8 12 3 7 8"></polyline>
+                                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                                    </svg> Load .json / .bin file
+                                </button>
+                                <span class="file-name-label" id="baseFileNameLabel"></span>
+                                <input type="file" id="baseConfigFileInput" accept=".json,.bin" style="display:none;">
+                            </div>
+                            <textarea id="baseConfigContent" class="template-editor" rows="14" placeholder="Base config JSON (paste or load file)..."></textarea>
+                        </div>
+                        <div class="modal-actions">
+                            <button class="btn btn-secondary" id="cancelTemplateBtn">Cancel</button>
+                            <button class="btn btn-primary" id="nextToFullBtn">Next &rarr; Full Config</button>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Full Config -->
+                    <div id="templateStepFull" style="display:none;">
+                        <div class="form-group">
+                            <label>Full Config (applied by remote admin):</label>
+                            <div class="file-btn-row">
+                                <button type="button" class="btn btn-secondary btn-sm" id="loadFullFileBtn">
+                                    <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="17 8 12 3 7 8"></polyline>
+                                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                                    </svg> Load .json / .bin file
+                                </button>
+                                <span class="file-name-label" id="fullFileNameLabel"></span>
+                                <input type="file" id="fullConfigFileInput" accept=".json,.bin" style="display:none;">
+                            </div>
+                            <textarea id="fullConfigContent" class="template-editor" rows="14" placeholder="Full config JSON (paste or load file)..."></textarea>
+                        </div>
+                        <div id="templateValidation" style="display:none;"></div>
+                        <div class="modal-actions">
+                            <button class="btn btn-secondary" id="backToBaseBtn">&larr; Back to Base</button>
+                            <button class="btn btn-primary" id="saveTemplateBtn">Save Template</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Guide Modal -->
+        <div class="modal" id="userGuideModal">
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h2>User Guide</h2>
+                    <button class="modal-close" id="closeUserGuideModal">&times;</button>
+                </div>
+                <div class="modal-body user-guide-body">
+                    <h3>Overview</h3>
+                    <p>Config Builder creates Cradlepoint .bin configuration files from templates with per-site variable substitution. No internet or NCM API access required.</p>
+
+                    <h3>Workflow</h3>
+                    <ol>
+                        <li><strong>Create a Config Template</strong> — Go to <em>Config Templates</em> and click <em>Add Config Template</em>. Give it a name, upload or paste a Base config (connectivity on install), then click Next and upload or paste a Full config (applied by remote admin). Save the template.</li>
+                        <li><strong>Add variables</strong> — In your JSON configs, replace site-specific values with <code>{{Variable Name}}</code> placeholders. Example:<br><code>"ip_address": "{{Vlan2 IP Address}}"</code></li>
+                        <li><strong>Build a site config</strong> — Go to the <em>Build</em> tab. Select your template. Fill in all the fields (site info + template variables). The form is auto-generated from your template placeholders.</li>
+                        <li><strong>Save the site</strong> — Enter a filename (default: sites.csv) and click Save Site. This stores the site data for reuse later.</li>
+                        <li><strong>Download configs</strong> — Click <em>Download Base Config</em> or <em>Download Full Config</em> to get the .bin files with all variables replaced. Files are named like:<br><code>RDL999222 - E3000 - Full Config.bin</code></li>
+                        <li><strong>Load a saved site</strong> — Switch to "Load Saved Site" to pick a previously saved site, edit values if needed, and re-download configs.</li>
+                    </ol>
+
+                    <h3>Variable Types</h3>
+                    <p>By default variables are strings. To enforce a type, use <code>{{name|type}}</code>:</p>
+                    <ul>
+                        <li><code>string</code> — any text</li>
+                        <li><code>integer</code> — whole number (e.g. 42)</li>
+                        <li><code>float</code> — decimal number (e.g. 3.14)</li>
+                        <li><code>boolean</code> — true or false</li>
+                        <li><code>ipv4</code> — IPv4 address (e.g. 192.168.1.1)</li>
+                        <li><code>ipv6</code> — IPv6 address</li>
+                        <li><code>cidr</code> — CIDR notation (e.g. 10.0.0.0/24)</li>
+                        <li><code>mac</code> — MAC address (e.g. AA:BB:CC:DD:EE:FF)</li>
+                    </ul>
+
+                    <h3>Tips</h3>
+                    <ul>
+                        <li>You can upload .bin files exported from NCM — they are automatically decompressed to JSON.</li>
+                        <li>If you download without saving, you'll be prompted to save first.</li>
+                        <li>Manage saved site CSVs from the <em>Saved Sites</em> tab.</li>
+                        <li>Router models can be extended by editing <code>router_models.csv</code>.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notification -->
+        <div class="notification" id="notification">
+            <span id="notificationText"></span>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
