@@ -20,16 +20,19 @@ cd api-samples
 
 Run the setup script to create the virtual environment, install dependencies, and configure API credentials:
 
-```bash
-python3 setup_env.py        # macOS/Linux
-python setup_env.py         # Windows
+**macOS / Linux**
+
+```
+python3 setup_env.py && source .venv/bin/activate
 ```
 
-This handles everything — venv creation, `pip install`, and credential configuration. After setup:
+**Windows**
 
-```bash
-source .venv/bin/activate
 ```
+python setup_env.py && .venv\Scripts\activate
+```
+
+This handles everything — venv creation, `pip install`, and credential configuration.
 
 ### Manual Setup (alternative)
 
