@@ -2,6 +2,10 @@
 
 A web application for generating and deploying geographic IP blocking rules to Cradlepoint routers via the NetCloud Manager API. Select countries or entire regions to block, and the tool converts their IP address ranges into zone firewall (ZFW) filter policy rules that can be pushed directly to NCM groups.
 
+<img width="1639" height="845" alt="image" src="https://github.com/user-attachments/assets/4142307a-14ba-4261-b217-8a1bb0e17fb6" />
+<img width="1639" height="845" alt="image" src="https://github.com/user-attachments/assets/c85e2921-a97f-4213-bead-141cef0c572c" />
+<img width="1639" height="845" alt="image" src="https://github.com/user-attachments/assets/38a97809-5547-4c7d-aa92-e8921447302e" />
+
 ## How It Works
 
 1. **Select Regions** — Choose individual countries or entire geographic regions to block. IP address ranges are sourced from [ipdeny.com](https://www.ipdeny.com/ipblocks/) aggregated zone files.
