@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geo IP Blocker - Zone Firewall Rule Generator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    <style>
+:root {
+    --primary-color: #4f46e5;
+    --primary-dark: #3730a3;
+    --secondary-color: #6b7280;
+    --success-color: #059669;
+    --warning-color: #d97706;
+    --danger-color: #dc2626;
+    --info-color: #0284c7;
+    --dark-bg: #111827;
+    --dark-surface: #1f2937;
+    --light-bg: #f9fafb;
+    --light-surface: #ffffff;
+    --text-primary: #111827;
+    --text-secondary: #6b7280;
+    --text-light: #9ca3af;
+    --border-color: #d1d5db;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --radius-sm: 0.375rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.75rem;
+    --radius-xl: 1rem;
+    --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    min-height: 100vh;
+    color: var(--text-primary);
+    line-height: 1.6;
+}
+
+body.dark-mode {
+    --light-bg: #1f2937;
+    --light-surface: #111827;
+    --text-primary: #f9fafb;
+    --text-secondary: #d1d5db;
+    --text-light: #6b7280;
+    --border-color: #374151;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+}
+
+.app-container { min-height: 100vh; display: flex; flex-direction: column; }
+
+.app-header {
+    background: var(--light-surface);
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: var(--shadow-md);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.header-content {
+    max-width: 100%;
+    padding: 1rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.logo-section { display: flex; align-items: center; gap: 1rem; }
+
+.app-logo { height: 40px; width: auto; }
+body.dark-mode .app-logo { content: url('/static/logo_dark.png'); }
+
+#app-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--primary-color), var(--info-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.header-actions { display: flex; align-items: center; gap: 0.75rem; }
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+    box-shadow: var(--shadow-sm);
+    text-decoration: none;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    color: white;
+}
+.btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--shadow-lg); }
+
+.btn-secondary {
+    background: var(--light-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+.btn-secondary:hover:not(:disabled) { background: var(--border-color); }
+
+.btn-danger {
+    background: linear-gradient(135deg, var(--danger-color), #b91c1c);
+    color: white;
+}
+.btn-danger:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--shadow-lg); }
+
+.btn-success {
+    background: linear-gradient(135deg, var(--success-color), #047857);
+    color: white;
+}
+.btn-success:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--shadow-lg); }
+
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-sm { padding: 0.4rem 0.75rem; font-size: 0.8125rem; }
+
+.icon-btn {
+    background: var(--light-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 0.625rem;
+    cursor: pointer;
+    transition: var(--transition);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.icon-btn:hover { background: var(--light-bg); transform: translateY(-1px); }
+
+/* Main Layout */
+.app-main {
+    flex: 1;
+    padding: 1.5rem 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+/* Stepper */
+.stepper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 2rem;
+    gap: 0;
+}
+
+.step {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-lg);
+    color: var(--text-light);
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: var(--transition);
+    cursor: pointer;
+}
+
+.step.active {
+    background: var(--light-surface);
+    color: var(--primary-color);
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--primary-color);
+}
+
+.step.completed { color: var(--success-color); }
+
+.step-number {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.8rem;
+    background: var(--border-color);
+    color: var(--text-secondary);
+}
+
+.step.active .step-number { background: var(--primary-color); color: white; }
+.step.completed .step-number { background: var(--success-color); color: white; }
+
+.step-connector {
+    width: 40px;
+    height: 2px;
+    background: var(--border-color);
+    margin: 0 0.25rem;
+}
+.step-connector.completed { background: var(--success-color); }
+
+/* Panels */
+.panel {
+    background: var(--light-surface);
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+}
+
+.panel-header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--light-bg);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.panel-header h2 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.panel-content { padding: 1.5rem; }
+
+/* Step Panels */
+.step-panel { display: none; }
+.step-panel.active { display: block; }
+
+/* Region Selector */
+.region-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+}
+
+.region-card {
+    background: var(--light-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    transition: var(--transition);
+}
+
+.region-card:hover { border-color: var(--primary-color); }
+
+.region-card-header {
+    padding: 0.75rem 1rem;
+    background: var(--light-surface);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+}
+
+.region-card-header h3 {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.region-toggle { font-size: 0.75rem; color: var(--primary-color); cursor: pointer; font-weight: 500; }
+.region-toggle:hover { text-decoration: underline; }
+
+.country-list {
+    padding: 0.75rem 1rem;
+    max-height: 250px;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.25rem;
+}
+
+.country-item {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.375rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.8125rem;
+    cursor: pointer;
+    transition: var(--transition);
+}
+.country-item:hover { background: var(--light-surface); }
+.country-item input[type="checkbox"] { accent-color: var(--primary-color); cursor: pointer; }
+.country-item label { cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Selection Summary */
+.selection-summary {
+    background: var(--light-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    margin-top: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.selection-count {
+    font-weight: 600;
+    color: var(--primary-color);
+    font-size: 0.9375rem;
+}
+
+.selected-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    max-height: 80px;
+    overflow-y: auto;
+    flex: 1;
+    margin: 0 1rem;
+}
+
+.tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.5rem;
+    background: var(--primary-color);
+    color: white;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.tag .remove-tag {
+    cursor: pointer;
+    opacity: 0.7;
+    font-size: 0.875rem;
+    line-height: 1;
+}
+.tag .remove-tag:hover { opacity: 1; }
+
+/* Rules Preview */
+.rules-preview {
+    background: var(--dark-bg);
+    color: #e5e7eb;
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.8125rem;
+    max-height: 400px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+body.dark-mode .rules-preview { background: #0f172a; border: 1px solid var(--border-color); }
+
+/* Rule Summary Cards */
+.rule-summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.summary-card {
+    background: var(--light-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    text-align: center;
+}
+
+.summary-card .value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.summary-card .label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+}
+
+/* Group Selector */
+.group-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.group-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: var(--light-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.group-item:hover { border-color: var(--primary-color); background: var(--light-surface); }
+.group-item.selected { border-color: var(--primary-color); background: rgba(79, 70, 229, 0.05); }
+.group-item input[type="checkbox"] { accent-color: var(--primary-color); cursor: pointer; }
+
+.group-info { flex: 1; }
+.group-name { font-weight: 600; font-size: 0.9375rem; }
+.group-meta { font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.125rem; }
+
+/* Push Results */
+.push-results {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.result-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+}
+
+.result-item.success { background: rgba(5, 150, 105, 0.1); border: 1px solid var(--success-color); color: var(--success-color); }
+.result-item.error { background: rgba(220, 38, 38, 0.1); border: 1px solid var(--danger-color); color: var(--danger-color); }
+
+/* Loading */
+.loading-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.loading-overlay.hidden { display: none; }
+
+.loading-box {
+    background: var(--light-surface);
+    border-radius: var(--radius-xl);
+    padding: 2rem 3rem;
+    text-align: center;
+    box-shadow: var(--shadow-lg);
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--border-color);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Toast Notifications */
+.toast-container {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.toast {
+    padding: 0.75rem 1.25rem;
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-weight: 500;
+    box-shadow: var(--shadow-lg);
+    animation: slideIn 0.3s ease;
+    max-width: 400px;
+}
+
+.toast.success { background: var(--success-color); color: white; }
+.toast.error { background: var(--danger-color); color: white; }
+.toast.info { background: var(--info-color); color: white; }
+.toast.warning { background: var(--warning-color); color: white; }
+
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+/* Modal */
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+.modal-overlay.hidden { display: none; }
+
+.modal {
+    background: var(--light-surface);
+    border-radius: var(--radius-xl);
+    width: 90%;
+    max-width: 500px;
+    box-shadow: var(--shadow-lg);
+}
+
+.modal-header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.modal-header h3 { font-size: 1.125rem; font-weight: 600; }
+.modal-body { padding: 1.5rem; }
+.modal-footer { padding: 1rem 1.5rem; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 0.75rem; }
+
+.form-group { margin-bottom: 1rem; }
+.form-group label { display: block; font-weight: 500; font-size: 0.875rem; margin-bottom: 0.375rem; color: var(--text-primary); }
+
+.input-field {
+    width: 100%;
+    padding: 0.625rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    background: var(--light-surface);
+    color: var(--text-primary);
+    transition: var(--transition);
+}
+.input-field:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
+
+/* Search */
+.search-box {
+    position: relative;
+    margin-bottom: 1rem;
+}
+.search-box input {
+    width: 100%;
+    padding: 0.625rem 0.75rem 0.625rem 2.25rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    background: var(--light-surface);
+    color: var(--text-primary);
+}
+.search-box input:focus { outline: none; border-color: var(--primary-color); }
+.search-box .search-icon { position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--text-light); }
+
+/* Responsive */
+@media (max-width: 768px) {
+    .header-content { padding: 0.75rem 1rem; }
+    .app-main { padding: 1rem; }
+    .region-grid { grid-template-columns: 1fr; }
+    .stepper { flex-wrap: wrap; gap: 0.25rem; }
+    .step-connector { width: 20px; }
+}
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <img src="/static/logo.png" alt="Logo" class="app-logo">
+                    <h1 id="app-title">Geo IP Blocker</h1>
+                </div>
+                <div class="header-actions">
+                    <button type="button" class="icon-btn" id="settingsBtn" title="Settings">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                    <button type="button" class="icon-btn" id="darkModeToggle" title="Toggle Dark Mode">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="app-main">
+            <!-- Stepper -->
+            <div class="stepper">
+                <div class="step active" data-step="1">
+                    <span class="step-number">1</span>
+                    <span>Select Regions</span>
+                </div>
+                <div class="step-connector"></div>
+                <div class="step" data-step="2">
+                    <span class="step-number">2</span>
+                    <span>Review Rules</span>
+                </div>
+                <div class="step-connector"></div>
+                <div class="step" data-step="3">
+                    <span class="step-number">3</span>
+                    <span>Push to Groups</span>
+                </div>
+            </div>
+
+            <!-- Step 1: Select Regions -->
+            <div class="step-panel active" id="step1-panel">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2><i class="fas fa-globe-americas"></i> Select Regions to Block</h2>
+                        <div style="display:flex;gap:0.5rem;">
+                            <button class="btn btn-sm btn-secondary" id="selectAllBtn">Select All</button>
+                            <button class="btn btn-sm btn-secondary" id="clearAllBtn">Clear All</button>
+                        </div>
+                    </div>
+                    <div class="panel-content">
+                        <div class="search-box">
+                            <i class="fas fa-search search-icon"></i>
+                            <input type="text" id="countrySearch" placeholder="Search countries...">
+                        </div>
+                        <div class="region-grid" id="regionGrid"></div>
+                        <div class="selection-summary" id="selectionSummary" style="display:none;">
+                            <span class="selection-count" id="selectionCount">0 countries selected</span>
+                            <div class="selected-tags" id="selectedTags"></div>
+                            <button class="btn btn-primary" id="fetchBlocksBtn">
+                                <i class="fas fa-download"></i> Fetch IP Blocks
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2: Review Rules -->
+            <div class="step-panel" id="step2-panel">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2><i class="fas fa-shield-alt"></i> Generated ZFW Filter Policy Rules</h2>
+                        <div style="display:flex;gap:0.5rem;">
+                            <button class="btn btn-sm btn-secondary" id="copyConfigBtn">
+                                <i class="fas fa-copy"></i> Copy JSON
+                            </button>
+                            <button class="btn btn-sm btn-secondary" id="downloadConfigBtn">
+                                <i class="fas fa-download"></i> Download
+                            </button>
+                        </div>
+                    </div>
+                    <div class="panel-content">
+                        <div class="rule-summary-cards" id="ruleSummaryCards"></div>
+                        <h3 style="margin-bottom:0.75rem;font-size:0.9375rem;">Configuration Preview</h3>
+                        <div class="rules-preview" id="rulesPreview"></div>
+                        <div style="display:flex;justify-content:space-between;margin-top:1.5rem;">
+                            <button class="btn btn-secondary" id="backToStep1">
+                                <i class="fas fa-arrow-left"></i> Back
+                            </button>
+                            <button class="btn btn-primary" id="goToStep3">
+                                <i class="fas fa-arrow-right"></i> Select Groups to Push
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 3: Push to Groups -->
+            <div class="step-panel" id="step3-panel">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2><i class="fas fa-upload"></i> Push Configuration to Groups</h2>
+                        <button class="btn btn-sm btn-secondary" id="refreshGroupsBtn">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+                    <div class="panel-content">
+                        <div class="search-box">
+                            <i class="fas fa-search search-icon"></i>
+                            <input type="text" id="groupSearch" placeholder="Search groups...">
+                        </div>
+                        <div class="group-list" id="groupList">
+                            <div style="text-align:center;padding:2rem;color:var(--text-secondary);">
+                                <i class="fas fa-spinner fa-spin" style="font-size:1.5rem;"></i>
+                                <p style="margin-top:0.5rem;">Loading groups...</p>
+                            </div>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;margin-top:1.5rem;">
+                            <button class="btn btn-secondary" id="backToStep2">
+                                <i class="fas fa-arrow-left"></i> Back
+                            </button>
+                            <button class="btn btn-success" id="pushConfigBtn" disabled>
+                                <i class="fas fa-paper-plane"></i> Push to Selected Groups
+                            </button>
+                        </div>
+                        <div class="push-results" id="pushResults"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay hidden" id="loadingOverlay">
+        <div class="loading-box">
+            <div class="spinner"></div>
+            <p id="loadingText">Loading...</p>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay hidden" id="settingsModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3><i class="fas fa-cog"></i> API Credentials</h3>
+                <button class="icon-btn" id="closeSettingsBtn"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="cpApiId">X_CP_API_ID</label>
+                    <input type="text" class="input-field" id="cpApiId" placeholder="Cradlepoint API ID">
+                </div>
+                <div class="form-group">
+                    <label for="cpApiKey">X_CP_API_KEY</label>
+                    <input type="password" class="input-field" id="cpApiKey" placeholder="Cradlepoint API Key">
+                </div>
+                <div class="form-group">
+                    <label for="ecmApiId">X_ECM_API_ID</label>
+                    <input type="text" class="input-field" id="ecmApiId" placeholder="ECM API ID">
+                </div>
+                <div class="form-group">
+                    <label for="ecmApiKey">X_ECM_API_KEY</label>
+                    <input type="password" class="input-field" id="ecmApiKey" placeholder="ECM API Key">
+                </div>
+                <div class="form-group" style="display:flex;gap:0.5rem;align-items:end;">
+                    <div style="flex:1;">
+                        <label for="profileSelect">Profiles</label>
+                        <select class="input-field" id="profileSelect">
+                            <option value="">-- Select Profile --</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-sm btn-secondary" id="loadProfileBtn">Load</button>
+                    <button class="btn btn-sm btn-danger" id="deleteProfileBtn">Delete</button>
+                </div>
+                <div class="form-group" style="display:flex;gap:0.5rem;align-items:end;">
+                    <div style="flex:1;">
+                        <label for="profileName">Save As</label>
+                        <input type="text" class="input-field" id="profileName" placeholder="Profile name">
+                    </div>
+                    <button class="btn btn-sm btn-primary" id="saveProfileBtn">Save</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelSettingsBtn">Cancel</button>
+                <button class="btn btn-primary" id="applySettingsBtn">
+                    <i class="fas fa-check"></i> Apply & Refresh
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+
+// --- State ---
+let countries = {};
+let selectedCountries = new Set();
+let ipBlocks = {};
+let generatedConfig = null;
+let groups = [];
+let selectedGroups = new Set();
+let currentStep = 1;
+
+// --- Utilities ---
+function showLoading(text = 'Loading...') {
+    document.getElementById('loadingText').textContent = text;
+    document.getElementById('loadingOverlay').classList.remove('hidden');
+}
+function hideLoading() {
+    document.getElementById('loadingOverlay').classList.add('hidden');
+}
+
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+}
+
+function setStep(step) {
+    currentStep = step;
+    document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById(`step${step}-panel`).classList.add('active');
+    document.querySelectorAll('.step').forEach(s => {
+        const sStep = parseInt(s.dataset.step);
+        s.classList.remove('active', 'completed');
+        if (sStep === step) s.classList.add('active');
+        else if (sStep < step) s.classList.add('completed');
+    });
+    document.querySelectorAll('.step-connector').forEach((c, i) => {
+        c.classList.toggle('completed', i < step - 1);
+    });
+}
+
+// --- Region/Country Rendering ---
+function renderRegions(filter = '') {
+    const grid = document.getElementById('regionGrid');
+    grid.innerHTML = '';
+    const filterLower = filter.toLowerCase();
+
+    for (const [region, regionCountries] of Object.entries(countries)) {
+        const filteredCountries = Object.entries(regionCountries).filter(([code, name]) =>
+            !filter || name.toLowerCase().includes(filterLower) || code.toLowerCase().includes(filterLower)
+        );
+        if (filteredCountries.length === 0) continue;
+
+        const card = document.createElement('div');
+        card.className = 'region-card';
+        const allSelected = filteredCountries.every(([code]) => selectedCountries.has(code));
+
+        card.innerHTML = `
+            <div class="region-card-header">
+                <h3><i class="fas fa-map-marker-alt"></i> ${region} (${filteredCountries.length})</h3>
+                <span class="region-toggle" data-region="${region}">${allSelected ? 'Deselect All' : 'Select All'}</span>
+            </div>
+            <div class="country-list">
+                ${filteredCountries.map(([code, name]) => `
+                    <div class="country-item">
+                        <input type="checkbox" id="country-${code}" value="${code}" ${selectedCountries.has(code) ? 'checked' : ''}>
+                        <label for="country-${code}" title="${name} (${code})">${name}</label>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        grid.appendChild(card);
+    }
+
+    // Bind events
+    grid.querySelectorAll('.region-toggle').forEach(el => {
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const region = el.dataset.region;
+            const codes = Object.keys(countries[region]);
+            const allSel = codes.every(c => selectedCountries.has(c));
+            codes.forEach(c => allSel ? selectedCountries.delete(c) : selectedCountries.add(c));
+            renderRegions(document.getElementById('countrySearch').value);
+            updateSelectionSummary();
+        });
+    });
+
+    grid.querySelectorAll('.country-item input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener('change', () => {
+            if (cb.checked) selectedCountries.add(cb.value);
+            else selectedCountries.delete(cb.value);
+            updateSelectionSummary();
+        });
+    });
+}
+
+function updateSelectionSummary() {
+    const summary = document.getElementById('selectionSummary');
+    const count = document.getElementById('selectionCount');
+    const tags = document.getElementById('selectedTags');
+
+    if (selectedCountries.size === 0) {
+        summary.style.display = 'none';
+        return;
+    }
+
+    summary.style.display = 'flex';
+    count.textContent = `${selectedCountries.size} ${selectedCountries.size === 1 ? 'country' : 'countries'} selected`;
+
+    tags.innerHTML = '';
+    for (const code of selectedCountries) {
+        const name = getCountryName(code);
+        const tag = document.createElement('span');
+        tag.className = 'tag';
+        tag.innerHTML = `${code} <span class="remove-tag" data-code="${code}">&times;</span>`;
+        tag.title = name;
+        tags.appendChild(tag);
+    }
+
+    tags.querySelectorAll('.remove-tag').forEach(el => {
+        el.addEventListener('click', () => {
+            selectedCountries.delete(el.dataset.code);
+            renderRegions(document.getElementById('countrySearch').value);
+            updateSelectionSummary();
+        });
+    });
+}
+
+function getCountryName(code) {
+    for (const regionCountries of Object.values(countries)) {
+        if (code in regionCountries) return regionCountries[code];
+    }
+    return code;
+}
+
+// --- Fetch IP Blocks ---
+async function fetchIpBlocks() {
+    if (selectedCountries.size === 0) {
+        showToast('Please select at least one country', 'warning');
+        return;
+    }
+
+    showLoading(`Fetching IP blocks for ${selectedCountries.size} countries...`);
+    try {
+        const resp = await fetch('/api/fetch-ip-blocks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ countries: Array.from(selectedCountries) })
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.detail || 'Failed to fetch IP blocks');
+
+        ipBlocks = data.ip_blocks;
+        if (data.errors && data.errors.length > 0) {
+            showToast(`Warnings: ${data.errors.join(', ')}`, 'warning');
+        }
+        showToast(`Fetched ${data.total_blocks} IP blocks`, 'success');
+
+        // Generate rules
+        await generateRules();
+    } catch (err) {
+        showToast(err.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+// --- Generate Rules ---
+async function generateRules() {
+    showLoading('Generating ZFW filter policy rules...');
+    try {
+        const resp = await fetch('/api/generate-rules', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                countries: Array.from(selectedCountries),
+                ip_blocks: ipBlocks
+            })
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.detail || 'Failed to generate rules');
+
+        generatedConfig = data.config;
+        renderRulesPreview(data.summary);
+        setStep(2);
+    } catch (err) {
+        showToast(err.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+function renderRulesPreview(summary) {
+    // Summary cards
+    const cards = document.getElementById('ruleSummaryCards');
+    cards.innerHTML = `
+        <div class="summary-card">
+            <div class="value">${summary.total_rules}</div>
+            <div class="label">Deny Rules</div>
+        </div>
+        <div class="summary-card">
+            <div class="value">${summary.total_ip_blocks.toLocaleString()}</div>
+            <div class="label">IP Blocks</div>
+        </div>
+        <div class="summary-card">
+            <div class="value">${summary.countries.length}</div>
+            <div class="label">Countries</div>
+        </div>
+        <div class="summary-card">
+            <div class="value">allow</div>
+            <div class="label">Default Action</div>
+        </div>
+    `;
+
+    // JSON preview
+    const preview = document.getElementById('rulesPreview');
+    preview.textContent = JSON.stringify(generatedConfig, null, 2);
+}
+
+// --- Groups ---
+async function loadGroups() {
+    const list = document.getElementById('groupList');
+    list.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-secondary);"><i class="fas fa-spinner fa-spin" style="font-size:1.5rem;"></i><p style="margin-top:0.5rem;">Loading groups...</p></div>';
+
+    try {
+        const resp = await fetch('/api/groups');
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.detail || 'Failed to fetch groups');
+
+        groups = data;
+        renderGroups();
+    } catch (err) {
+        list.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--danger-color);"><i class="fas fa-exclamation-triangle" style="font-size:1.5rem;"></i><p style="margin-top:0.5rem;">${err.message}</p><p style="font-size:0.8rem;margin-top:0.5rem;">Configure credentials in Settings (gear icon)</p></div>`;
+    }
+}
+
+function renderGroups(filter = '') {
+    const list = document.getElementById('groupList');
+    const filterLower = filter.toLowerCase();
+    const filtered = groups.filter(g =>
+        !filter || g.name.toLowerCase().includes(filterLower) || (g.account_name || '').toLowerCase().includes(filterLower)
+    );
+
+    if (filtered.length === 0) {
+        list.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-secondary);">No groups found</div>';
+        return;
+    }
+
+    list.innerHTML = filtered.map(g => `
+        <div class="group-item ${selectedGroups.has(g.id) ? 'selected' : ''}" data-id="${g.id}">
+            <input type="checkbox" ${selectedGroups.has(g.id) ? 'checked' : ''}>
+            <div class="group-info">
+                <div class="group-name">${g.name}</div>
+                <div class="group-meta">${g.product || 'Unknown product'} &middot; ${g.account_name || 'Root'} &middot; ID: ${g.id}</div>
+            </div>
+        </div>
+    `).join('');
+
+    list.querySelectorAll('.group-item').forEach(el => {
+        el.addEventListener('click', (e) => {
+            if (e.target.tagName === 'INPUT') return;
+            const id = parseInt(el.dataset.id);
+            const cb = el.querySelector('input[type="checkbox"]');
+            if (selectedGroups.has(id)) {
+                selectedGroups.delete(id);
+                cb.checked = false;
+                el.classList.remove('selected');
+            } else {
+                selectedGroups.add(id);
+                cb.checked = true;
+                el.classList.add('selected');
+            }
+            updatePushBtn();
+        });
+        el.querySelector('input').addEventListener('change', (e) => {
+            const id = parseInt(el.dataset.id);
+            if (e.target.checked) selectedGroups.add(id);
+            else selectedGroups.delete(id);
+            el.classList.toggle('selected', e.target.checked);
+            updatePushBtn();
+        });
+    });
+}
+
+function updatePushBtn() {
+    document.getElementById('pushConfigBtn').disabled = selectedGroups.size === 0;
+}
+
+// --- Push Config ---
+async function pushConfig() {
+    if (selectedGroups.size === 0 || !generatedConfig) return;
+
+    const confirmed = confirm(
+        `Push geo-blocking ZFW rules to ${selectedGroups.size} group(s)?\n\n` +
+        `This will PATCH the zone firewall filter policies and IP identities. ` +
+        `Existing ZFW rules in these groups will NOT be removed (PATCH merges).`
+    );
+    if (!confirmed) return;
+
+    showLoading(`Pushing configuration to ${selectedGroups.size} groups...`);
+    const resultsDiv = document.getElementById('pushResults');
+    resultsDiv.innerHTML = '';
+
+    try {
+        const resp = await fetch('/api/push-config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                group_ids: Array.from(selectedGroups),
+                config: generatedConfig
+            })
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.detail || 'Failed to push configuration');
+
+        let successCount = 0;
+        for (const result of data.results) {
+            const groupName = groups.find(g => g.id === result.group_id)?.name || `Group ${result.group_id}`;
+            const item = document.createElement('div');
+            item.className = `result-item ${result.status}`;
+            if (result.status === 'success') {
+                successCount++;
+                item.innerHTML = `<i class="fas fa-check-circle"></i> ${groupName} — Configuration applied`;
+            } else {
+                item.innerHTML = `<i class="fas fa-times-circle"></i> ${groupName} — ${result.detail}`;
+            }
+            resultsDiv.appendChild(item);
+        }
+
+        if (successCount === data.results.length) {
+            showToast('Configuration pushed to all groups', 'success');
+        } else {
+            showToast(`${successCount}/${data.results.length} groups updated`, 'warning');
+        }
+    } catch (err) {
+        showToast(err.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+// --- Settings / Profiles ---
+async function loadProfiles() {
+    try {
+        const resp = await fetch('/api/profiles');
+        const names = await resp.json();
+        const select = document.getElementById('profileSelect');
+        select.innerHTML = '<option value="">-- Select Profile --</option>';
+        for (const name of names) {
+            select.innerHTML += `<option value="${name}">${name}</option>`;
+        }
+    } catch (err) { /* ignore */ }
+}
+
+async function loadCurrentCredentials() {
+    try {
+        const resp = await fetch('/api/profiles/current');
+        const data = await resp.json();
+        document.getElementById('cpApiId').value = data.X_CP_API_ID || '';
+        document.getElementById('cpApiKey').value = data.X_CP_API_KEY === '***' ? '' : '';
+        document.getElementById('cpApiKey').placeholder = data.X_CP_API_KEY === '***' ? '(set from environment)' : 'Cradlepoint API Key';
+        document.getElementById('ecmApiId').value = data.X_ECM_API_ID || '';
+        document.getElementById('ecmApiKey').value = data.X_ECM_API_KEY === '***' ? '' : '';
+        document.getElementById('ecmApiKey').placeholder = data.X_ECM_API_KEY === '***' ? '(set from environment)' : 'ECM API Key';
+    } catch (err) { /* ignore */ }
+}
+
+// --- Dark Mode ---
+function initDarkMode() {
+    const saved = localStorage.getItem('geoBlockerDarkMode');
+    if (saved === 'true') document.body.classList.add('dark-mode');
+
+    document.getElementById('darkModeToggle').addEventListener('click', () => {
+        document.body.classList.toggle('dark-mode');
+        localStorage.setItem('geoBlockerDarkMode', document.body.classList.contains('dark-mode'));
+        const icon = document.querySelector('#darkModeToggle i');
+        icon.className = document.body.classList.contains('dark-mode') ? 'fas fa-sun' : 'fas fa-moon';
+    });
+
+    // Set correct icon on load
+    if (document.body.classList.contains('dark-mode')) {
+        document.querySelector('#darkModeToggle i').className = 'fas fa-sun';
+    }
+}
+
+// --- Init ---
+document.addEventListener('DOMContentLoaded', async () => {
+    initDarkMode();
+
+    // Load countries
+    try {
+        const resp = await fetch('/api/countries');
+        countries = await resp.json();
+        renderRegions();
+    } catch (err) {
+        showToast('Failed to load country list', 'error');
+    }
+
+    // Country search
+    document.getElementById('countrySearch').addEventListener('input', (e) => {
+        renderRegions(e.target.value);
+    });
+
+    // Select/Clear all
+    document.getElementById('selectAllBtn').addEventListener('click', () => {
+        for (const regionCountries of Object.values(countries)) {
+            for (const code of Object.keys(regionCountries)) {
+                selectedCountries.add(code);
+            }
+        }
+        renderRegions(document.getElementById('countrySearch').value);
+        updateSelectionSummary();
+    });
+
+    document.getElementById('clearAllBtn').addEventListener('click', () => {
+        selectedCountries.clear();
+        renderRegions(document.getElementById('countrySearch').value);
+        updateSelectionSummary();
+    });
+
+    // Fetch blocks button
+    document.getElementById('fetchBlocksBtn').addEventListener('click', fetchIpBlocks);
+
+    // Step navigation
+    document.getElementById('backToStep1').addEventListener('click', () => setStep(1));
+    document.getElementById('goToStep3').addEventListener('click', () => {
+        setStep(3);
+        loadGroups();
+    });
+    document.getElementById('backToStep2').addEventListener('click', () => setStep(2));
+
+    // Stepper click navigation
+    document.querySelectorAll('.step').forEach(s => {
+        s.addEventListener('click', () => {
+            const target = parseInt(s.dataset.step);
+            if (target < currentStep) setStep(target);
+            else if (target === 2 && generatedConfig) setStep(2);
+            else if (target === 3 && generatedConfig) { setStep(3); loadGroups(); }
+        });
+    });
+
+    // Group search
+    document.getElementById('groupSearch').addEventListener('input', (e) => {
+        renderGroups(e.target.value);
+    });
+
+    // Refresh groups
+    document.getElementById('refreshGroupsBtn').addEventListener('click', loadGroups);
+
+    // Push config
+    document.getElementById('pushConfigBtn').addEventListener('click', pushConfig);
+
+    // Copy JSON
+    document.getElementById('copyConfigBtn').addEventListener('click', () => {
+        if (!generatedConfig) return;
+        navigator.clipboard.writeText(JSON.stringify(generatedConfig, null, 2));
+        showToast('Configuration JSON copied to clipboard', 'success');
+    });
+
+    // Download JSON
+    document.getElementById('downloadConfigBtn').addEventListener('click', () => {
+        if (!generatedConfig) return;
+        const blob = new Blob([JSON.stringify(generatedConfig, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'geo_block_zfw_config.json';
+        a.click();
+        URL.revokeObjectURL(url);
+    });
+
+    // Settings modal
+    document.getElementById('settingsBtn').addEventListener('click', () => {
+        document.getElementById('settingsModal').classList.remove('hidden');
+        loadCurrentCredentials();
+        loadProfiles();
+    });
+
+    document.getElementById('closeSettingsBtn').addEventListener('click', () => {
+        document.getElementById('settingsModal').classList.add('hidden');
+    });
+    document.getElementById('cancelSettingsBtn').addEventListener('click', () => {
+        document.getElementById('settingsModal').classList.add('hidden');
+    });
+
+    document.getElementById('applySettingsBtn').addEventListener('click', async () => {
+        const creds = {
+            X_CP_API_ID: document.getElementById('cpApiId').value,
+            X_CP_API_KEY: document.getElementById('cpApiKey').value,
+            X_ECM_API_ID: document.getElementById('ecmApiId').value,
+            X_ECM_API_KEY: document.getElementById('ecmApiKey').value,
+        };
+        try {
+            await fetch('/api/credentials/apply', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(creds)
+            });
+            showToast('Credentials applied', 'success');
+            document.getElementById('settingsModal').classList.add('hidden');
+        } catch (err) {
+            showToast('Failed to apply credentials', 'error');
+        }
+    });
+
+    document.getElementById('saveProfileBtn').addEventListener('click', async () => {
+        const name = document.getElementById('profileName').value.trim();
+        if (!name) { showToast('Enter a profile name', 'warning'); return; }
+        const creds = {
+            name,
+            X_CP_API_ID: document.getElementById('cpApiId').value,
+            X_CP_API_KEY: document.getElementById('cpApiKey').value,
+            X_ECM_API_ID: document.getElementById('ecmApiId').value,
+            X_ECM_API_KEY: document.getElementById('ecmApiKey').value,
+        };
+        try {
+            await fetch('/api/profiles', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(creds)
+            });
+            showToast(`Profile "${name}" saved`, 'success');
+            loadProfiles();
+        } catch (err) {
+            showToast('Failed to save profile', 'error');
+        }
+    });
+
+    document.getElementById('loadProfileBtn').addEventListener('click', async () => {
+        const name = document.getElementById('profileSelect').value;
+        if (!name) { showToast('Select a profile first', 'warning'); return; }
+        try {
+            await fetch('/api/profiles/load', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name })
+            });
+            showToast(`Profile "${name}" loaded`, 'success');
+            loadCurrentCredentials();
+        } catch (err) {
+            showToast('Failed to load profile', 'error');
+        }
+    });
+
+    document.getElementById('deleteProfileBtn').addEventListener('click', async () => {
+        const name = document.getElementById('profileSelect').value;
+        if (!name) { showToast('Select a profile first', 'warning'); return; }
+        if (!confirm(`Delete profile "${name}"?`)) return;
+        try {
+            await fetch(`/api/profiles/${encodeURIComponent(name)}`, { method: 'DELETE' });
+            showToast(`Profile "${name}" deleted`, 'success');
+            loadProfiles();
+        } catch (err) {
+            showToast('Failed to delete profile', 'error');
+        }
+    });
+});
+    </script>
+</body>
+</html>
