@@ -1156,7 +1156,7 @@ class NcmClientv2(BaseNcmClient):
         call_type = 'Net Device Health'
         get_url = '{0}/net_device_health/'.format(self.base_url)
 
-        allowed_params = ['net_device']
+        allowed_params = ['net_device', 'net_device__in', 'limit', 'offset']
         params = self.__parse_kwargs(kwargs, allowed_params)
 
         return self.__get_json(get_url, call_type, params=params)

@@ -472,8 +472,8 @@ def _get_cellular_health():
     accounts = client.get_accounts()
     account_name = accounts[0].get('name', 'Unknown Account') if accounts else 'Unknown Account'
 
-    # Step 1: Get net_device_health records
-    health_data = client.get_net_device_health()
+    # Step 1: Get net_device_health records (all pages)
+    health_data = client.get_net_device_health(limit='all')
     if not health_data:
         return {"account_name": account_name, "devices": []}
 
