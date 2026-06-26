@@ -1,5 +1,6 @@
 ---
-inclusion: auto
+inclusion: fileMatch
+fileMatchPattern: "scripts/**/*.py"
 description: Code standards for NCM scripts — virtual environment usage, required environment variables, file structure template, authentication, error handling, and output conventions.
 ---
 

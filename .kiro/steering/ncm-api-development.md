@@ -1,5 +1,6 @@
 ---
-inclusion: auto
+inclusion: fileMatch
+fileMatchPattern: "{scripts/**/*.py,ncm/**/*.py,ncm2/**/*.py,dashboards/**/*.py}"
 description: NetCloud Manager API development guide — required reading before building applications that call the NCM API. Covers documentation consultation, endpoint routing, SDK usage, and critical rules like trailing slashes.
 ---
 
@@ -76,3 +77,28 @@ Use this to quickly find which doc and SDK method to use for a given task:
 5. **Check deprecations**: Before using any endpoint, verify it's not deprecated in `docs/api-deprecations.md`
 6. **Error handling**: Always implement retry logic with exponential backoff
 7. **Pagination**: Always handle pagination for list endpoints (SDK does this automatically)
+
+## Quality Gates
+
+Before considering any NCM application complete:
+1. Code runs without errors
+2. All API calls use proper authentication
+3. All URLs have trailing slashes (v2)
+4. Pagination is handled for list operations
+5. Error handling with retries is implemented
+6. No deprecated endpoints are used
+7. Documentation has been updated if applicable
+
+## Documentation Update Format
+
+When appending to `docs/known-issues.md`:
+```markdown
+### [Short Title] (discovered YYYY-MM-DD)
+[Description of the issue and workaround]
+```
+
+When appending to `docs/CHANGELOG.md`:
+```markdown
+## YYYY-MM-DD — [Brief Description]
+- [What changed and why]
+```

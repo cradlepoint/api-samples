@@ -1,5 +1,6 @@
 ---
-inclusion: auto
+inclusion: fileMatch
+fileMatchPattern: "{**/*.html,**/*.css,**/web_apps/**,**/dashboards/**}"
 description: Web UI standards — use the web_app_template at scripts/script_manager/static/ as the style foundation, with required light/dark mode support, CSS custom properties, and responsive breakpoints.
 ---
 

@@ -36,10 +36,10 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 REQUIRED_VARS = [
-    ("CP_API_ID", "Cradlepoint API ID"),
-    ("CP_API_KEY", "Cradlepoint API Key"),
-    ("ECM_API_ID", "ECM API ID"),
-    ("ECM_API_KEY", "ECM API Key"),
+    ("X_CP_API_ID", "Cradlepoint API ID"),
+    ("X_CP_API_KEY", "Cradlepoint API Key"),
+    ("X_ECM_API_ID", "ECM API ID"),
+    ("X_ECM_API_KEY", "ECM API Key"),
 ]
 
 _ENV_FILE = Path(__file__).parent / '.env'
@@ -129,10 +129,10 @@ X_ECM_API_KEY = ""
 
 def get_headers():
     """Build API headers from placeholders or environment variables."""
-    cp_api_id = X_CP_API_ID or os.environ.get('CP_API_ID', '')
-    cp_api_key = X_CP_API_KEY or os.environ.get('CP_API_KEY', '')
-    ecm_api_id = X_ECM_API_ID or os.environ.get('ECM_API_ID', '')
-    ecm_api_key = X_ECM_API_KEY or os.environ.get('ECM_API_KEY', '')
+    cp_api_id = X_CP_API_ID or os.environ.get('X_CP_API_ID', '')
+    cp_api_key = X_CP_API_KEY or os.environ.get('X_CP_API_KEY', '')
+    ecm_api_id = X_ECM_API_ID or os.environ.get('X_ECM_API_ID', '')
+    ecm_api_key = X_ECM_API_KEY or os.environ.get('X_ECM_API_KEY', '')
 
     return {
         'X-CP-API-ID': cp_api_id,

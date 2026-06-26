@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Fix Errors After Python Run",
+      "trigger": "PostToolUse",
+      "description": "After running a bash command, checks if it was a Python script execution and iterates on fixes if errors occurred. Ignores non-Python commands like git, pip, ls.",
+      "matcher": "execute_bash",
+      "action": {
+        "type": "agent",
+        "prompt": "If the command that just ran was executing a Python script (e.g. contained '.py' or 'python'), review the output for errors (syntax errors, import errors, runtime exceptions, API errors). If errors are present, diagnose the root cause and fix the code, then re-run until clean. If the error reveals undocumented API behavior, note it for a docs update. If the command was NOT a Python script run (e.g. git, pip, ls, npm, etc.), do nothing."
+      }
+    }
+  ]
+}

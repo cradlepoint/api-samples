@@ -1,6 +1,6 @@
 ---
-inclusion: auto
-description: Reflexion workflow — the self-improving loop where the AI consults docs, builds code, reflects on discoveries, and updates docs/known-issues/patterns/CHANGELOG when new gotchas or reusable patterns are found.
+inclusion: manual
+description: Detailed reflexion workflow loop — pull in with #reflexion-workflow when you want the full self-improving docs-update process.
 ---
 
 # Reflexion Workflow System
@@ -65,28 +65,3 @@ After completing the task, ask yourself:
 - `docs/CHANGELOG.md` — log what changed and why
 - Relevant `docs/*.md` file — fix errors or add missing info
 - `.kiro/steering/*.md` — update routing guide if new endpoint patterns discovered
-
-## Documentation Update Format
-
-When appending to `docs/known-issues.md`:
-```markdown
-### [Short Title] (discovered YYYY-MM-DD)
-[Description of the issue and workaround]
-```
-
-When appending to `docs/CHANGELOG.md`:
-```markdown
-## YYYY-MM-DD — [Brief Description]
-- [What changed and why]
-```
-
-## Quality Gates
-
-Before considering any NCM application complete:
-1. Code runs without errors
-2. All API calls use proper authentication
-3. All URLs have trailing slashes
-4. Pagination is handled for list operations
-5. Error handling with retries is implemented
-6. No deprecated endpoints are used
-7. Documentation has been updated if applicable

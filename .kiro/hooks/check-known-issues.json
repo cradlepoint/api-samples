@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Check Known Issues Before Building",
+      "trigger": "UserPromptSubmit",
+      "description": "On prompt submit, reminds the agent to check known-issues.md for gotchas before building — the one thing conditional steering can't handle automatically.",
+      "action": {
+        "type": "agent",
+        "prompt": "If the user is asking you to create, build, or implement NCM API code (not just asking a question), check docs/known-issues.md for relevant gotchas before starting. If the user is asking a question, making a simple edit, or working on non-API code, skip this step."
+      }
+    }
+  ]
+}
