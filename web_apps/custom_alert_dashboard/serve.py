@@ -169,6 +169,53 @@ def _fetch_custom_alerts(days=30):
     # since /alerts/ doesn't support order_by=created_at
     alerts.sort(key=lambda a: a.get('created_at', ''), reverse=True)
 
+    # Collect unique router IDs from alert router URLs
+    router_ids = set()
+    for a in alerts:
+        router_url = a.get('router', '')
+        if router_url and '/' in str(router_url):
+            rid = str(router_url).rstrip('/').split('/')[-1]
+            if rid.isdigit():
+                router_ids.add(rid)
+
+    # Batch lookup router names using expand is not needed here —
+    # just fetch routers by ID. Use __in filter (max 100 per chunk).
+    router_names = {}
+    if router_ids:
+        id_list = list(router_ids)
+        for i in range(0, len(id_list), 100):
+            chunk = ','.join(id_list[i:i+100])
+            routers = client.get_routers(id__in=chunk, fields='id,name')
+            if isinstance(routers, list):
+                for r in routers:
+                    router_names[str(r.get('id', ''))] = r.get('name', '')
+
+    # Enrich alerts with router_name and title extracted from info
+    for a in alerts:
+        # Resolve router name
+        router_url = a.get('router', '')
+        if router_url and '/' in str(router_url):
+            rid = str(router_url).rstrip('/').split('/')[-1]
+            a['router_name'] = router_names.get(rid, f'Router {rid}')
+            a['router_id'] = rid
+        else:
+            a['router_name'] = ''
+            a['router_id'] = ''
+
+        # Extract title from info (info can be a dict or JSON string)
+        info = a.get('info', '')
+        title = ''
+        if isinstance(info, dict):
+            title = info.get('title', '')
+        elif isinstance(info, str):
+            try:
+                info_obj = json.loads(info)
+                if isinstance(info_obj, dict):
+                    title = info_obj.get('title', '')
+            except (json.JSONDecodeError, TypeError):
+                pass
+        a['alert_title'] = title
+
     return {"account_name": account_name, "alerts": alerts, "days": days}
 
 
@@ -201,6 +248,58 @@ async def index():
     """Serve the dashboard HTML."""
     html_path = APP_DIR / "index.html"
     return HTMLResponse(html_path.read_text(encoding="utf-8"))
+
+
+# --- ACK Persistence ---
+ACKS_PATH = APP_DIR / "acks.json"
+
+
+def _load_acks():
+    """Load acknowledged alert IDs from disk."""
+    if ACKS_PATH.exists():
+        try:
+            return json.loads(ACKS_PATH.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, IOError):
+            pass
+    return {}
+
+
+def _save_acks(acks):
+    """Save acknowledged alert IDs to disk."""
+    ACKS_PATH.write_text(json.dumps(acks, indent=2), encoding="utf-8")
+
+
+@app.get("/api/acks")
+async def get_acks():
+    """Return all acknowledged alert IDs."""
+    return JSONResponse(_load_acks())
+
+
+@app.post("/api/acks")
+async def set_ack(request: Request):
+    """Acknowledge or unacknowledge an alert.
+
+    Body: {"id": "<alert_id>", "acked": true/false, "alert": {...}}
+    Stores the full alert object and ack timestamp when acking.
+    """
+    body = await request.json()
+    alert_id = str(body.get("id", ""))
+    acked = body.get("acked", True)
+    alert_data = body.get("alert", None)
+
+    if not alert_id:
+        return JSONResponse({"error": "id required"}, status_code=400)
+
+    acks = _load_acks()
+    if acked:
+        acks[alert_id] = {
+            "acked_at": datetime.now(timezone.utc).isoformat(),
+            "alert": alert_data,
+        }
+    else:
+        acks.pop(alert_id, None)
+    _save_acks(acks)
+    return JSONResponse({"status": "ok", "id": alert_id, "acked": acked})
 
 
 @app.get("/api/alerts")
