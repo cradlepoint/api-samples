@@ -527,3 +527,12 @@ The v2 `/groups/` endpoint DOES support `expand=account`. When used, the
 for a separate `/accounts/` fetch to resolve group account names. Known
 endpoints that support `expand`: `/routers/` (group, account), `/groups/`
 (account).
+
+### v2 `/alerts/` Endpoint Does Not Support `order_by` (discovered 2026-06-26)
+The `/alerts/` endpoint returns `409 Conflict` with `"Invalid ordering field
+specified: created_at"` when using `order_by=-created_at` or any `order_by`
+parameter. The endpoint does not support ordering — results must be sorted
+client-side. The endpoint does support `created_at__gt` for time filtering,
+but requires full ISO 8601 format with microseconds and timezone offset
+(e.g. `2026-06-26T15:00:37.703000+00:00`). The alert `type` field for
+custom alerts is `custom_alert` (not `custom`).

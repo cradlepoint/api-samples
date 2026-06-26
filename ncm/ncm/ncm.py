@@ -514,7 +514,8 @@ class NcmClientv2(BaseNcmClient):
         call_type = 'Alerts'
         get_url = '{0}/alerts/'.format(self.base_url)
 
-        allowed_params = ['account', 'created_at', 'created_at_timeuuid',
+        allowed_params = ['account', 'created_at', 'created_at__gt',
+                          'created_at__lt', 'created_at_timeuuid',
                           'detected_at', 'friendly_info', 'info',
                           'router', 'type', 'order_by', 'limit', 'offset']
         params = self.__parse_kwargs(kwargs, allowed_params)
