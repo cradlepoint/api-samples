@@ -761,6 +761,7 @@ body {
         let alertsData = [];
         let filteredData = [];
         let acksData = {};  // {alertId: {acked_at, alert}}
+        let lastFetchTimestamp = null;  // ISO string from server
         let autoRefreshTimer = null;
         let countdownTimer = null;
         let countdownSeconds = 0;
@@ -834,7 +835,7 @@ body {
         }
 
         // --- Fetch Alerts ---
-        async function fetchAlerts() {
+        async function fetchAlerts(incremental = false) {
             if (isRefreshing) return;
             isRefreshing = true;
             loadingOverlay.classList.add('visible');
@@ -844,7 +845,14 @@ body {
             daysInput.value = days;
 
             try {
-                const resp = await fetch(`/api/alerts?days=${days}`);
+                let url;
+                if (incremental && lastFetchTimestamp) {
+                    url = `/api/alerts?days=${days}&since=${encodeURIComponent(lastFetchTimestamp)}`;
+                } else {
+                    url = `/api/alerts?days=${days}`;
+                }
+
+                const resp = await fetch(url);
                 const json = await resp.json();
 
                 if (json.status === 'error') {
@@ -853,12 +861,27 @@ body {
                     return;
                 }
 
-                alertsData = json.data || [];
+                if (json.incremental && json.data.length > 0) {
+                    // Merge new alerts at the top, dedup by id
+                    const existingIds = new Set(alertsData.map(a => a.id || a.created_at_timeuuid));
+                    const newAlerts = json.data.filter(a => !existingIds.has(a.id || a.created_at_timeuuid));
+                    alertsData = [...newAlerts, ...alertsData];
+                    if (newAlerts.length > 0) {
+                        showToast(`${newAlerts.length} new alert(s)`, 'info');
+                    }
+                } else if (!json.incremental) {
+                    // Full refresh
+                    alertsData = json.data || [];
+                }
+
+                lastFetchTimestamp = json.timestamp;
                 statAccount.textContent = json.account_name || '-';
                 updateStats();
                 applySearch();
                 setStatus('connected', `${alertsData.length} alerts`);
-                showToast(`Loaded ${alertsData.length} custom alerts`, 'success');
+                if (!json.incremental) {
+                    showToast(`Loaded ${alertsData.length} custom alerts`, 'success');
+                }
             } catch (err) {
                 showToast('Network error: ' + err.message, 'error');
                 setStatus('disconnected', 'Error');
@@ -917,6 +940,13 @@ body {
 
         // --- Render Alerts ---
         function renderAlerts() {
+            // Preserve expanded state
+            const expandedIds = new Set();
+            alertList.querySelectorAll('.alert-item.expanded').forEach(el => {
+                const id = el.getAttribute('data-alert-id');
+                if (id) expandedIds.add(id);
+            });
+
             if (filteredData.length === 0) {
                 alertList.innerHTML = `
                     <div class="empty-state">
@@ -936,12 +966,13 @@ body {
 
                 const alertId = a.id || a.created_at_timeuuid || String(idx);
                 const isAcked = alertId in acksData;
+                const isExpanded = expandedIds.has(alertId);
                 const ackTime = isAcked && acksData[alertId]?.acked_at
                     ? new Date(acksData[alertId].acked_at).toLocaleString()
                     : '';
 
                 return `
-                <div class="alert-item ${isAcked ? 'acked' : ''}" data-index="${idx}" data-alert-id="${escapeHtml(alertId)}">
+                <div class="alert-item ${isAcked ? 'acked' : ''} ${isExpanded ? 'expanded' : ''}" data-index="${idx}" data-alert-id="${escapeHtml(alertId)}">
                     <div class="alert-header" onclick="toggleAlert(this)">
                         <span class="alert-expand-icon"><i class="fas fa-chevron-right"></i></span>
                         <div class="alert-summary">
@@ -1126,7 +1157,7 @@ body {
                 countdownSeconds--;
                 updateCountdown();
                 if (countdownSeconds <= 0) {
-                    fetchAlerts();
+                    fetchAlerts(true);  // incremental on auto-refresh
                     countdownSeconds = interval;
                 }
             }, 1000);

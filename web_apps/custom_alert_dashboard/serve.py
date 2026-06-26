@@ -33,7 +33,7 @@ from ncm import ncm
 
 
 # --- Configuration ---
-PORT = 8060
+PORT = 8065
 APP_DIR = Path(__file__).parent
 PROFILES_PATH = APP_DIR / "profiles.json"
 SETTINGS_PATH = APP_DIR / "settings.json"
@@ -219,6 +219,93 @@ def _fetch_custom_alerts(days=30):
     return {"account_name": account_name, "alerts": alerts, "days": days}
 
 
+def _fetch_custom_alerts_since(since_ts):
+    """Fetch only new custom alerts since the given ISO timestamp.
+
+    Used for incremental refresh — much faster than re-fetching the full range.
+    """
+    from time import sleep
+
+    client = _build_client()
+
+    # Get account name
+    accounts = client.get_accounts()
+    account_name = accounts[0].get('name', 'Unknown') if accounts else 'Unknown'
+
+    # Use the SDK's authenticated session directly
+    base_url = client.base_url
+    url = f"{base_url}/alerts/"
+    params = {
+        'type': 'custom_alert',
+        'created_at__gt': since_ts,
+        'limit': '500'
+    }
+
+    alerts = []
+
+    while url:
+        resp = client.session.get(url, params=params)
+        if resp.status_code == 200:
+            data = resp.json()
+            alerts.extend(data.get('data', []))
+            url = data.get('meta', {}).get('next')
+            params = None
+        elif resp.status_code in (408, 429, 500, 502, 503, 504):
+            sleep(2)
+            continue
+        else:
+            raise RuntimeError(
+                f"API error {resp.status_code}: {resp.text[:500]}"
+            )
+
+    # Sort newest first
+    alerts.sort(key=lambda a: a.get('created_at', ''), reverse=True)
+
+    # Resolve router names for new alerts
+    router_ids = set()
+    for a in alerts:
+        router_url = a.get('router', '')
+        if router_url and '/' in str(router_url):
+            rid = str(router_url).rstrip('/').split('/')[-1]
+            if rid.isdigit():
+                router_ids.add(rid)
+
+    router_names = {}
+    if router_ids:
+        id_list = list(router_ids)
+        for i in range(0, len(id_list), 100):
+            chunk = ','.join(id_list[i:i+100])
+            routers = client.get_routers(id__in=chunk, fields='id,name')
+            if isinstance(routers, list):
+                for r in routers:
+                    router_names[str(r.get('id', ''))] = r.get('name', '')
+
+    for a in alerts:
+        router_url = a.get('router', '')
+        if router_url and '/' in str(router_url):
+            rid = str(router_url).rstrip('/').split('/')[-1]
+            a['router_name'] = router_names.get(rid, f'Router {rid}')
+            a['router_id'] = rid
+        else:
+            a['router_name'] = ''
+            a['router_id'] = ''
+
+        info = a.get('info', '')
+        title = ''
+        if isinstance(info, dict):
+            title = info.get('title', '')
+        elif isinstance(info, str):
+            try:
+                info_obj = json.loads(info)
+                if isinstance(info_obj, dict):
+                    title = info_obj.get('title', '')
+            except (json.JSONDecodeError, TypeError):
+                pass
+        a['alert_title'] = title
+
+    return {"account_name": account_name, "alerts": alerts}
+
+
 # --- FastAPI App ---
 
 app = FastAPI(title="Custom Alert Dashboard")
@@ -303,23 +390,29 @@ async def set_ack(request: Request):
 
 
 @app.get("/api/alerts")
-async def get_alerts(days: int = 30):
+async def get_alerts(days: int = 30, since: str = None):
     """Return custom alerts as JSON.
 
     Query params:
-        days: Number of days to look back (1-90, default 30)
+        days: Number of days to look back (1-90, default 30) — used on first load
+        since: ISO timestamp — if provided, only fetch alerts newer than this
+               (used for incremental refresh)
     """
     days = min(max(1, days), 90)
     try:
         loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(None, _fetch_custom_alerts, days)
+        if since:
+            result = await loop.run_in_executor(None, _fetch_custom_alerts_since, since)
+        else:
+            result = await loop.run_in_executor(None, _fetch_custom_alerts, days)
         return JSONResponse({
             "status": "ok",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "account_name": result["account_name"],
-            "days": result["days"],
+            "days": result.get("days", days),
             "count": len(result["alerts"]),
             "data": result["alerts"],
+            "incremental": since is not None,
         })
     except Exception as e:
         import traceback
