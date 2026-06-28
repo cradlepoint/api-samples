@@ -2,6 +2,8 @@
 
 A web dashboard that displays **custom alerts** from the NCM API with configurable timeframe, auto-refresh, acknowledgment tracking, and export capabilities.
 
+<img width="1484" height="842" alt="image" src="https://github.com/user-attachments/assets/66eada90-6517-42c2-b500-9ff50dace94e" />
+
 ## Features
 
 - **Custom alerts only** — filters for `type=custom_alert` from the NCM `/alerts/` endpoint
