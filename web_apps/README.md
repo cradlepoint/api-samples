@@ -13,7 +13,7 @@ Interactive web applications for managing, configuring, and monitoring Cradlepoi
 | [script_manager](script_manager/) | 8000 | CSV file editor and NCM script runner with a web UI |
 | [ncm_api_key_encryptor](ncm_api_key_encryptor/) | 8000 | Encrypt NCM API keys for embedding in SDK app configurations |
 | [cisco_to_cradlepoint_zfw_converter](cisco_to_cradlepoint_zfw_converter/) | 5001 | Convert Cisco router configs to Cradlepoint zone firewall format |
-| [netcloud_router_lookup](netcloud_router_lookup/) | 8000 | Look up router info by serial number or MAC address |
+| [netcloud_router_lookup](netcloud_router_lookup/) | 8000 | Search routers across multiple accounts |
 | [assign_sdk](assign_sdk/) | 9000 | Assign SDK app versions to router groups |
 
 ## Running a Web App
