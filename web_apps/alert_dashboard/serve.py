@@ -116,12 +116,11 @@ def _build_client():
     return client
 
 
-def _fetch_custom_alerts(days=30):
-    """Fetch custom alerts from NCM API for the given time range.
+def _fetch_alerts(days=30):
+    """Fetch all alerts from NCM API for the given time range.
 
-    Uses direct session calls to /alerts/ with type=custom_alert and
-    created_at__gt, bypassing the SDK's __get_json which silently
-    swallows errors and returns empty lists.
+    Uses direct session calls to /alerts/ with created_at__gt,
+    bypassing the SDK's __get_json which silently swallows errors.
     """
     # Clamp days to max 90
     days = min(max(1, days), 90)
@@ -132,17 +131,23 @@ def _fetch_custom_alerts(days=30):
     accounts = client.get_accounts()
     account_name = accounts[0].get('name', 'Unknown') if accounts else 'Unknown'
 
+    # Build account URL-to-name lookup
+    account_names = {}
+    for acc in (accounts or []):
+        acc_id = str(acc.get('id', ''))
+        acc_name = acc.get('name', '')
+        if acc_id and acc_name:
+            account_names[acc_id] = acc_name
+
     # Calculate time window — API expects full ISO format with tz offset
     start_time = (datetime.now(timezone.utc) - timedelta(days=days)).strftime(
         "%Y-%m-%dT%H:%M:%S.%f+00:00"
     )
 
-    # Use the SDK's authenticated session directly to avoid the SDK's
-    # silent error swallowing in __get_json pagination
+    # Use the SDK's authenticated session directly
     base_url = client.base_url
     url = f"{base_url}/alerts/"
     params = {
-        'type': 'custom_alert',
         'created_at__gt': start_time,
         'limit': '500'
     }
@@ -190,7 +195,7 @@ def _fetch_custom_alerts(days=30):
                 for r in routers:
                     router_names[str(r.get('id', ''))] = r.get('name', '')
 
-    # Enrich alerts with router_name and title extracted from info
+    # Enrich alerts with router_name, account_name, and title extracted from info
     for a in alerts:
         # Resolve router name
         router_url = a.get('router', '')
@@ -201,6 +206,15 @@ def _fetch_custom_alerts(days=30):
         else:
             a['router_name'] = ''
             a['router_id'] = ''
+
+        # Resolve account name from URL
+        account_url = a.get('account', '')
+        if account_url and '/' in str(account_url):
+            aid = str(account_url).rstrip('/').split('/')[-1]
+            a['account_name'] = account_names.get(aid, account_names.get(account_url, f'Account {aid}'))
+        else:
+            # No account URL — assign the primary account name
+            a['account_name'] = account_name
 
         # Extract title from info (info can be a dict or JSON string)
         info = a.get('info', '')
@@ -219,8 +233,8 @@ def _fetch_custom_alerts(days=30):
     return {"account_name": account_name, "alerts": alerts, "days": days}
 
 
-def _fetch_custom_alerts_since(since_ts):
-    """Fetch only new custom alerts since the given ISO timestamp.
+def _fetch_alerts_since(since_ts):
+    """Fetch only new alerts since the given ISO timestamp.
 
     Used for incremental refresh — much faster than re-fetching the full range.
     """
@@ -232,11 +246,18 @@ def _fetch_custom_alerts_since(since_ts):
     accounts = client.get_accounts()
     account_name = accounts[0].get('name', 'Unknown') if accounts else 'Unknown'
 
+    # Build account URL-to-name lookup
+    account_names = {}
+    for acc in (accounts or []):
+        acc_id = str(acc.get('id', ''))
+        acc_name = acc.get('name', '')
+        if acc_id and acc_name:
+            account_names[acc_id] = acc_name
+
     # Use the SDK's authenticated session directly
     base_url = client.base_url
     url = f"{base_url}/alerts/"
     params = {
-        'type': 'custom_alert',
         'created_at__gt': since_ts,
         'limit': '500'
     }
@@ -290,6 +311,14 @@ def _fetch_custom_alerts_since(since_ts):
             a['router_name'] = ''
             a['router_id'] = ''
 
+        # Resolve account name
+        account_url = a.get('account', '')
+        if account_url and '/' in str(account_url):
+            aid = str(account_url).rstrip('/').split('/')[-1]
+            a['account_name'] = account_names.get(aid, account_name)
+        else:
+            a['account_name'] = account_name
+
         info = a.get('info', '')
         title = ''
         if isinstance(info, dict):
@@ -308,7 +337,7 @@ def _fetch_custom_alerts_since(since_ts):
 
 # --- FastAPI App ---
 
-app = FastAPI(title="Custom Alert Dashboard")
+app = FastAPI(title="Alert Dashboard")
 
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -402,9 +431,9 @@ async def get_alerts(days: int = 30, since: str = None):
     try:
         loop = asyncio.get_event_loop()
         if since:
-            result = await loop.run_in_executor(None, _fetch_custom_alerts_since, since)
+            result = await loop.run_in_executor(None, _fetch_alerts_since, since)
         else:
-            result = await loop.run_in_executor(None, _fetch_custom_alerts, days)
+            result = await loop.run_in_executor(None, _fetch_alerts, days)
         return JSONResponse({
             "status": "ok",
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -413,6 +442,14 @@ async def get_alerts(days: int = 30, since: str = None):
             "count": len(result["alerts"]),
             "data": result["alerts"],
             "incremental": since is not None,
+            "filters": {
+                "types": sorted(set(
+                    a.get('type', '') for a in result["alerts"] if a.get('type')
+                )),
+                "accounts": sorted(set(
+                    a.get('account_name', '') for a in result["alerts"] if a.get('account_name')
+                )),
+            },
         })
     except Exception as e:
         import traceback
@@ -560,7 +597,7 @@ if __name__ == "__main__":
         print("  You can set them via the Settings panel in the dashboard.\n")
 
     print("=" * 60)
-    print("  Custom Alert Dashboard")
+    print("  Alert Dashboard")
     print("=" * 60)
     print(f"  Server: http://localhost:{PORT}")
     print(f"  Press Ctrl+C to stop")

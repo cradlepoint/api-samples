@@ -1,12 +1,12 @@
-# Custom Alert Dashboard
+# Alert Dashboard
 
-A web dashboard that displays **custom alerts** from the NCM API with configurable timeframe, auto-refresh, acknowledgment tracking, and export capabilities.
+A web dashboard that displays **all alerts** from the NCM API with filterable type and account dropdowns, configurable timeframe, auto-refresh, acknowledgment tracking, and export capabilities.
 
 <img width="1484" height="842" alt="image" src="https://github.com/user-attachments/assets/66eada90-6517-42c2-b500-9ff50dace94e" />
 
 ## Features
 
-- **Custom alerts only** — filters for `type=custom_alert` from the NCM `/alerts/` endpoint
+- **All alert types** — fetches all alerts from the NCM `/alerts/` endpoint; filter by type and account via dropdowns
 - **Configurable time range** — default 30 days, max 90 days
 - **Auto-refresh** — enabled by default at 60-second intervals; incremental (only fetches new alerts since last check)
 - **Manual refresh** — full reload of the entire time range

@@ -8,7 +8,7 @@ Interactive web applications for managing, configuring, and monitoring Cradlepoi
 |-----|------|-------------|
 | [inventory_dashboard](inventory_dashboard/) | 8060 | Device inventory with license status, subscription details, and modem info |
 | [cellular_health_dashboard](cellular_health_dashboard/) | 8055 | Cellular health metrics — signal strength, RSRP, SINR, health scores |
-| [custom_alert_dashboard](custom_alert_dashboard/) | 8065 | Custom alert viewer with ACK tracking, auto-refresh, and export |
+| [alert_dashboard](alert_dashboard/) | 8065 | Alert dashboard with type/account filters, ACK tracking, auto-refresh, and export |
 | [config_builder](config_builder/) | 8100 | Build Cradlepoint JSON configurations from templates with per-site variables |
 | [script_manager](script_manager/) | 8000 | CSV file editor and NCM script runner with a web UI |
 | [ncm_api_key_encryptor](ncm_api_key_encryptor/) | 8000 | Encrypt NCM API keys for embedding in SDK app configurations |
