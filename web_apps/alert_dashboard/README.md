@@ -1,8 +1,8 @@
 # Alert Dashboard
 
-A web dashboard that displays **all alerts** from the NCM API with filterable type and account dropdowns, configurable timeframe, auto-refresh, acknowledgment tracking, and export capabilities.
+A web dashboard that displays alerts from the NCM API with filterable type and account dropdowns, configurable timeframe, auto-refresh, acknowledgment tracking, and export capabilities.
 
-<img width="1484" height="842" alt="image" src="https://github.com/user-attachments/assets/66eada90-6517-42c2-b500-9ff50dace94e" />
+<img width="1593" height="842" alt="image" src="https://github.com/user-attachments/assets/93c0d115-abba-4280-ad42-962a487e6bef" />
 
 ## Features
 
