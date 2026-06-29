@@ -502,6 +502,17 @@ body {
     flex-shrink: 0;
 }
 
+.alert-type-tag {
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--text-light);
+    background: var(--border-color);
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
 .alert-title-tag {
     font-size: 0.8rem;
     font-weight: 500;
@@ -1260,6 +1271,7 @@ body {
                         <span class="alert-expand-icon"><i class="fas fa-chevron-right"></i></span>
                         <div class="alert-summary">
                             ${routerName ? `<span class="alert-router-name">${escapeHtml(routerName)}</span>` : ''}
+                            ${a.type ? `<span class="alert-type-tag">${escapeHtml(a.type)}</span>` : ''}
                             ${alertTitle ? `<span class="alert-title-tag">${escapeHtml(alertTitle)}</span>` : ''}
                             <span class="alert-friendly-info">${escapeHtml(friendly)}</span>
                         </div>
