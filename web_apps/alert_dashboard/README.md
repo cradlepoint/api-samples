@@ -2,7 +2,7 @@
 
 A web dashboard that displays alerts from the NCM API with filterable type and account dropdowns, configurable timeframe, auto-refresh, acknowledgment tracking, and export capabilities.
 
-<img width="1593" height="842" alt="image" src="https://github.com/user-attachments/assets/93c0d115-abba-4280-ad42-962a487e6bef" />
+<img width="1482" height="842" alt="image" src="https://github.com/user-attachments/assets/5dc49ac1-cfa4-4b18-823e-950b2b6f390e" />
 
 ## Features
 
