@@ -1,104 +1,83 @@
 ---
 inclusion: fileMatch
 fileMatchPattern: "{scripts/**/*.py,ncm/**/*.py,ncm2/**/*.py,dashboards/**/*.py}"
-description: NetCloud Manager API development guide — required reading before building applications that call the NCM API. Covers documentation consultation, endpoint routing, SDK usage, and critical rules like trailing slashes.
+description: NCM API development — endpoint routing, SDK usage, critical rules. Pull in #reflexion-workflow for the full self-improving docs loop.
 ---
 
 # NetCloud Manager API Development Guide
 
-## Reflexion Workflow
+## Documentation Lookup
 
-When building any application that uses the Cradlepoint NetCloud Manager API, follow this workflow:
+Before writing code, consult `docs/`:
+- `api-overview.md` — auth, base URLs, pagination, filtering
+- `api-v2-endpoints.md` / `api-v3-endpoints.md` — endpoint details
+- `api-configuration.md` — device/group config push
+- `api-webhooks.md` — webhook setup
+- `ncm-sdk-reference.md` — Python SDK methods
+- `common-patterns.md` — reusable code patterns
+- `known-issues.md` — gotchas and workarounds
+- `api-deprecations.md` — deprecated endpoints to avoid
 
-### 1. Consult Documentation First
-Before writing any code, read the relevant documentation in `docs/`:
-- `docs/api-overview.md` — for auth, base URLs, pagination, filtering
-- `docs/api-v2-endpoints.md` — for v2 endpoint details
-- `docs/api-v3-endpoints.md` — for v3 endpoint details
-- `docs/api-configuration.md` — for device/group configuration
-- `docs/api-webhooks.md` — for webhook setup
-- `docs/ncm-sdk-reference.md` — for Python SDK methods
-- `docs/common-patterns.md` — for reusable code patterns
-- `docs/known-issues.md` — for gotchas and workarounds
+## Approach Selection
 
-### 2. Choose the Right Approach
-- Use the NCM SDK (`from ncm import ncm`) when possible — it handles pagination, retries, auth
-- **Always read the SDK source** at `ncm/ncm/ncm.py` to discover available methods before writing code. The SDK has many convenience methods (e.g. `get_net_device_health()`, `get_net_devices_metrics_for_wan()`, `get_net_devices_metrics_for_mdm()`) that combine multiple API calls. Don't reinvent what the SDK already provides.
-- Use `scripts/utils/session.py` for direct API calls with automatic retry/pagination
-- Use raw `requests` only when SDK/session don't cover the use case
+1. **NCM SDK** (`from ncm import ncm`) — preferred. Handles pagination, retries, auth. Always read `ncm/ncm/ncm.py` to discover methods before writing custom code.
+2. **`scripts/utils/session.py`** — direct API calls with auto retry/pagination.
+3. **Raw `requests`** — only when SDK/session don't cover the use case.
 
-### 3. Build and Test
-- Write the code following patterns in `docs/common-patterns.md`
-- Run the code and check for errors
-- Fix errors iteratively until clean
+## Endpoint Routing (Task → Doc → SDK)
 
-### 4. Reflexion — Update Documentation
-After completing any task, evaluate whether you discovered anything new:
-- **New API behavior** not documented → update the relevant `docs/*.md` file
-- **Bug or gotcha** discovered → append to `docs/known-issues.md`
-- **New reusable pattern** → add to `docs/common-patterns.md`
-- **Documentation was wrong** → fix it and log the change in `docs/CHANGELOG.md`
-- **Only applies to this specific app** → do NOT update docs (keep docs general)
+| Task | Doc | SDK Methods |
+|------|-----|-------------|
+| Routers | v2 → routers | `get_routers()`, `get_router_by_id()` |
+| Router state | v2 → router_state_samples | `get_router_state_samples()` |
+| Push device config | api-configuration | `patch_configuration_managers()`, `put_configuration_managers()` |
+| Push group config | api-configuration | `patch_group_configuration()`, `put_group_configuration()` |
+| Locations | v2 → locations | `get_locations()`, `get_historical_locations()` |
+| Alerts | v2 → alerts | `get_alerts()`, `get_router_alerts()` |
+| Webhooks | api-webhooks | Direct API: `alert_push_destinations` |
+| Groups | v2 → groups | `get_groups()`, `create_group_by_parent_id()` |
+| Net devices | v2 → net_devices | `get_net_devices()`, `get_net_device_metrics()` |
+| Cellular health | v2 → net_device_health | `get_net_device_health()` |
+| Cellular metrics | v2 → net_device_metrics | `get_net_devices_metrics_for_wan()`, `get_net_devices_metrics_for_mdm()` |
+| Signal/usage | v2 → net_device_signal/usage | `get_net_device_signal_samples()`, `get_net_device_usage_samples()` |
+| Firmware | v2 → firmwares | `get_firmwares()` |
+| Reboot | v2 → reboot_activity | `reboot_device()`, `reboot_group()` |
+| Speed tests | v2 → speed_test | `create_speed_test()` |
+| Users | v3 → users | `get_users()`, `create_user()` |
+| Subscriptions | v3 → subscriptions | `get_subscriptions()`, `regrade()` |
+| Private cellular | v3 → private_cellular_* | `get_private_cellular_networks()` |
+| NCX sites/resources | v3 → exchange_* | `get_exchange_sites()`, `create_exchange_site()` |
+| CSV export | common-patterns | `export_to_csv()` pattern |
+| Batch ops | common-patterns | `batch_operation()` pattern |
 
-## Endpoint Routing Guide
-
-Use this to quickly find which doc and SDK method to use for a given task:
-
-| Task | Doc File | SDK Methods |
-|------|----------|-------------|
-| List/manage routers | api-v2-endpoints.md → routers | `get_routers()`, `get_router_by_id()` |
-| Router online/offline status | api-v2-endpoints.md → router_state_samples | `get_router_state_samples()` |
-| Push device config | api-configuration.md | `patch_configuration_managers()`, `put_configuration_managers()` |
-| Push group config | api-configuration.md | `patch_group_configuration()`, `put_group_configuration()` |
-| Get/set locations | api-v2-endpoints.md → locations | `get_locations()`, `get_historical_locations()` |
-| Manage alerts | api-v2-endpoints.md → alerts | `get_alerts()`, `get_router_alerts()` |
-| Setup webhooks | api-webhooks.md | Direct API calls to `alert_push_destinations` |
-| Manage groups | api-v2-endpoints.md → groups | `get_groups()`, `create_group_by_parent_id()` |
-| Network device info | api-v2-endpoints.md → net_devices | `get_net_devices()`, `get_net_device_metrics()` |
-| Cellular health scores | api-v2-endpoints.md → net_device_health | `get_net_device_health()` |
-| Cellular metrics (WAN) | api-v2-endpoints.md → net_device_metrics | `get_net_devices_metrics_for_wan()`, `get_net_devices_metrics_for_mdm()` |
-| Signal/usage data | api-v2-endpoints.md → net_device_signal/usage | `get_net_device_signal_samples()`, `get_net_device_usage_samples()` |
-| Firmware info | api-v2-endpoints.md → firmwares | `get_firmwares()` |
-| Reboot devices | api-v2-endpoints.md → reboot_activity | `reboot_device()`, `reboot_group()` |
-| Speed tests | api-v2-endpoints.md → speed_test | `create_speed_test()` |
-| Manage users | api-v3-endpoints.md → users | `get_users()`, `create_user()` |
-| Subscriptions | api-v3-endpoints.md → subscriptions | `get_subscriptions()`, `regrade()` |
-| Private cellular | api-v3-endpoints.md → private_cellular_* | `get_private_cellular_networks()`, etc. |
-| NCX sites/resources | api-v3-endpoints.md → exchange_* | `get_exchange_sites()`, `create_exchange_site()` |
-| Export data to CSV | common-patterns.md | `export_to_csv()` pattern |
-| Batch operations | common-patterns.md | `batch_operation()` pattern |
-
-## Critical Rules (Always Follow)
+## Critical Rules
 
 1. **Trailing slash**: ALL v2 URLs must end with `/`
-2. **Config manager ID ≠ Router ID**: Always look up the config manager ID first
-3. **PATCH vs PUT**: PATCH merges, PUT replaces. Use PATCH for incremental changes
-4. **_id_ fields**: When using UUID keys, include `_id_` inside the object too
-5. **Check deprecations**: Before using any endpoint, verify it's not deprecated in `docs/api-deprecations.md`
-6. **Error handling**: Always implement retry logic with exponential backoff
-7. **Pagination**: Always handle pagination for list endpoints (SDK does this automatically)
+2. **Config manager ID ≠ Router ID**: Look up config manager ID first
+3. **PATCH vs PUT**: PATCH merges, PUT replaces — use PATCH for incremental changes
+4. **`_id_` fields**: Include UUID `_id_` inside the object when using UUID keys
+5. **Deprecations**: Verify endpoint isn't deprecated before using
+6. **Retries**: Exponential backoff on transient errors
+7. **Pagination**: Always handle for list endpoints (SDK does this automatically)
 
 ## Quality Gates
 
-Before considering any NCM application complete:
-1. Code runs without errors
-2. All API calls use proper authentication
-3. All URLs have trailing slashes (v2)
-4. Pagination is handled for list operations
-5. Error handling with retries is implemented
-6. No deprecated endpoints are used
-7. Documentation has been updated if applicable
+Before considering an NCM app complete:
+1. Runs without errors
+2. Proper auth on all API calls
+3. Trailing slashes on v2 URLs
+4. Pagination handled for lists
+5. Retry logic implemented
+6. No deprecated endpoints used
 
-## Documentation Update Format
+## After Completion — Reflexion
 
-When appending to `docs/known-issues.md`:
-```markdown
-### [Short Title] (discovered YYYY-MM-DD)
-[Description of the issue and workaround]
-```
+Evaluate whether you discovered anything new:
+- New API behavior → update relevant `docs/*.md`
+- Bug/gotcha → append to `docs/known-issues.md`
+- Reusable pattern → add to `docs/common-patterns.md`
+- Doc was wrong → fix it, log in `docs/CHANGELOG.md`
+- App-specific only → do NOT update docs
 
-When appending to `docs/CHANGELOG.md`:
-```markdown
-## YYYY-MM-DD — [Brief Description]
-- [What changed and why]
-```
+Format for `known-issues.md`: `### [Title] (discovered YYYY-MM-DD)`
+Format for `CHANGELOG.md`: `## YYYY-MM-DD — [Description]`

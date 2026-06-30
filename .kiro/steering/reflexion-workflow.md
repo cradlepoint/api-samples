@@ -1,67 +1,52 @@
 ---
 inclusion: manual
-description: Detailed reflexion workflow loop — pull in with #reflexion-workflow when you want the full self-improving docs-update process.
+description: Full reflexion workflow loop — self-improving docs-update process. Pull in with #reflexion-workflow when needed.
 ---
 
-# Reflexion Workflow System
+# Reflexion Workflow
 
-## Purpose
-
-This steering file defines the reflexion loop: a self-improving workflow where the AI
-updates its own documentation and steering rules when it discovers new information
-during development.
-
-## The Reflexion Loop
+## Loop
 
 ```
-User Request → Consult Docs → Build Code → Test → Fix Errors → Reflect → Update Docs
-                  ↑                                                          |
-                  └──────────────────────────────────────────────────────────┘
+Request → Consult Docs → Code → Test → Fix → Reflect → Update Docs
+              ↑                                              |
+              └──────────────────────────────────────────────┘
 ```
 
-## When Building Any NCM Application
+## Steps
 
-### Step 1: Understand the Request
-- Identify which API endpoints are needed
-- Check `#[[file:docs/api-overview.md]]` for API basics
-- Use the Endpoint Routing Guide in the NCM steering to find the right docs
+1. **Understand** — Identify needed endpoints. Check `#[[file:docs/api-overview.md]]` and the endpoint routing table in `ncm-api-development` steering.
+2. **Check known issues** — Read `#[[file:docs/known-issues.md]]` to avoid known pitfalls.
+3. **Write code** — Follow `#[[file:docs/common-patterns.md]]`. Use NCM SDK when possible. Include error handling and retries.
+4. **Test** — Run code. Check for syntax, import, and runtime errors. Verify output.
+5. **Fix** — Diagnose and fix errors iteratively. Note any doc gaps found.
+6. **Reflect and update** — See below.
 
-### Step 2: Check Known Issues
-- Read `#[[file:docs/known-issues.md]]` before writing code
-- Avoid known pitfalls
+## When to Update Docs
 
-### Step 3: Write Code
-- Follow patterns from `#[[file:docs/common-patterns.md]]`
-- Use the NCM SDK when possible
-- Include proper error handling and retry logic
+**Update if:**
+- Discovered undocumented API behavior
+- Found a documentation error
+- Created a reusable pattern
+- Hit a gotcha others should know about
 
-### Step 4: Test
-- Run the code
-- Check for syntax errors, import errors, runtime errors
-- Verify output matches expectations
+**Skip if:**
+- Discovery is app-specific
+- User-specific config issue
+- Already documented
 
-### Step 5: Fix Errors
-- If errors occur, diagnose and fix
-- Re-run until clean
-- If the error reveals a documentation gap, note it for Step 6
+## What to Update
 
-### Step 6: Reflect and Update
-After completing the task, ask yourself:
+| Discovery | Target File |
+|-----------|-------------|
+| New gotcha | `docs/known-issues.md` → "Discovered Issues Log" |
+| Reusable pattern | `docs/common-patterns.md` |
+| Doc error/addition | Relevant `docs/*.md` file |
+| New endpoint routing | `.kiro/steering/ncm-api-development.md` |
+| Any change | Log in `docs/CHANGELOG.md` |
 
-**Should I update documentation?** Update if:
-- You discovered an API behavior not documented in `docs/`
-- You found a documentation error
-- You created a reusable pattern others could benefit from
-- You hit a gotcha that should be warned about
+## Formats
 
-**Should I NOT update documentation?** Skip if:
-- The discovery is specific to this one application
-- It's a user-specific configuration issue
-- It's already documented
+`known-issues.md`: `### [Title] (discovered YYYY-MM-DD)` + description/workaround
 
-**What to update:**
-- `docs/known-issues.md` — append new gotchas under "Discovered Issues Log"
-- `docs/common-patterns.md` — add new reusable patterns
-- `docs/CHANGELOG.md` — log what changed and why
-- Relevant `docs/*.md` file — fix errors or add missing info
-- `.kiro/steering/*.md` — update routing guide if new endpoint patterns discovered
+`CHANGELOG.md`: `## YYYY-MM-DD — [Description]` + bullet list of changes

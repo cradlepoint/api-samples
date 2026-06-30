@@ -1,0 +1,13 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Reflexion: Update Docs",
+      "trigger": "Stop",
+      "action": {
+        "type": "agent",
+        "prompt": "Review this session. If you discovered any new API behaviors, gotchas, or reusable patterns NOT already in docs/known-issues.md or docs/common-patterns.md, and the discovery is generally applicable (not app-specific), update the relevant docs file and append to docs/CHANGELOG.md. Otherwise do nothing."
+      }
+    }
+  ]
+}
