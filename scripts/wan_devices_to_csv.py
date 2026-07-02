@@ -3,7 +3,7 @@ Export connected WAN modem net_devices with router info to CSV.
 
 Fetches all net_devices in WAN mode with connection_state=connected and
 is_asset=true (modems only), expanding the router relationship inline.
-Writes router ID, router name, carrier, and RF band to a CSV file.
+Writes router ID, router name, IPv4 address, carrier, and RF band to a CSV file.
 
 Requirements: requests (pip install requests)
 
@@ -113,6 +113,7 @@ def main():
             router_id = ''
             router_name = ''
 
+        ipv4_address = device.get('ipv4_address', '') or ''
         carrier = device.get('carrier', '') or ''
         rfband = device.get('rfband', '') or ''
         rfband5g = device.get('rfband5g', '') or ''
@@ -121,11 +122,12 @@ def main():
         rows.append({
             'router_id': router_id,
             'router_name': router_name,
+            'ipv4_address': ipv4_address,
             'carrier': carrier,
             'rf_band': rf_band,
         })
 
-    fields = ['router_id', 'router_name', 'carrier', 'rf_band']
+    fields = ['router_id', 'router_name', 'ipv4_address', 'carrier', 'rf_band']
     with open(OUTPUT_FILE, 'w', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=fields)
         writer.writeheader()
