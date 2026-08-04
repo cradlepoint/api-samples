@@ -24,6 +24,12 @@ python web_apps/cellular_health_dashboard/serve.py
 
 Open http://localhost:8055 → click the gear icon → enter API credentials → Apply & Refresh.
 
+> **Note:** Always launch with `source .venv/bin/activate && python ...`, not
+> `.venv/bin/python serve.py` directly. `setup_env.py` injects credentials as
+> `export` statements into `.venv/bin/activate` — skipping activation runs the
+> correct interpreter but silently omits those credentials, so the server
+> boots fine but every `/api/health` call fails with no startup error.
+
 ## Command-Line Options
 
 ```bash
@@ -50,7 +56,11 @@ python serve.py -ro -p "Name"  # Read-only with specific profile
 ## Settings Panel
 
 - **Profiles** — Save, Load, Delete, ★ Default (for read-only mode)
-- **Auto Refresh** — toggle + interval in minutes
+- **Display Options**
+  - Group interfaces by device (shade rows)
+  - Remove devices with health score 0
+  - Only show connected devices
+  - Auto Refresh — toggle + interval in minutes
 - **Clear History** — wipe all recorded samples
 
 ## History
