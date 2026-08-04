@@ -4,3 +4,10 @@ scripts/script_manager/csv_files/
 scripts/script_manager/.last_file.txt
 .vscode/settings.json
 .gitignore
+
+# API credentials written by setup_env.py - never commit
+.env
+
+# Python caches
+__pycache__/
+*.pyc

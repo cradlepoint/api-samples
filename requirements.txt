@@ -2,7 +2,9 @@ ncm
 fastapi
 uvicorn
 httpx
+requests
 python-dateutil
+python-dotenv
 python-multipart
 jinja2
 itsdangerous

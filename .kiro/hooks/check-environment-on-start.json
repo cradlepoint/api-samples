@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Check Environment On Session Start",
+      "trigger": "SessionStart",
+      "description": "Reports whether the .venv, dependencies and API credentials are ready when a session starts, so Kiro knows the environment state up front.",
+      "action": {
+        "type": "command",
+        "command": "python3 scripts/utils/env_status.py 2>/dev/null || python scripts/utils/env_status.py 2>/dev/null || true",
+        "timeout": 30
+      }
+    }
+  ]
+}

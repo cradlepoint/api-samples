@@ -4,64 +4,117 @@ A collection of Python scripts and web applications for interacting with Ericsso
 
 ## Getting Started
 
-### Prerequisites
+Three steps: clone, run setup, start chatting with Kiro.
 
-- Python 3.9 or higher — Windows users, see the [Windows Python Setup Guide](WINDOWS_PYTHON_SETUP.md)
-- Git (optional, for cloning the repository)
+### 1. Prerequisites
 
-### Download and Extract the Repository
+- Python 3.9 or higher (3.12 recommended) — Windows users, see the [Windows Python Setup Guide](WINDOWS_PYTHON_SETUP.md)
+- Git
+
+### 2. Clone the repository
 
 ```bash
 git clone <repository-url>
 cd api-samples
 ```
 
-## Setup
-
-Run the setup script to create the virtual environment, install dependencies, and configure API credentials:
+### 3. Run setup
 
 **macOS / Linux**
 
-```
-python3 setup_env.py && source .venv/bin/activate
-```
-
-**Windows**
-
-```
-python setup_env.py && .venv\Scripts\activate
+```bash
+python3 setup_env.py
 ```
 
-This handles everything — venv creation, `pip install`, and credential configuration.
+**Windows (PowerShell)**
 
-### Manual Setup (alternative)
+```powershell
+python setup_env.py
+```
 
-If you prefer to set things up manually:
+That's it. The script checks your Python version, creates the `.venv` virtual
+environment, upgrades pip, installs everything in `requirements.txt`, prompts for
+your API credentials (input is hidden), and verifies the result.
+
+Then activate the venv:
+
+```bash
+source .venv/bin/activate          # macOS / Linux
+.venv\Scripts\Activate.ps1         # Windows PowerShell
+.venv\Scripts\activate.bat         # Windows cmd
+```
+
+### 4. Start chatting with Kiro
+
+Open the folder in Kiro and ask for what you want:
+
+- "Build me a dashboard showing routers with poor signal"
+- "Export all my routers to CSV"
+- "Which devices have subscriptions expiring in the next 30 days?"
+
+Kiro reads the API docs in `docs/`, uses the venv, and picks up your credentials
+automatically.
+
+### Setup script options
+
+| Command | What it does |
+|---|---|
+| `python3 setup_env.py` | Full setup, prompts for credentials |
+| `python3 setup_env.py --skip-credentials` | venv + dependencies only, no prompts |
+| `python3 setup_env.py --credentials-only` | Re-enter credentials only |
+| `python3 setup_env.py --check` | Report environment status, change nothing |
+
+Use `python` instead of `python3` on Windows.
+
+You can also have Kiro run setup for you: type `#setup-environment` in chat and
+it will build the environment, diagnose any failures, and report what's left.
+
+### Where credentials are stored
+
+`setup_env.py` writes them to `.env` at the repo root (gitignored, owner-only
+permissions on macOS/Linux) and injects them into every venv activate script —
+bash/zsh, fish, csh, PowerShell, and cmd — so they work in any shell on any
+platform, activated or not.
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `X_CP_API_ID` | yes | Cradlepoint API ID |
+| `X_CP_API_KEY` | yes | Cradlepoint API key |
+| `X_ECM_API_ID` | yes | ECM API ID |
+| `X_ECM_API_KEY` | yes | ECM API key |
+| `NCM_API_TOKEN` | no | Bearer token, v3 endpoints only |
+
+Dashboard apps also support configuring credentials via the Settings panel in the UI.
+
+### Manual setup (alternative)
+
+If you prefer to do it by hand:
 
 ```bash
 python3 -m venv .venv                   # macOS/Linux
-# or: python -m venv .venv             # Windows
+# or: python -m venv .venv              # Windows
 source .venv/bin/activate               # macOS/Linux
-# or: .venv\Scripts\activate            # Windows
-pip install -r requirements.txt
+# or: .venv\Scripts\Activate.ps1        # Windows PowerShell
+python -m pip install -r requirements.txt
 ```
 
-Set API keys:
+Then set the API keys:
 
 ```bash
-export X_CP_API_ID="your_api_id"
-export X_CP_API_KEY="your_api_key"
-export X_ECM_API_ID="your_ecm_api_id"
-export X_ECM_API_KEY="your_ecm_api_key"
-export NCM_API_TOKEN="your_v3_bearer_token"  # optional, for v3 API
+export X_CP_API_ID="your_api_id"                # macOS/Linux
 ```
 
-Dashboard apps also support configuring credentials via the Settings panel in the UI.
+```powershell
+$env:X_CP_API_ID = "your_api_id"                # Windows PowerShell
+```
 
 ## Project Structure
 
 ```
 api-samples/
+├── setup_env.py         # One-shot environment setup (start here)
+├── requirements.txt     # Python dependencies
+├── .kiro/               # Kiro steering rules and agent hooks
 ├── web_apps/            # Web applications and dashboards
 ├── scripts/             # Standalone Python scripts and utilities
 ├── ncm/                 # NCM Python SDK source (also pip installable)
@@ -135,11 +188,29 @@ The `docs/` folder contains detailed API references:
 
 ## Troubleshooting
 
-**Missing API keys:** Verify environment variables are set, or use the Settings panel in dashboard apps.
+Start here — it diagnoses most problems in one command:
 
-**ModuleNotFoundError:** Make sure your venv is activated and `pip install -r requirements.txt` was run.
+```bash
+python3 setup_env.py --check       # python setup_env.py --check on Windows
+```
 
-**Port already in use:** Kill the existing process (`lsof -ti:<port> | xargs kill`) or use a different port.
+**Missing API keys:** Run `python3 setup_env.py --credentials-only`, or use the Settings panel in dashboard apps.
+
+**ModuleNotFoundError:** Re-run `python3 setup_env.py --skip-credentials` to reinstall dependencies into the venv.
+
+**`python` not recognized (Windows):** Python isn't on your PATH. See the [Windows Python Setup Guide](WINDOWS_PYTHON_SETUP.md).
+
+**`Activate.ps1 cannot be loaded` (Windows PowerShell):** PowerShell's execution policy is blocking the script. Run:
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+Or use `.venv\Scripts\activate.bat` from cmd instead.
+
+**venv creation fails (Linux):** Install the venv module: `sudo apt install python3-venv`.
+
+**Port already in use:** macOS/Linux `lsof -ti:<port> | xargs kill`. Windows `netstat -ano | findstr :<port>` then `taskkill /PID <pid> /F`.
 
 ## License
 

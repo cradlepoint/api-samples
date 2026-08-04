@@ -8,7 +8,12 @@ description: Code standards for NCM scripts — venv, env vars, file structure, 
 
 ## Virtual Environment
 
-Always use `.venv/bin/python` and `.venv/bin/pip`. Never system Python. Python 3.12.
+Always use the project venv, never system Python. Python 3.9+ (3.12 recommended).
+
+- macOS / Linux: `.venv/bin/python`, `.venv/bin/python -m pip`
+- Windows: `.venv\Scripts\python.exe`, `.venv\Scripts\python.exe -m pip`
+
+Detect the platform rather than hardcoding `.venv/bin`. See `#project-setup`.
 
 ## Required Environment Variables
 
@@ -19,10 +24,12 @@ Auth vars (prefix `X_`, matching HTTP headers with dashes→underscores):
 
 **Do NOT use unprefixed `CP_API_ID` form.**
 
-Setup: run `.venv/bin/python setup_env.py` to inject into venv activate scripts.
-Manual: export in shell profile. Windows users see `WINDOWS_PYTHON_SETUP.md`.
+Setup: run `python3 setup_env.py` (`python setup_env.py` on Windows). It writes
+`.env` at the repo root and injects the vars into every venv activate script
+(bash/zsh, fish, csh, PowerShell, cmd). Windows users see `WINDOWS_PYTHON_SETUP.md`.
 
-Scripts must detect missing vars and print setup instructions — use `scripts/utils/env_check.py`.
+Scripts must call `check_env()` from `scripts/utils/env_check.py`, which loads
+`.env` on import and prints OS-specific instructions when vars are missing.
 
 ## File Structure Template
 

@@ -528,6 +528,31 @@ for a separate `/accounts/` fetch to resolve group account names. Known
 endpoints that support `expand`: `/routers/` (group, account), `/groups/`
 (account).
 
+### Long-Running Servers Need `source .venv/bin/activate`, Not Just `.venv/bin/python` (discovered 2026-08-04)
+`setup_env.py` injects real credential values (`X_CP_API_ID`, `X_CP_API_KEY`,
+`X_ECM_API_ID`, `X_ECM_API_KEY`) as `export` statements directly into
+`.venv/bin/activate`. If `.env` is missing or incomplete (e.g. deleted,
+partial setup), those exported values in `activate` are the only place the
+credentials exist.
+
+Calling `.venv/bin/python script.py` directly executes the interpreter
+without sourcing `activate`, so those exported vars are never set in the
+process environment — even though the venv itself (`sys.prefix`) is correctly
+active. For one-shot scripts that call `check_env()` at startup, this fails
+loudly and is easy to catch. For long-running servers (FastAPI/Flask
+dashboards under `web_apps/`) that read `os.environ` lazily per-request
+(e.g. via `_build_client()` on each API call) instead of validating at
+startup, the server boots fine and returns 200 on static routes, but every
+API call silently fails with a missing/empty credential error — there is no
+startup-time signal that credentials are missing.
+
+Workaround: always launch long-running dev servers with
+`source .venv/bin/activate && python path/to/serve.py`, not
+`.venv/bin/python path/to/serve.py`, whenever credentials may only be
+present in the activate script rather than `.env`. This is safe to run in a
+single non-interactive shell command (no prompts), unlike `setup_env.py`
+with no flags.
+
 ### v2 `/alerts/` Endpoint Does Not Support `order_by` (discovered 2026-06-26)
 The `/alerts/` endpoint returns `409 Conflict` with `"Invalid ordering field
 specified: created_at"` when using `order_by=-created_at` or any `order_by`

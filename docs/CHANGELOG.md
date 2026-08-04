@@ -177,3 +177,7 @@ automatically by the reflexion system.
 ## 2026-06-09 — Documented NCM SDK + FastAPI event loop blocking pattern
 
 - Added common pattern: NCM SDK uses synchronous `requests.Session` which blocks the async event loop when called from FastAPI `async def` handlers. Must wrap in `run_in_executor()` to keep the server responsive. Applies to all dashboard apps using FastAPI + NCM SDK.
+
+## 2026-08-04 — Documented venv activation gap for long-running servers
+
+- Added known issue: `setup_env.py` injects credentials as `export` statements into `.venv/bin/activate`, not always into `.env`. Running long-running servers with `.venv/bin/python serve.py` (without sourcing `activate`) uses the correct venv interpreter but skips those exported credentials, causing silent per-request auth failures with no startup error. Workaround: launch servers with `source .venv/bin/activate && python serve.py`.

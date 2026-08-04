@@ -1,0 +1,10 @@
+LICENSE
+README.md
+setup.py
+ncm/__init__.py
+ncm/ncm.py
+ncm.egg-info/PKG-INFO
+ncm.egg-info/SOURCES.txt
+ncm.egg-info/dependency_links.txt
+ncm.egg-info/requires.txt
+ncm.egg-info/top_level.txt
