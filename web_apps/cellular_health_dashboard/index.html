@@ -287,6 +287,14 @@
                         Group interfaces by device (shade rows)
                     </label>
                     <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;cursor:pointer;margin-top:0.75rem;">
+                        <input type="checkbox" id="hideZeroScoreToggle" style="width:1rem;height:1rem;cursor:pointer;">
+                        Remove devices with health score 0
+                    </label>
+                    <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;cursor:pointer;margin-top:0.75rem;">
+                        <input type="checkbox" id="onlyConnectedToggle" style="width:1rem;height:1rem;cursor:pointer;">
+                        Only show connected devices
+                    </label>
+                    <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;cursor:pointer;margin-top:0.75rem;">
                         <input type="checkbox" id="autoRefreshToggle" style="width:1rem;height:1rem;cursor:pointer;">
                         Auto Refresh
                     </label>
@@ -549,6 +557,8 @@
         let sortKey = 'health_score';
         let sortDir = 1; // 1 = asc (lowest first), -1 = desc
         let groupByRouter = localStorage.getItem('groupByRouter') !== 'false'; // default true
+        let hideZeroScore = localStorage.getItem('hideZeroScore') === 'true'; // default false
+        let onlyConnected = localStorage.getItem('onlyConnected') === 'true'; // default false
         let currentPage = 0;
         const PAGE_SIZE = 100;
 
@@ -605,6 +615,8 @@
         function applyFilters() {
             const search = searchInput.value.toLowerCase().trim();
             filteredData = healthData.filter(row => {
+                if (hideZeroScore && row.health_score === 0) return false;
+                if (onlyConnected && row.router_state !== 'online') return false;
                 if (search) {
                     const hay = [row.router_name, row.carrier, row.mac, row.model, row.interface_name].join(' ').toLowerCase();
                     if (!hay.includes(search)) return false;
@@ -957,6 +969,26 @@
         groupToggle.addEventListener('change', () => {
             groupByRouter = groupToggle.checked;
             localStorage.setItem('groupByRouter', groupByRouter);
+            applyFilters();
+        });
+
+        // Hide devices with health score 0
+        const hideZeroScoreToggle = document.getElementById('hideZeroScoreToggle');
+        hideZeroScoreToggle.checked = hideZeroScore;
+        hideZeroScoreToggle.addEventListener('change', () => {
+            hideZeroScore = hideZeroScoreToggle.checked;
+            localStorage.setItem('hideZeroScore', hideZeroScore);
+            currentPage = 0;
+            applyFilters();
+        });
+
+        // Only show connected devices
+        const onlyConnectedToggle = document.getElementById('onlyConnectedToggle');
+        onlyConnectedToggle.checked = onlyConnected;
+        onlyConnectedToggle.addEventListener('change', () => {
+            onlyConnected = onlyConnectedToggle.checked;
+            localStorage.setItem('onlyConnected', onlyConnected);
+            currentPage = 0;
             applyFilters();
         });
 
