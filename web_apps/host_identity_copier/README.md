@@ -3,6 +3,12 @@
 Copy the host address identities (`identities.ip`) from a master NCM group to any
 number of destination groups.
 
+<img width="1369" height="636" alt="image" src="https://github.com/user-attachments/assets/ec0737a6-5ba0-4474-8c1b-2ce81ac7b0f4" />
+<img width="1369" height="749" alt="image" src="https://github.com/user-attachments/assets/64d65def-63cb-49ce-92aa-de8429097110" />
+<img width="1369" height="841" alt="image" src="https://github.com/user-attachments/assets/f66b25bc-b9f3-4fdb-8bfe-e669946c8762" />
+<img width="1369" height="841" alt="image" src="https://github.com/user-attachments/assets/328de778-8173-4434-a761-f760ed6ecb70" />
+
+
 Port: **8070**
 
 ```bash
