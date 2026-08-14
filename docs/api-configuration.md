@@ -27,6 +27,28 @@ The second element lists paths to remove from defaults:
 [{}, [["lan", "00000001-0d93-319d-8220-4a1fb0372b51"]]]
 ```
 
+**Works with PATCH as well as PUT.** NCM's own UI removes config via PATCH with an
+empty updates dict and a populated removals list, so you do not need PUT (and its
+reset-unmentioned-fields behavior) just to delete something.
+
+A path walks the config tree. Object keys are strings; **array positions are
+integers**, unlike in the updates dict where the same position is a string key:
+
+```json
+[{}, [["identities", "ip", "0897fa24-b4a4-4aa2-9cab-0bed9507c233", "members", 2]]]
+```
+
+Stopping the path short removes the whole entry rather than one of its elements:
+
+```json
+[{}, [["identities", "ip", "0897fa24-b4a4-4aa2-9cab-0bed9507c233"]]]
+```
+
+Both diff slots may be used in a single PATCH — set values via updates and prune
+via removals in one call. When removing several elements from one array, emit the
+indices highest-first so the paths remain valid regardless of whether NCM resolves
+them against the pre-change config or applies them sequentially with reindexing.
+
 ## Endpoints
 
 ### Device Config
@@ -49,7 +71,7 @@ PATCH  /api/v2/groups/{id}/
 |----------|-----|-------|
 | Unmentioned fields | Reset to defaults | Left unchanged |
 | Use case | Replace entire config | Adjust existing config |
-| Can remove items | Yes (via removals list) | No |
+| Can remove items | Yes (via removals list) | Yes (via removals list) — see below |
 | Returns payload | Yes | No |
 
 ## _id_ Fields

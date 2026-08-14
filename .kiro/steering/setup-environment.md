@@ -58,7 +58,10 @@ Run this when the user pulls in `#setup-environment`, or any time they ask to
 ## Rules
 
 - Never print or echo credential values.
-- Do not run `setup_env.py` without a flag from a tool call — the bare form
-  prompts for credentials and will appear to hang.
+- Do not run `setup_env.py` without a flag from a tool call — tool calls get a
+  tty, so the bare form prompts for credentials and hangs until timeout with the
+  user never seeing the prompt.
+- If `.venv/` is missing, run this procedure without asking first. See the
+  "Missing `.venv`" section of `project-setup.md`.
 - After setup, always invoke project code through the venv interpreter
   (`.venv/bin/python` or `.venv\Scripts\python.exe`), never system Python.

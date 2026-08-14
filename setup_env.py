@@ -19,8 +19,13 @@ Usage:
     python3 setup_env.py --credentials-only   # re-enter credentials only
     python3 setup_env.py --check              # report status, change nothing
 
-The credential prompt is skipped automatically when stdin is not a terminal,
-so this script is safe to run from automation and from Kiro hooks.
+The credential prompt is skipped automatically when stdin is not a terminal, so
+the bare form is safe from Kiro hooks and CI, which pipe stdin.
+
+It is NOT safe from an agent tool call: those run with a real tty, so the bare
+form prompts and then blocks with nobody able to answer. Pass --skip-credentials
+there. Note that the "non-interactive mode" message that flag prints comes from
+the flag itself, not from a tty check, so it is not evidence either way.
 
 Afterwards, activate the venv:
     source .venv/bin/activate              # macOS / Linux
@@ -142,10 +147,15 @@ def activation_command() -> str:
 
 
 def run_python_command() -> str:
-    """The command Kiro or the user should use to run project code."""
+    """The command to run project code without activating the venv."""
     if IS_WINDOWS:
         return r".venv\Scripts\python.exe"
     return ".venv/bin/python"
+
+
+def activated_python_command() -> str:
+    """The command to run project code from a shell that has activated the venv."""
+    return "python" if IS_WINDOWS else "python3"
 
 
 # --------------------------------------------------------------------------
@@ -457,17 +467,22 @@ def _strip_block(content: str, start: str, end: str) -> str:
 
 def _write_activate_block(filename: str, body_lines: list[str],
                           start: str = MARKER_START,
-                          end: str = MARKER_END) -> bool:
-    """Replace the credential block in one activate script. True if written."""
+                          end: str = MARKER_END) -> str:
+    """
+    Replace the credential block in one activate script.
+
+    Returns "updated", "missing" (file not in this venv) or "failed". Callers
+    report the result, so nothing is skipped silently.
+    """
     path = venv_scripts_dir() / filename
     if not path.exists():
-        return False
+        return "missing"
 
     try:
         content = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         warn(f"Could not read {path.name}, skipping.")
-        return False
+        return "failed"
 
     content = _strip_block(content, start, end)
     block = "\n".join([start, *body_lines, end])
@@ -477,10 +492,24 @@ def _write_activate_block(filename: str, body_lines: list[str],
         path.write_text(content, encoding="utf-8")
     except OSError as exc:
         warn(f"Could not write {path.name}: {exc}")
-        return False
+        return "failed"
 
-    print(f"         {path.name}")
-    return True
+    return "updated"
+
+
+def _vars_present_in(path: Path, variables: list[str]) -> set[str]:
+    """
+    Which of `variables` appear by name in a file.
+
+    Name-level check only — values are never read back or printed. Used to
+    verify an injection landed, and by --check to surface drift between
+    activate scripts.
+    """
+    try:
+        content = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return set()
+    return {var for var in variables if var in content}
 
 
 def _clear_old_unsets(content: str, patterns: list[str]) -> str:
@@ -491,16 +520,21 @@ def _clear_old_unsets(content: str, patterns: list[str]) -> str:
     return content
 
 
-def update_posix_activate(creds: dict[str, str]) -> bool:
-    """bash / zsh: .venv/bin/activate (also present on Windows for Git Bash)."""
+def update_posix_activate(creds: dict[str, str]) -> str:
+    """
+    bash / zsh: .venv/bin/activate (also present on Windows for Git Bash).
+
+    Returns "updated", "missing" or "failed", like _write_activate_block.
+    """
     path = venv_scripts_dir() / "activate"
     if not path.exists():
-        return False
+        return "missing"
 
     try:
         content = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
-        return False
+        warn(f"Could not read {path.name}, skipping.")
+        return "failed"
 
     content = _strip_block(content, MARKER_START, MARKER_END)
     content = _clear_old_unsets(content, ["    unset {var}\n"])
@@ -520,43 +554,31 @@ def update_posix_activate(creds: dict[str, str]) -> bool:
         path.write_text(content, encoding="utf-8")
     except OSError as exc:
         warn(f"Could not write {path.name}: {exc}")
-        return False
+        return "failed"
 
-    print(f"         {path.name}")
-    return True
+    return "updated"
+
+
+# Activate scripts that `python -m venv` only writes on Windows. Their absence
+# from a POSIX venv is expected, not a problem worth flagging as an error.
+WINDOWS_ONLY_SCRIPTS = {"activate.bat"}
 
 
 def update_activate_scripts(creds: dict[str, str]) -> None:
-    """Inject credentials into every activate script the venv provides."""
+    """
+    Inject credentials into every activate script the venv provides.
+
+    Every script is reported by name with its outcome, and the result is then
+    read back to confirm the variables actually landed. A script that exists but
+    does not receive the credentials is called out loudly — silent skips are how
+    activate scripts drift out of sync with each other and with .env.
+    """
     print()
     print("  Updating activate scripts:")
 
-    written = update_posix_activate(creds)
-
-    # fish
-    written |= _write_activate_block(
-        "activate.fish",
-        [f'set -gx {var} "{_escape_fish(value)}"'
-         for var, value in creds.items()],
-    )
-
-    # csh / tcsh
-    written |= _write_activate_block(
-        "activate.csh",
-        [f'setenv {var} "{_escape_csh(value)}"'
-         for var, value in creds.items()],
-    )
-
-    # Windows PowerShell. Also present in POSIX venvs for pwsh users.
-    written |= _write_activate_block(
-        "Activate.ps1",
-        [f"$env:{var} = '{_escape_powershell(value)}'"
-         for var, value in creds.items()],
-    )
-
     # Windows cmd. Batch files use REM for comments, not #.
-    bat_lines = []
-    unrepresentable = []
+    bat_lines: list[str] = []
+    unrepresentable: list[str] = []
     for var, value in creds.items():
         escaped = _escape_bat(value)
         if escaped is None:
@@ -566,12 +588,53 @@ def update_activate_scripts(creds: dict[str, str]) -> None:
             continue
         bat_lines.append(f'set "{var}={escaped}"')
 
-    written |= _write_activate_block(
-        "activate.bat",
-        bat_lines,
-        start=BAT_MARKER_START,
-        end=BAT_MARKER_END,
-    )
+    results: list[tuple[str, str]] = [
+        # bash / zsh needs the deactivate-unset handling, so it has its own writer
+        ("activate", update_posix_activate(creds)),
+        ("activate.fish", _write_activate_block(
+            "activate.fish",
+            [f'set -gx {var} "{_escape_fish(value)}"'
+             for var, value in creds.items()])),
+        ("activate.csh", _write_activate_block(
+            "activate.csh",
+            [f'setenv {var} "{_escape_csh(value)}"'
+             for var, value in creds.items()])),
+        # Windows PowerShell. Also present in POSIX venvs, for pwsh users.
+        ("Activate.ps1", _write_activate_block(
+            "Activate.ps1",
+            [f"$env:{var} = '{_escape_powershell(value)}'"
+             for var, value in creds.items()])),
+        ("activate.bat", _write_activate_block(
+            "activate.bat", bat_lines,
+            start=BAT_MARKER_START, end=BAT_MARKER_END)),
+    ]
+
+    # Read back and confirm. Blank optional values are never written, so only
+    # verify the ones that carry a value.
+    expected = [var for var, value in creds.items() if value]
+    incomplete: list[str] = []
+
+    for filename, status in results:
+        if status == "updated":
+            wanted = [v for v in expected
+                      if not (filename == "activate.bat" and v in unrepresentable)]
+            found = _vars_present_in(venv_scripts_dir() / filename, wanted)
+            if len(found) == len(wanted):
+                print(f"         {filename:<15} updated ({len(found)} vars)")
+            else:
+                missing = [v for v in wanted if v not in found]
+                print(f"         {filename:<15} INCOMPLETE - missing "
+                      f"{', '.join(missing)}")
+                incomplete.append(filename)
+        elif status == "missing":
+            if filename in WINDOWS_ONLY_SCRIPTS and not IS_WINDOWS:
+                note = "not present (Windows-only, expected here)"
+            else:
+                note = "not present in this venv"
+            print(f"         {filename:<15} {note}")
+        else:
+            print(f"         {filename:<15} FAILED")
+            incomplete.append(filename)
 
     if unrepresentable:
         warn(f"activate.bat could not represent: {', '.join(unrepresentable)}")
@@ -579,7 +642,12 @@ def update_activate_scripts(creds: dict[str, str]) -> None:
         print("         which scripts read directly. Use PowerShell instead of cmd,")
         print("         or regenerate the key without a double quote.")
 
-    if not written:
+    if incomplete:
+        warn(f"Credentials may be missing from: {', '.join(incomplete)}")
+        print("         Shells using those scripts will start without credentials.")
+        print("         .env still holds them, so scripts that read .env are fine.")
+
+    if not any(status == "updated" for _, status in results):
         warn("No activate scripts found to update. .env still holds your credentials.")
 
 
@@ -736,6 +804,38 @@ def report_status() -> int:
         fail(f"credentials: missing {', '.join(missing)}")
         problems += 1
 
+    # .env is what non-activated runs read (`.venv/bin/python script.py`).
+    if ENV_FILE.is_file():
+        ok(".env: present")
+    else:
+        warn(".env: not found - only activated shells will have credentials")
+        print("         Non-activated runs see no credentials. Fix with:")
+        launcher = "python" if IS_WINDOWS else "python3"
+        print(f"           {launcher} setup_env.py --credentials-only")
+
+    # Per-script credential presence, so drift between shells is visible.
+    if interpreter:
+        scripts = [("activate", False), ("activate.fish", False),
+                   ("activate.csh", False), ("Activate.ps1", False),
+                   ("activate.bat", True)]
+        stale = []
+        for filename, windows_only in scripts:
+            path = venv_scripts_dir() / filename
+            if not path.is_file():
+                continue
+            found = _vars_present_in(path, REQUIRED_VARS)
+            if not found:
+                stale.append(f"{filename} (none)")
+            elif len(found) < len(REQUIRED_VARS):
+                stale.append(f"{filename} ({len(found)}/{len(REQUIRED_VARS)})")
+        if stale:
+            warn(f"activate scripts without all credentials: {', '.join(stale)}")
+            print("         Those shells start without credentials. Refresh them with:")
+            launcher = "python" if IS_WINDOWS else "python3"
+            print(f"           {launcher} setup_env.py --credentials-only")
+        else:
+            ok("activate scripts: all present scripts carry the credentials")
+
     print()
     if problems:
         print(f"  {problems} problem(s) found. Run:  python3 setup_env.py")
@@ -760,8 +860,8 @@ def print_next_steps(creds: dict[str, str]) -> None:
     print()
     print("  Then run a dashboard:")
     print()
-    print(f"    {run_python_command()} web_apps/inventory_dashboard/serve.py        # http://localhost:8060")
-    print(f"    {run_python_command()} web_apps/cellular_health_dashboard/serve.py  # http://localhost:8055")
+    print(f"    {activated_python_command()} web_apps/inventory_dashboard/serve.py        # http://localhost:8060")
+    print(f"    {activated_python_command()} web_apps/cellular_health_dashboard/serve.py  # http://localhost:8055")
     print()
     print("  Or just ask Kiro in chat, for example:")
     print()

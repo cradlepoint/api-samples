@@ -9,12 +9,16 @@ Interactive web applications for managing, configuring, and monitoring Cradlepoi
 | [inventory_dashboard](inventory_dashboard/) | 8060 | Device inventory with license status, subscription details, and modem info |
 | [cellular_health_dashboard](cellular_health_dashboard/) | 8055 | Cellular health metrics — signal strength, RSRP, SINR, health scores |
 | [alert_dashboard](alert_dashboard/) | 8065 | Alert dashboard with type/account filters, ACK tracking, auto-refresh, and export |
+| [geo_ip_blocker](geo_ip_blocker/) | 8065 | Convert country IP ranges into zone firewall deny rules and push to groups |
+| [host_identity_copier](host_identity_copier/) | 8070 | Copy host address identities from a master group to many destination groups |
 | [config_builder](config_builder/) | 8100 | Build Cradlepoint JSON configurations from templates with per-site variables |
 | [script_manager](script_manager/) | 8000 | CSV file editor and NCM script runner with a web UI |
 | [ncm_api_key_encryptor](ncm_api_key_encryptor/) | 8000 | Encrypt NCM API keys for embedding in SDK app configurations |
 | [cisco_to_cradlepoint_zfw_converter](cisco_to_cradlepoint_zfw_converter/) | 5001 | Convert Cisco router configs to Cradlepoint zone firewall format |
 | [netcloud_router_lookup](netcloud_router_lookup/) | 8000 | Search routers across multiple accounts |
 | [assign_sdk](assign_sdk/) | 9000 | Assign SDK app versions to router groups |
+
+Some ports are shared by more than one app (8000 and 8065), so run those apps one at a time.
 
 ## Running a Web App
 

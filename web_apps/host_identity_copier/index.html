@@ -1,0 +1,1644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Host Identity Copier — NCM Group Config</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    <style>
+:root {
+    --primary-color: #4f46e5;
+    --primary-dark: #3730a3;
+    --secondary-color: #6b7280;
+    --success-color: #059669;
+    --warning-color: #d97706;
+    --danger-color: #dc2626;
+    --info-color: #0284c7;
+    --light-bg: #f9fafb;
+    --light-surface: #ffffff;
+    --text-primary: #111827;
+    --text-secondary: #6b7280;
+    --text-light: #9ca3af;
+    --border-color: #d1d5db;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --radius-sm: 0.375rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.75rem;
+    --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    min-height: 100vh;
+    color: var(--text-primary);
+    line-height: 1.6;
+}
+
+body.dark-mode {
+    --light-bg: #1f2937;
+    --light-surface: #111827;
+    --text-primary: #f9fafb;
+    --text-secondary: #d1d5db;
+    --text-light: #6b7280;
+    --border-color: #374151;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+}
+
+.app-container { min-height: 100vh; display: flex; flex-direction: column; }
+
+.app-header {
+    background: var(--light-surface);
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: var(--shadow-md);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.header-content {
+    padding: 1rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.logo-section { display: flex; align-items: center; gap: 1rem; }
+.app-logo { height: 40px; width: auto; }
+body.dark-mode .app-logo { content: url('/static/logo_dark.png'); }
+
+#app-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--primary-color), var(--info-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.header-actions { display: flex; align-items: center; gap: 0.75rem; }
+
+.cred-pill {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.625rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+.cred-pill.ok { color: var(--success-color); border-color: var(--success-color); }
+.cred-pill.bad { color: var(--danger-color); border-color: var(--danger-color); }
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+    box-shadow: var(--shadow-sm);
+    font-family: inherit;
+}
+.btn-primary { background: linear-gradient(135deg, var(--primary-color), var(--primary-dark)); color: #fff; }
+.btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--shadow-lg); }
+.btn-secondary { background: var(--light-bg); color: var(--text-primary); border: 1px solid var(--border-color); }
+.btn-secondary:hover:not(:disabled) { background: var(--border-color); }
+.btn-danger { background: linear-gradient(135deg, var(--danger-color), #b91c1c); color: #fff; }
+.btn-danger:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--shadow-lg); }
+.btn-success { background: linear-gradient(135deg, var(--success-color), #047857); color: #fff; }
+.btn-success:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--shadow-lg); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-sm { padding: 0.4rem 0.75rem; font-size: 0.8125rem; }
+
+.icon-btn {
+    background: var(--light-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 0.625rem;
+    cursor: pointer;
+    transition: var(--transition);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.icon-btn:hover { background: var(--light-bg); transform: translateY(-1px); }
+
+.app-main { flex: 1; max-width: 1100px; width: 100%; margin: 0 auto; padding: 2rem; }
+
+/* Stepper */
+.stepper { display: flex; align-items: center; justify-content: center; margin-bottom: 2rem; gap: 0.5rem; }
+.step {
+    display: flex; align-items: center; gap: 0.5rem;
+    font-size: 0.875rem; font-weight: 500; color: var(--text-light);
+    cursor: pointer; user-select: none;
+}
+.step-number {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--light-bg); border: 1px solid var(--border-color);
+    font-size: 0.8125rem; font-weight: 600;
+}
+.step.active { color: var(--primary-color); }
+.step.active .step-number { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
+.step.completed { color: var(--success-color); }
+.step.completed .step-number { background: var(--success-color); color: #fff; border-color: var(--success-color); }
+.step-connector { width: 60px; height: 2px; background: var(--border-color); }
+.step-connector.completed { background: var(--success-color); }
+
+.step-panel { display: none; }
+.step-panel.active { display: block; }
+
+/* Panels */
+.panel {
+    background: var(--light-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+}
+.panel-header {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    flex-wrap: wrap;
+}
+.panel-header h2 { font-size: 1.0625rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
+.panel-header h2 i { color: var(--primary-color); }
+.panel-content { padding: 1.5rem; }
+
+.hint { font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem; }
+.hint code {
+    background: var(--light-bg); border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm); padding: 0.0625rem 0.3125rem; font-size: 0.78rem;
+}
+
+.notice {
+    display: flex; gap: 0.625rem; align-items: flex-start;
+    font-size: 0.8125rem;
+    border: 1px solid var(--info-color);
+    border-left-width: 3px;
+    border-radius: var(--radius-md);
+    padding: 0.75rem 0.875rem;
+    margin-bottom: 1rem;
+    color: var(--text-secondary);
+}
+.notice i { color: var(--info-color); margin-top: 0.15rem; }
+.notice.warn { border-color: var(--warning-color); }
+.notice.warn i { color: var(--warning-color); }
+
+/* Inputs */
+.input-field {
+    width: 100%;
+    padding: 0.625rem 0.875rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-family: inherit;
+    background: var(--light-surface);
+    color: var(--text-primary);
+    transition: var(--transition);
+}
+.input-field:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgb(79 70 229 / 0.15); }
+
+.form-group { margin-bottom: 1rem; }
+.form-group label { display: block; font-size: 0.8125rem; font-weight: 600; margin-bottom: 0.375rem; color: var(--text-secondary); }
+
+.search-row { display: flex; gap: 0.75rem; align-items: flex-start; }
+.search-row .autocomplete { flex: 1; }
+
+.autocomplete { position: relative; }
+.autocomplete-list {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: var(--light-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    max-height: 300px; overflow-y: auto; z-index: 50;
+}
+.autocomplete-list.hidden { display: none; }
+.autocomplete-item { padding: 0.5rem 0.875rem; cursor: pointer; font-size: 0.875rem; border-bottom: 1px solid var(--border-color); }
+.autocomplete-item:last-child { border-bottom: none; }
+.autocomplete-item:hover, .autocomplete-item.highlighted { background: var(--light-bg); }
+.autocomplete-item .ac-name { font-weight: 500; }
+.autocomplete-item .ac-meta { font-size: 0.75rem; color: var(--text-secondary); }
+.autocomplete-empty { padding: 0.75rem 0.875rem; font-size: 0.8125rem; color: var(--text-secondary); }
+
+/* Result / summary cards */
+.result-card {
+    border: 1px solid var(--success-color);
+    background: var(--light-bg);
+    background: color-mix(in srgb, var(--success-color) 8%, var(--light-surface));
+    border-radius: var(--radius-md);
+    padding: 1rem 1.25rem;
+    margin-top: 1.25rem;
+}
+.result-card.warn {
+    border-color: var(--warning-color);
+    background: var(--light-bg);
+    background: color-mix(in srgb, var(--warning-color) 8%, var(--light-surface));
+}
+.result-card.err {
+    border-color: var(--danger-color);
+    background: var(--light-bg);
+    background: color-mix(in srgb, var(--danger-color) 8%, var(--light-surface));
+}
+.result-card.info {
+    border-color: var(--info-color);
+    background: var(--light-bg);
+    background: color-mix(in srgb, var(--info-color) 8%, var(--light-surface));
+}
+.result-card h3 { font-size: 0.9375rem; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+.result-card.ok h3 { color: var(--success-color); }
+.result-card.warn h3 { color: var(--warning-color); }
+.result-card.err h3 { color: var(--danger-color); }
+.result-card.info h3 { color: var(--info-color); }
+
+.badge-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.75rem 0; }
+.badge {
+    font-size: 0.75rem; font-weight: 600; padding: 0.2rem 0.6rem;
+    border-radius: 999px; border: 1px solid var(--border-color); color: var(--text-secondary);
+    background: var(--light-surface);
+}
+.badge.ok { color: var(--success-color); border-color: var(--success-color); }
+.badge.warn { color: var(--warning-color); border-color: var(--warning-color); }
+
+/* Identity cards */
+.identity-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.75rem; margin-top: 0.75rem; }
+.identity-card {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--light-surface);
+    padding: 0.75rem 0.875rem;
+}
+.identity-card .id-name { font-weight: 600; font-size: 0.875rem; display: flex; align-items: center; gap: 0.375rem; }
+.identity-card .id-name i { color: var(--primary-color); font-size: 0.8rem; }
+.identity-card .id-meta { font-size: 0.72rem; color: var(--text-light); margin-bottom: 0.375rem; }
+.addr-list { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.addr-chip {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.75rem;
+    background: var(--light-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 0.1rem 0.4rem;
+}
+
+/* Source candidate chooser */
+.candidate-list { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.75rem; }
+.candidate {
+    display: flex; align-items: center; gap: 0.75rem;
+    border: 1px solid var(--border-color); border-radius: var(--radius-md);
+    padding: 0.625rem 0.875rem; cursor: pointer; font-size: 0.875rem;
+    background: var(--light-surface);
+}
+.candidate:hover { border-color: var(--primary-color); }
+.candidate.selected { border-color: var(--primary-color); box-shadow: 0 0 0 2px rgb(79 70 229 / 0.12); }
+.candidate .c-meta { font-size: 0.75rem; color: var(--text-secondary); }
+
+/* Destination list */
+.dest-toolbar { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; }
+.dest-toolbar .autocomplete { flex: 1; min-width: 220px; }
+.match-count { font-size: 0.8125rem; color: var(--text-secondary); white-space: nowrap; }
+
+.group-list {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    max-height: 340px; overflow-y: auto;
+}
+.group-item {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.5rem 0.875rem;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.875rem;
+}
+.group-item:last-child { border-bottom: none; }
+.group-item:nth-child(even) { background: var(--light-bg); }
+.group-item label { flex: 1; cursor: pointer; }
+.group-item .gi-meta { font-size: 0.75rem; color: var(--text-secondary); }
+.group-item input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--primary-color); }
+
+.selected-tags { display: flex; flex-wrap: wrap; gap: 0.375rem; margin-top: 0.75rem; }
+.tag {
+    display: inline-flex; align-items: center; gap: 0.375rem;
+    font-size: 0.78rem; background: var(--light-bg);
+    border: 1px solid var(--border-color); border-radius: 999px;
+    padding: 0.1875rem 0.5rem 0.1875rem 0.625rem;
+}
+.tag i { cursor: pointer; color: var(--text-light); }
+.tag i:hover { color: var(--danger-color); }
+
+.mode-options { display: flex; flex-direction: column; gap: 0.625rem; margin: 1rem 0; }
+.mode-option {
+    display: flex; gap: 0.625rem; align-items: flex-start;
+    border: 1px solid var(--border-color); border-radius: var(--radius-md);
+    padding: 0.75rem 0.875rem; cursor: pointer;
+}
+.mode-option.selected { border-color: var(--primary-color); box-shadow: 0 0 0 2px rgb(79 70 229 / 0.12); }
+.mode-option input { margin-top: 0.3rem; accent-color: var(--primary-color); }
+.mode-option strong { font-size: 0.875rem; }
+.mode-option span { display: block; font-size: 0.78rem; color: var(--text-secondary); }
+
+.panel-actions { display: flex; gap: 0.75rem; justify-content: space-between; flex-wrap: wrap; }
+.panel-actions .right { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border-color); }
+th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-secondary); background: var(--light-bg); position: sticky; top: 0; }
+tbody tr:nth-child(even) { background: var(--light-bg); }
+.status-success { color: var(--success-color); font-weight: 600; }
+.status-error { color: var(--danger-color); font-weight: 600; }
+.status-skipped { color: var(--warning-color); font-weight: 600; }
+.detail-cell { font-size: 0.78rem; color: var(--text-secondary); word-break: break-word; }
+
+.stat-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+.stat-card {
+    flex: 1; min-width: 110px;
+    border: 1px solid var(--border-color); border-radius: var(--radius-md);
+    padding: 0.875rem 1rem; background: var(--light-bg);
+}
+.stat-card .stat-value { font-size: 1.5rem; font-weight: 700; line-height: 1.2; }
+.stat-card .stat-label { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em; }
+.stat-card.ok .stat-value { color: var(--success-color); }
+.stat-card.bad .stat-value { color: var(--danger-color); }
+
+pre.json-view {
+    background: var(--light-bg); border: 1px solid var(--border-color);
+    border-radius: var(--radius-md); padding: 0.875rem;
+    font-size: 0.75rem; overflow-x: auto; max-height: 260px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--text-primary);
+}
+
+details.payload { margin-top: 1rem; }
+details.payload summary { cursor: pointer; font-size: 0.8125rem; color: var(--text-secondary); font-weight: 600; }
+
+.empty-state { padding: 2rem; text-align: center; color: var(--text-secondary); font-size: 0.875rem; }
+.empty-state i { font-size: 1.75rem; display: block; margin-bottom: 0.5rem; color: var(--text-light); }
+
+/* Modal */
+.modal-overlay {
+    position: fixed; inset: 0; background: rgb(0 0 0 / 0.5);
+    display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 1rem;
+}
+.modal-overlay.hidden { display: none; }
+.modal {
+    background: var(--light-surface); border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg); width: 100%; max-width: 520px;
+    max-height: 90vh; display: flex; flex-direction: column;
+}
+.modal-header {
+    padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color);
+    display: flex; align-items: center; justify-content: space-between;
+}
+.modal-header h3 { font-size: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+.modal-body { padding: 1.5rem; overflow-y: auto; }
+.modal-footer {
+    padding: 1rem 1.5rem; border-top: 1px solid var(--border-color);
+    display: flex; justify-content: flex-end; gap: 0.75rem;
+}
+
+/* Loading + toasts */
+.loading-overlay {
+    position: fixed; inset: 0; background: rgb(0 0 0 / 0.45);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 1rem; z-index: 2000; color: #fff;
+}
+.loading-overlay.hidden { display: none; }
+.spinner {
+    width: 44px; height: 44px; border: 4px solid rgb(255 255 255 / 0.3);
+    border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.toast-container { position: fixed; bottom: 1.5rem; right: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; z-index: 3000; }
+.toast {
+    padding: 0.75rem 1.125rem; border-radius: var(--radius-md);
+    color: #fff; font-size: 0.875rem; box-shadow: var(--shadow-lg);
+    background: var(--secondary-color); max-width: 380px;
+    animation: slideIn 0.2s ease-out;
+}
+.toast.success { background: var(--success-color); }
+.toast.error { background: var(--danger-color); }
+.toast.warning { background: var(--warning-color); }
+.toast.info { background: var(--info-color); }
+@keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+@media (max-width: 1024px) {
+    .app-main { padding: 1.5rem 1rem; }
+    .step-connector { width: 32px; }
+}
+@media (max-width: 768px) {
+    .header-content { padding: 1rem; }
+    #app-title { font-size: 1.125rem; }
+    .stepper { flex-wrap: wrap; }
+    .step span:not(.step-number) { display: none; }
+    .search-row { flex-direction: column; }
+    .search-row .btn { width: 100%; justify-content: center; }
+}
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <img src="/static/logo.png" alt="Logo" class="app-logo">
+                    <h1 id="app-title">Host Identity Copier</h1>
+                </div>
+                <div class="header-actions">
+                    <span class="cred-pill" id="credPill">Checking credentials...</span>
+                    <button type="button" class="icon-btn" id="reloadGroupsBtn" title="Reload groups from NCM">
+                        <i class="fas fa-rotate"></i>
+                    </button>
+                    <button type="button" class="icon-btn" id="settingsBtn" title="Settings">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                    <button type="button" class="icon-btn" id="darkModeToggle" title="Toggle Dark Mode">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="app-main">
+            <div class="stepper">
+                <div class="step active" data-step="1">
+                    <span class="step-number">1</span>
+                    <span>Source Group</span>
+                </div>
+                <div class="step-connector"></div>
+                <div class="step" data-step="2">
+                    <span class="step-number">2</span>
+                    <span>Destination Groups</span>
+                </div>
+                <div class="step-connector"></div>
+                <div class="step" data-step="3">
+                    <span class="step-number">3</span>
+                    <span>Results</span>
+                </div>
+            </div>
+
+            <!-- Step 1: source group -->
+            <div class="step-panel active" id="step1-panel">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2><i class="fas fa-crown"></i> Source (Master) Group</h2>
+                        <span class="match-count" id="groupsLoadedCount"></span>
+                    </div>
+                    <div class="panel-content">
+                        <p class="hint">
+                            Defaults to the group with <code id="srcPatternHint">Base</code> in its name.
+                            Search to override — plain text matches anywhere in the name, or use
+                            wildcards like <code>*Base*</code>. Submitting reads the group
+                            configuration and extracts the <code>identities.ip</code> subtree.
+                        </p>
+                        <div class="search-row">
+                            <div class="autocomplete">
+                                <input type="text" class="input-field" id="sourceSearch"
+                                       placeholder="Search group names..." autocomplete="off">
+                                <div class="autocomplete-list hidden" id="sourceList"></div>
+                            </div>
+                            <button class="btn btn-primary" id="extractBtn" disabled>
+                                <i class="fas fa-download"></i> Submit
+                            </button>
+                        </div>
+                        <div id="sourceChooser"></div>
+                        <div id="sourceResult"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2: destination groups -->
+            <div class="step-panel" id="step2-panel">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2><i class="fas fa-layer-group"></i> Destination Groups</h2>
+                        <span class="match-count" id="matchCount"></span>
+                    </div>
+                    <div class="panel-content">
+                        <p class="hint">
+                            Defaults to every group containing <code id="dstPatternHint">(R)</code>
+                            (restricted). Search with plain text or wildcards — <code>*(R)*</code>,
+                            <code>PROD-*</code>, <code>SITE-?</code> — then use
+                            <strong>Select All Matching</strong>.
+                        </p>
+                        <div class="dest-toolbar">
+                            <div class="autocomplete">
+                                <input type="text" class="input-field" id="destSearch"
+                                       placeholder="Filter groups, e.g. (R)" autocomplete="off">
+                            </div>
+                            <button class="btn btn-sm btn-secondary" id="selectMatchingBtn">
+                                <i class="fas fa-check-double"></i> Select All Matching
+                            </button>
+                            <button class="btn btn-sm btn-secondary" id="clearSelectionBtn">
+                                <i class="fas fa-xmark"></i> Clear
+                            </button>
+                            <button class="btn btn-sm btn-secondary" id="applyDefaultsBtn"
+                                    title="Re-apply the Base / (R) defaults">
+                                <i class="fas fa-wand-magic-sparkles"></i> Defaults
+                            </button>
+                        </div>
+                        <div class="notice" id="sourceExcludedNote" style="display:none;"></div>
+                        <div class="group-list" id="destList"></div>
+                        <div class="selected-tags" id="selectedTags"></div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2><i class="fas fa-sliders"></i> Copy Mode</h2>
+                    </div>
+                    <div class="panel-content">
+                        <div class="mode-options">
+                            <label class="mode-option selected" id="modeMirrorLabel">
+                                <input type="radio" name="pushMode" value="mirror" checked>
+                                <div>
+                                    <strong>Mirror (recommended)</strong>
+                                    <span>Each destination ends up with exactly the source's
+                                    identities. Addresses beyond the source's list and identities that
+                                    exist only in the destination are removed via the diff's removals
+                                    list. Each destination's current config is read first to work out
+                                    what needs pruning.</span>
+                                </div>
+                            </label>
+                            <label class="mode-option" id="modeAdditiveLabel">
+                                <input type="radio" name="pushMode" value="additive">
+                                <div>
+                                    <strong>Additive — never remove</strong>
+                                    <span>Adds and updates the source identities but removes nothing.
+                                    Destination-only identities and surplus addresses stay in place.</span>
+                                </div>
+                            </label>
+                        </div>
+                        <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.8125rem;">
+                            <input type="checkbox" id="dryRunCheck" style="accent-color:var(--primary-color);">
+                            Dry run — show exactly what would change per group, send nothing to NCM
+                        </label>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-content panel-actions">
+                        <button class="btn btn-secondary" id="backToStep1">
+                            <i class="fas fa-arrow-left"></i> Back
+                        </button>
+                        <div class="right">
+                            <button class="btn btn-secondary" id="saveJobBtn">
+                                <i class="fas fa-floppy-disk"></i> Save Selection
+                            </button>
+                            <button class="btn btn-success" id="pushBtn" disabled>
+                                <i class="fas fa-paper-plane"></i> Copy Identities
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 3: results -->
+            <div class="step-panel" id="step3-panel">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2><i class="fas fa-clipboard-check"></i> Push Results</h2>
+                        <button class="btn btn-sm btn-secondary" id="exportResultsBtn">
+                            <i class="fas fa-file-csv"></i> Export CSV
+                        </button>
+                    </div>
+                    <div class="panel-content">
+                        <div class="stat-row" id="resultStats"></div>
+                        <div id="resultsTableWrap"></div>
+                        <details class="payload" id="payloadDetails">
+                            <summary>Payload sent to each destination group</summary>
+                            <pre class="json-view" id="payloadJson"></pre>
+                        </details>
+                    </div>
+                </div>
+                <div class="panel">
+                    <div class="panel-content panel-actions">
+                        <button class="btn btn-secondary" id="backToStep2">
+                            <i class="fas fa-arrow-left"></i> Back to Destinations
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="loading-overlay hidden" id="loadingOverlay">
+        <div class="spinner"></div>
+        <div id="loadingText">Loading...</div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay hidden" id="settingsModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3><i class="fas fa-cog"></i> API Credentials</h3>
+                <button class="icon-btn" id="closeSettingsBtn"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <p class="hint">
+                    Keys are saved to <code>config.json</code> in this app's folder and loaded
+                    automatically next run. Leave a key field blank to keep the stored value.
+                </p>
+                <div class="form-group">
+                    <label for="cpApiId">X_CP_API_ID</label>
+                    <input type="text" class="input-field" id="cpApiId" placeholder="Cradlepoint API ID">
+                </div>
+                <div class="form-group">
+                    <label for="cpApiKey">X_CP_API_KEY</label>
+                    <input type="password" class="input-field" id="cpApiKey" placeholder="Cradlepoint API Key">
+                </div>
+                <div class="form-group">
+                    <label for="ecmApiId">X_ECM_API_ID</label>
+                    <input type="text" class="input-field" id="ecmApiId" placeholder="ECM API ID">
+                </div>
+                <div class="form-group">
+                    <label for="ecmApiKey">X_ECM_API_KEY</label>
+                    <input type="password" class="input-field" id="ecmApiKey" placeholder="ECM API Key">
+                </div>
+                <div class="form-group" style="display:flex;gap:0.5rem;align-items:end;">
+                    <div style="flex:1;">
+                        <label for="profileSelect">Profiles</label>
+                        <select class="input-field" id="profileSelect">
+                            <option value="">-- Select Profile --</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-sm btn-secondary" id="loadProfileBtn">Load</button>
+                    <button class="btn btn-sm btn-danger" id="deleteProfileBtn">Delete</button>
+                </div>
+                <div class="form-group" style="display:flex;gap:0.5rem;align-items:end;">
+                    <div style="flex:1;">
+                        <label for="profileName">Save As</label>
+                        <input type="text" class="input-field" id="profileName" placeholder="Profile name">
+                    </div>
+                    <button class="btn btn-sm btn-primary" id="saveProfileBtn">Save</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelSettingsBtn">Cancel</button>
+                <button class="btn btn-primary" id="applySettingsBtn">
+                    <i class="fas fa-check"></i> Apply &amp; Load Groups
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+// --- State ---
+let groups = [];                  // [{id, name, product, device_count, account_name}]
+let sourceGroup = null;           // {id, name}
+let extracted = null;             // response from /api/extract-identities
+let selectedDest = new Map();     // id -> {id, name}
+let lastResults = null;           // response from /api/push-identities
+let savedConfig = null;
+let sourcePattern = 'Base';
+let destPattern = '(R)';
+let currentStep = 1;
+let acHighlight = -1;
+
+// --- Utilities ---
+function showLoading(text = 'Loading...') {
+    document.getElementById('loadingText').textContent = text;
+    document.getElementById('loadingOverlay').classList.remove('hidden');
+}
+function hideLoading() {
+    document.getElementById('loadingOverlay').classList.add('hidden');
+}
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 5000);
+}
+function esc(value) {
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+async function apiFetch(url, options) {
+    const resp = await fetch(url, options);
+    let data = null;
+    try { data = await resp.json(); } catch (e) { /* non-JSON body */ }
+    if (!resp.ok) {
+        const detail = (data && (data.detail || data.message)) || `HTTP ${resp.status}`;
+        throw new Error(detail);
+    }
+    return data;
+}
+
+function setStep(step) {
+    currentStep = step;
+    document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById(`step${step}-panel`).classList.add('active');
+    document.querySelectorAll('.step').forEach(s => {
+        const sStep = parseInt(s.dataset.step, 10);
+        s.classList.remove('active', 'completed');
+        if (sStep === step) s.classList.add('active');
+        else if (sStep < step) s.classList.add('completed');
+    });
+    document.querySelectorAll('.step-connector').forEach((c, i) => {
+        c.classList.toggle('completed', i < step - 1);
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// --- Matching ---
+// Plain text is a case-insensitive substring match, so a pattern like "(R)"
+// is treated literally. Patterns containing * or ? become wildcards anchored
+// to the whole name.
+function matchesPattern(name, pattern) {
+    const p = (pattern || '').trim();
+    if (!p) return true;
+    const n = String(name || '').toLowerCase();
+    const lower = p.toLowerCase();
+    if (!/[*?]/.test(lower)) return n.includes(lower);
+    const rx = lower
+        .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+        .replace(/\*/g, '.*')
+        .replace(/\?/g, '.');
+    try {
+        return new RegExp('^' + rx + '$').test(n);
+    } catch (e) {
+        return n.includes(lower.replace(/[*?]/g, ''));
+    }
+}
+
+// --- Credentials pill ---
+async function refreshCredentialStatus() {
+    const pill = document.getElementById('credPill');
+    try {
+        const data = await apiFetch('/api/profiles/current');
+        if (data.has_credentials) {
+            pill.textContent = 'Credentials set';
+            pill.className = 'cred-pill ok';
+        } else {
+            pill.textContent = 'No credentials';
+            pill.className = 'cred-pill bad';
+        }
+        return data.has_credentials;
+    } catch (e) {
+        pill.textContent = 'Credential status unknown';
+        pill.className = 'cred-pill';
+        return false;
+    }
+}
+
+// --- Groups ---
+async function loadGroups(silent = false) {
+    if (!silent) showLoading('Loading groups from NCM...');
+    try {
+        groups = await apiFetch('/api/groups');
+        document.getElementById('groupsLoadedCount').textContent = `${groups.length} groups loaded`;
+        renderDestList();
+        if (!silent) showToast(`Loaded ${groups.length} groups`, 'success');
+        return true;
+    } catch (e) {
+        document.getElementById('groupsLoadedCount').textContent = 'Groups not loaded';
+        showToast(e.message, 'error');
+        return false;
+    } finally {
+        if (!silent) hideLoading();
+    }
+}
+
+function groupLabel(g) {
+    const bits = [];
+    if (g.product) bits.push(g.product);
+    if (g.account_name) bits.push(g.account_name);
+    bits.push(`${g.device_count || 0} devices`);
+    bits.push(`id ${g.id}`);
+    return bits.join(' · ');
+}
+
+// --- Source autocomplete ---
+function renderSourceSuggestions() {
+    const input = document.getElementById('sourceSearch');
+    const list = document.getElementById('sourceList');
+    const query = input.value.trim();
+
+    if (!query) { list.classList.add('hidden'); list.innerHTML = ''; return; }
+    if (!groups.length) {
+        list.innerHTML = '<div class="autocomplete-empty">No groups loaded — check credentials in Settings.</div>';
+        list.classList.remove('hidden');
+        return;
+    }
+
+    const matches = groups.filter(g => matchesPattern(g.name, query)).slice(0, 50);
+    if (!matches.length) {
+        list.innerHTML = '<div class="autocomplete-empty">No matching groups</div>';
+        list.classList.remove('hidden');
+        return;
+    }
+    acHighlight = -1;
+    list.innerHTML = matches.map((g, i) => `
+        <div class="autocomplete-item" data-id="${esc(g.id)}" data-index="${i}">
+            <div class="ac-name">${esc(g.name)}</div>
+            <div class="ac-meta">${esc(groupLabel(g))}</div>
+        </div>`).join('');
+    list.classList.remove('hidden');
+}
+
+function pickSourceGroup(id, { clearChooser = true } = {}) {
+    const g = groups.find(x => String(x.id) === String(id));
+    if (!g) return false;
+    sourceGroup = { id: g.id, name: g.name };
+    document.getElementById('sourceSearch').value = g.name;
+    document.getElementById('sourceList').classList.add('hidden');
+    document.getElementById('extractBtn').disabled = false;
+    if (clearChooser) document.getElementById('sourceChooser').innerHTML = '';
+    // The source group can never also be a destination
+    selectedDest.delete(String(g.id));
+    renderDestList();
+    return true;
+}
+
+// --- Source defaults ---
+function sourceCandidates() {
+    const p = sourcePattern.toLowerCase();
+    return groups.filter(g => String(g.name).toLowerCase().includes(p));
+}
+
+function renderCandidateChooser(candidates) {
+    const box = document.getElementById('sourceChooser');
+    box.innerHTML = `
+        <div class="result-card info">
+            <h3><i class="fas fa-circle-question"></i>
+                ${candidates.length} groups match "${esc(sourcePattern)}"</h3>
+            <div>Pick the master group to copy from.</div>
+            <div class="candidate-list">
+                ${candidates.map(g => `
+                    <div class="candidate" data-id="${esc(g.id)}">
+                        <i class="fas fa-crown" style="color:var(--primary-color);"></i>
+                        <div>
+                            <div>${esc(g.name)}</div>
+                            <div class="c-meta">${esc(groupLabel(g))}</div>
+                        </div>
+                    </div>`).join('')}
+            </div>
+        </div>`;
+    box.querySelectorAll('.candidate').forEach(el => {
+        el.addEventListener('click', async () => {
+            box.querySelectorAll('.candidate').forEach(c => c.classList.remove('selected'));
+            el.classList.add('selected');
+            if (pickSourceGroup(el.dataset.id, { clearChooser: false })) {
+                await extractIdentities();
+            }
+        });
+    });
+}
+
+/**
+ * Apply the Base / (R) defaults. Returns true when a source was resolved.
+ * autoExtract only fires for an unambiguous single match.
+ */
+async function applyDefaults({ source = true, destinations = true, autoExtract = true } = {}) {
+    let resolved = false;
+
+    if (source && groups.length) {
+        const candidates = sourceCandidates();
+        document.getElementById('sourceChooser').innerHTML = '';
+        if (candidates.length === 1) {
+            pickSourceGroup(candidates[0].id);
+            showToast(`Source group "${candidates[0].name}" selected automatically`, 'info');
+            resolved = true;
+            if (autoExtract) await extractIdentities();
+        } else if (candidates.length > 1) {
+            renderCandidateChooser(candidates);
+            showToast(`${candidates.length} groups match "${sourcePattern}" — pick one`, 'warning');
+        } else {
+            showToast(`No group name contains "${sourcePattern}" — search manually`, 'warning');
+        }
+    }
+
+    if (destinations && groups.length) {
+        document.getElementById('destSearch').value = destPattern;
+        const visible = visibleDestGroups();
+        selectedDest.clear();
+        for (const g of visible) selectedDest.set(String(g.id), { id: g.id, name: g.name });
+        renderDestList();
+        if (visible.length) {
+            showToast(`${visible.length} group(s) matching "${destPattern}" selected as destinations`, 'info');
+        } else {
+            showToast(`No group name contains "${destPattern}"`, 'warning');
+        }
+    }
+
+    return resolved;
+}
+
+// --- Extract ---
+async function extractIdentities() {
+    if (!sourceGroup) { showToast('Pick a source group first', 'warning'); return; }
+    showLoading(`Reading configuration for "${sourceGroup.name}"...`);
+    const box = document.getElementById('sourceResult');
+    try {
+        const data = await apiFetch('/api/extract-identities', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ group_id: sourceGroup.id, group_name: sourceGroup.name })
+        });
+
+        if (!data.found) {
+            extracted = null;
+            box.innerHTML = `
+                <div class="result-card warn">
+                    <h3><i class="fas fa-triangle-exclamation"></i> No host address identities found</h3>
+                    <div>${esc(data.message)}</div>
+                </div>`;
+            updatePushButton();
+            showToast('No identities.ip config on that group', 'warning');
+            return;
+        }
+
+        extracted = data;
+        sourceGroup = { id: data.group_id, name: data.group_name };
+
+        const cards = (data.identities || []).map(i => `
+            <div class="identity-card">
+                <div class="id-name"><i class="fas fa-address-book"></i> ${esc(i.name)}</div>
+                <div class="id-meta">
+                    ${i.member_count} address${i.member_count === 1 ? '' : 'es'}${i.friendly_name ? ' · ' + esc(i.friendly_name) : ''}
+                </div>
+                <div class="addr-list">
+                    ${i.addresses.map(a => `<span class="addr-chip">${esc(a)}</span>`).join('')}
+                </div>
+            </div>`).join('');
+
+        box.innerHTML = `
+            <div class="result-card ok">
+                <h3><i class="fas fa-circle-check"></i>
+                    Host address identities extracted from "${esc(data.group_name)}"</h3>
+                <div class="badge-row">
+                    <span class="badge ok">${data.identity_count} identit${data.identity_count === 1 ? 'y' : 'ies'}</span>
+                    <span class="badge">${data.address_count} address${data.address_count === 1 ? '' : 'es'} total</span>
+                </div>
+                <div class="identity-grid">${cards}</div>
+                <details class="payload">
+                    <summary>Raw identities.ip from the group config</summary>
+                    <pre class="json-view">${esc(JSON.stringify(data.raw, null, 2))}</pre>
+                </details>
+                <div style="margin-top:1rem;">
+                    <button class="btn btn-primary" id="goToStep2">
+                        <i class="fas fa-arrow-right"></i> Choose Destination Groups
+                    </button>
+                </div>
+            </div>`;
+
+        document.getElementById('goToStep2').addEventListener('click', () => {
+            setStep(2);
+            renderDestList();
+        });
+
+        renderDestList();
+        updatePushButton();
+        showToast(`Extracted ${data.identity_count} identit${data.identity_count === 1 ? 'y' : 'ies'} (${data.address_count} addresses)`, 'success');
+    } catch (e) {
+        extracted = null;
+        box.innerHTML = `
+            <div class="result-card err">
+                <h3><i class="fas fa-circle-xmark"></i> Extraction failed</h3>
+                <div>${esc(e.message)}</div>
+            </div>`;
+        updatePushButton();
+        showToast(e.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+// --- Destination list ---
+function visibleDestGroups() {
+    const pattern = document.getElementById('destSearch').value;
+    return groups.filter(g => {
+        if (sourceGroup && String(g.id) === String(sourceGroup.id)) return false;
+        return matchesPattern(g.name, pattern);
+    });
+}
+
+/**
+ * The source group may itself match the destination pattern — a Base group is
+ * often named "... (R)" too. Guarantee it is never a destination, wherever the
+ * selection came from (defaults, saved config, or Select All Matching).
+ */
+function pruneSourceFromSelection() {
+    if (!sourceGroup) return false;
+    return selectedDest.delete(String(sourceGroup.id));
+}
+
+function renderDestList() {
+    const list = document.getElementById('destList');
+    if (!list) return;
+    pruneSourceFromSelection();
+
+    const excluded = document.getElementById('sourceExcludedNote');
+    if (excluded) {
+        excluded.innerHTML = sourceGroup
+            ? `<i class="fas fa-ban"></i> Source group <strong>${esc(sourceGroup.name)}</strong>
+               is excluded from this list, even if it matches the pattern.`
+            : '';
+        excluded.style.display = sourceGroup ? 'flex' : 'none';
+    }
+
+    if (!groups.length) {
+        list.innerHTML = `<div class="empty-state">
+            <i class="fas fa-plug-circle-exclamation"></i>
+            No groups loaded. Add credentials in Settings, then reload.
+        </div>`;
+        document.getElementById('matchCount').textContent = '';
+        renderSelectedTags();
+        return;
+    }
+
+    const visible = visibleDestGroups();
+    document.getElementById('matchCount').textContent =
+        `${visible.length} match${visible.length === 1 ? '' : 'es'} · ${selectedDest.size} selected`;
+
+    if (!visible.length) {
+        list.innerHTML = `<div class="empty-state">
+            <i class="fas fa-magnifying-glass"></i> No groups match that pattern.
+        </div>`;
+        renderSelectedTags();
+        return;
+    }
+
+    list.innerHTML = visible.slice(0, 500).map(g => `
+        <div class="group-item">
+            <input type="checkbox" id="dest-${esc(g.id)}" data-id="${esc(g.id)}"
+                   ${selectedDest.has(String(g.id)) ? 'checked' : ''}>
+            <label for="dest-${esc(g.id)}">
+                <div>${esc(g.name)}</div>
+                <div class="gi-meta">${esc(groupLabel(g))}</div>
+            </label>
+        </div>`).join('') +
+        (visible.length > 500
+            ? `<div class="empty-state">Showing the first 500 of ${visible.length} matches — narrow the pattern to see the rest.</div>`
+            : '');
+
+    renderSelectedTags();
+}
+
+function renderSelectedTags() {
+    const wrap = document.getElementById('selectedTags');
+    if (!wrap) return;
+    if (!selectedDest.size) { wrap.innerHTML = ''; updatePushButton(); return; }
+    wrap.innerHTML = [...selectedDest.values()].map(g => `
+        <span class="tag">${esc(g.name)}
+            <i class="fas fa-times" data-remove="${esc(g.id)}" title="Remove"></i>
+        </span>`).join('');
+    updatePushButton();
+}
+
+function updatePushButton() {
+    const btn = document.getElementById('pushBtn');
+    if (!btn) return;
+    const ready = !!(extracted && extracted.found && selectedDest.size);
+    btn.disabled = !ready;
+    btn.innerHTML = selectedDest.size
+        ? `<i class="fas fa-paper-plane"></i> Copy Identities to ${selectedDest.size} Group${selectedDest.size === 1 ? '' : 's'}`
+        : `<i class="fas fa-paper-plane"></i> Copy Identities`;
+}
+
+function currentMode() {
+    const checked = document.querySelector('input[name="pushMode"]:checked');
+    return checked ? checked.value : 'replace';
+}
+
+// --- Save job selection ---
+async function saveJob(showFeedback = true) {
+    const payload = {
+        source_group: sourceGroup,
+        destination_groups: [...selectedDest.values()],
+        destination_filter: document.getElementById('destSearch').value,
+        push_mode: currentMode()
+    };
+    try {
+        await apiFetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (showFeedback) showToast('Selection saved to config.json', 'success');
+    } catch (e) {
+        if (showFeedback) showToast(`Could not save selection: ${e.message}`, 'error');
+    }
+}
+
+// --- Push ---
+async function pushIdentities() {
+    if (!extracted || !extracted.found) { showToast('Extract the source config first', 'warning'); return; }
+    if (!selectedDest.size) { showToast('Select at least one destination group', 'warning'); return; }
+
+    const dryRun = document.getElementById('dryRunCheck').checked;
+    const mode = currentMode();
+    const dests = [...selectedDest.values()];
+
+    if (!dryRun) {
+        const what = `${extracted.identity_count} identit${extracted.identity_count === 1 ? 'y' : 'ies'}`;
+        const extra = mode === 'mirror'
+            ? '\n\nMirror mode also REMOVES identities and addresses that these groups have but the source does not.'
+            : '';
+        if (!confirm(`This will copy ${what} to ${dests.length} group(s) in NCM.${extra}\n\nContinue?`)) return;
+    }
+
+    showLoading(dryRun
+        ? `Comparing ${dests.length} group(s)...`
+        : `Reading and updating ${dests.length} group(s)...`);
+    try {
+        const data = await apiFetch('/api/push-identities', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                source_group_id: sourceGroup.id,
+                destination_group_ids: dests.map(g => g.id),
+                destination_groups: dests,
+                destination_filter: document.getElementById('destSearch').value,
+                mode,
+                dry_run: dryRun
+            })
+        });
+        lastResults = data;
+        renderResults(data);
+        setStep(3);
+        const pruned = [];
+        if (data.identities_removed) pruned.push(`${data.identities_removed} identity(s)`);
+        if (data.addresses_removed) pruned.push(`${data.addresses_removed} address(es)`);
+        const prunedText = pruned.length ? `, removed ${pruned.join(' and ')}` : '';
+
+        if (dryRun) showToast(`Dry run complete — nothing was sent${prunedText.replace('removed', 'would remove')}`, 'info');
+        else if (data.failed) showToast(`${data.succeeded} succeeded, ${data.failed} failed${prunedText}`, 'warning');
+        else showToast(`Copied to ${data.succeeded} group(s)${prunedText}`, 'success');
+    } catch (e) {
+        showToast(e.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+function groupNameFor(id) {
+    const sel = selectedDest.get(String(id));
+    if (sel) return sel.name;
+    const g = groups.find(x => String(x.id) === String(id));
+    return g ? g.name : `Group ${id}`;
+}
+
+function planSummary(plan) {
+    if (!plan) return '';
+    const bits = [];
+    if (plan.added.length) bits.push(`+${plan.added.length} identit${plan.added.length === 1 ? 'y' : 'ies'}`);
+    if (plan.updated.length) bits.push(`~${plan.updated.length} updated`);
+    if (plan.removed.length) bits.push(`-${plan.removed.length} identit${plan.removed.length === 1 ? 'y' : 'ies'}`);
+    if (plan.addresses_removed) bits.push(`-${plan.addresses_removed} address${plan.addresses_removed === 1 ? '' : 'es'}`);
+    if (!bits.length) return 'already in sync';
+    return bits.join(', ');
+}
+
+function planDetail(plan) {
+    if (!plan) return '';
+    const rows = [];
+    if (plan.added.length) rows.push(`added: ${plan.added.join(', ')}`);
+    if (plan.updated.length) rows.push(`updated: ${plan.updated.join(', ')}`);
+    if (plan.unchanged.length) rows.push(`unchanged: ${plan.unchanged.join(', ')}`);
+    if (plan.removed.length) rows.push(`removed: ${plan.removed.join(', ')}`);
+    return rows.join(' · ');
+}
+
+function renderResults(data) {
+    const skipped = data.results.filter(r => r.status === 'skipped').length;
+    document.getElementById('resultStats').innerHTML = `
+        <div class="stat-card ok">
+            <div class="stat-value">${data.succeeded}</div>
+            <div class="stat-label">Succeeded</div>
+        </div>
+        <div class="stat-card ${data.failed ? 'bad' : ''}">
+            <div class="stat-value">${data.failed}</div>
+            <div class="stat-label">Failed</div>
+        </div>
+        ${skipped ? `<div class="stat-card"><div class="stat-value">${skipped}</div><div class="stat-label">Dry run</div></div>` : ''}
+        <div class="stat-card">
+            <div class="stat-value">${data.identity_count}</div>
+            <div class="stat-label">Identities</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">${data.address_count}</div>
+            <div class="stat-label">Addresses</div>
+        </div>
+        <div class="stat-card ${data.identities_removed ? 'bad' : ''}">
+            <div class="stat-value">${data.identities_removed}</div>
+            <div class="stat-label">Identities removed</div>
+        </div>
+        <div class="stat-card ${data.addresses_removed ? 'bad' : ''}">
+            <div class="stat-value">${data.addresses_removed}</div>
+            <div class="stat-label">Addresses removed</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" style="font-size:1rem;">${data.mode === 'mirror' ? 'Mirror' : 'Additive'}</div>
+            <div class="stat-label">Mode</div>
+        </div>`;
+
+    document.getElementById('resultsTableWrap').innerHTML = `
+        <table>
+            <thead>
+                <tr><th>Group</th><th>ID</th><th>Status</th><th>Changes</th><th>Detail</th></tr>
+            </thead>
+            <tbody>
+                ${data.results.map(r => `
+                    <tr>
+                        <td>${esc(r.group_name || groupNameFor(r.group_id))}</td>
+                        <td>${esc(r.group_id)}</td>
+                        <td class="status-${esc(r.status)}">${esc(r.status)}</td>
+                        <td class="detail-cell">${esc(planSummary(r.plan))}</td>
+                        <td class="detail-cell">${esc(planDetail(r.plan) || r.detail)}</td>
+                    </tr>`).join('')}
+            </tbody>
+        </table>`;
+
+    // Payloads differ per destination now, since removals depend on each group's config
+    const withPayloads = data.results.filter(r => r.payload);
+    document.getElementById('payloadJson').textContent = withPayloads.map(r =>
+        `// ${r.group_name || groupNameFor(r.group_id)} (id ${r.group_id})\n` +
+        JSON.stringify(r.payload, null, 2)
+    ).join('\n\n');
+}
+
+function exportResultsCsv() {
+    if (!lastResults) { showToast('No results to export yet', 'warning'); return; }
+    const q = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+    const rows = [['Group Name', 'Group ID', 'Status', 'Detail', 'Source Group', 'Mode',
+                   'Identities Added', 'Identities Updated', 'Identities Unchanged',
+                   'Identities Removed', 'Addresses Removed']];
+    for (const r of lastResults.results) {
+        const p = r.plan || { added: [], updated: [], unchanged: [], removed: [], addresses_removed: 0 };
+        rows.push([r.group_name || groupNameFor(r.group_id), r.group_id, r.status, r.detail,
+                   sourceGroup ? sourceGroup.name : '', lastResults.mode,
+                   p.added.join('; '), p.updated.join('; '), p.unchanged.join('; '),
+                   p.removed.join('; '), p.addresses_removed]);
+    }
+    const csv = rows.map(r => r.map(q).join(',')).join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'host_identity_copy_results.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// --- Settings / Profiles ---
+async function loadProfiles() {
+    try {
+        const names = await apiFetch('/api/profiles');
+        const select = document.getElementById('profileSelect');
+        select.innerHTML = '<option value="">-- Select Profile --</option>' +
+            names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+    } catch (e) { /* ignore */ }
+}
+
+async function loadCurrentCredentials() {
+    try {
+        const data = await apiFetch('/api/profiles/current');
+        document.getElementById('cpApiId').value = data.X_CP_API_ID || '';
+        document.getElementById('ecmApiId').value = data.X_ECM_API_ID || '';
+        const cpKey = document.getElementById('cpApiKey');
+        const ecmKey = document.getElementById('ecmApiKey');
+        cpKey.value = '';
+        ecmKey.value = '';
+        cpKey.placeholder = data.X_CP_API_KEY === '***' ? '(stored — leave blank to keep)' : 'Cradlepoint API Key';
+        ecmKey.placeholder = data.X_ECM_API_KEY === '***' ? '(stored — leave blank to keep)' : 'ECM API Key';
+    } catch (e) { /* ignore */ }
+}
+
+function openSettings() {
+    document.getElementById('settingsModal').classList.remove('hidden');
+    loadCurrentCredentials();
+    loadProfiles();
+}
+function closeSettings() {
+    document.getElementById('settingsModal').classList.add('hidden');
+}
+
+// --- Restore saved job ---
+async function fetchSavedConfig() {
+    try {
+        savedConfig = await apiFetch('/api/config');
+    } catch (e) {
+        savedConfig = null;
+        return;
+    }
+    sourcePattern = savedConfig.source_default_pattern || sourcePattern;
+    destPattern = savedConfig.destination_default_pattern || destPattern;
+    document.getElementById('srcPatternHint').textContent = sourcePattern;
+    document.getElementById('dstPatternHint').textContent = destPattern;
+    document.getElementById('destSearch').placeholder = `Filter groups, e.g. ${destPattern}`;
+
+    if (savedConfig.push_mode === 'additive') {
+        document.querySelector('input[name="pushMode"][value="additive"]').checked = true;
+        syncModeStyles();
+    }
+}
+
+/**
+ * Restore what was saved, then fill the gaps with the Base / (R) defaults.
+ * Saved selections win so a repeat run reproduces the previous job exactly.
+ */
+async function restoreOrDefault() {
+    const hasSavedSource = !!(savedConfig && savedConfig.source_group
+                              && savedConfig.source_group.id != null);
+    const hasSavedDests = !!(savedConfig && (savedConfig.destination_groups || []).length);
+
+    if (hasSavedSource) {
+        const g = savedConfig.source_group;
+        // Prefer the live group record so the name reflects any rename
+        if (!pickSourceGroup(g.id)) {
+            sourceGroup = { id: g.id, name: g.name };
+            document.getElementById('sourceSearch').value = g.name || '';
+            document.getElementById('extractBtn').disabled = false;
+        }
+    }
+    if (hasSavedDests) {
+        if (savedConfig.destination_filter) {
+            document.getElementById('destSearch').value = savedConfig.destination_filter;
+        }
+        for (const g of savedConfig.destination_groups) {
+            if (g && g.id != null) selectedDest.set(String(g.id), { id: g.id, name: g.name });
+        }
+        renderDestList();
+    }
+
+    const bits = [];
+    if (hasSavedSource) bits.push(`source "${savedConfig.source_group.name}"`);
+    if (hasSavedDests) bits.push(`${savedConfig.destination_groups.length} destination group(s)`);
+    if (bits.length) showToast(`Restored ${bits.join(' and ')} from config.json`, 'info');
+
+    // Defaults only fill in what was not restored
+    if (!hasSavedSource || !hasSavedDests) {
+        await applyDefaults({ source: !hasSavedSource, destinations: !hasSavedDests,
+                              autoExtract: false });
+    }
+
+    // Read the source config so the user lands with the identities already shown
+    if (sourceGroup) await extractIdentities();
+}
+
+function syncModeStyles() {
+    document.querySelectorAll('.mode-option').forEach(label => {
+        const input = label.querySelector('input');
+        label.classList.toggle('selected', input.checked);
+    });
+}
+
+// --- Dark Mode ---
+function initDarkMode() {
+    if (localStorage.getItem('hostIdentityDarkMode') === 'true') {
+        document.body.classList.add('dark-mode');
+    }
+    const setIcon = () => {
+        document.querySelector('#darkModeToggle i').className =
+            document.body.classList.contains('dark-mode') ? 'fas fa-sun' : 'fas fa-moon';
+    };
+    setIcon();
+    document.getElementById('darkModeToggle').addEventListener('click', () => {
+        document.body.classList.toggle('dark-mode');
+        localStorage.setItem('hostIdentityDarkMode', document.body.classList.contains('dark-mode'));
+        setIcon();
+    });
+}
+
+// --- Init ---
+document.addEventListener('DOMContentLoaded', async () => {
+    initDarkMode();
+    syncModeStyles();
+
+    // Source autocomplete
+    const sourceInput = document.getElementById('sourceSearch');
+    const sourceList = document.getElementById('sourceList');
+
+    sourceInput.addEventListener('input', () => {
+        sourceGroup = null;
+        document.getElementById('extractBtn').disabled = true;
+        renderSourceSuggestions();
+    });
+    sourceInput.addEventListener('focus', renderSourceSuggestions);
+    sourceInput.addEventListener('keydown', (e) => {
+        const items = [...sourceList.querySelectorAll('.autocomplete-item')];
+        if (e.key === 'ArrowDown' && items.length) {
+            e.preventDefault();
+            acHighlight = Math.min(acHighlight + 1, items.length - 1);
+        } else if (e.key === 'ArrowUp' && items.length) {
+            e.preventDefault();
+            acHighlight = Math.max(acHighlight - 1, 0);
+        } else if (e.key === 'Enter') {
+            if (acHighlight >= 0 && items[acHighlight]) {
+                e.preventDefault();
+                pickSourceGroup(items[acHighlight].dataset.id);
+                return;
+            }
+            const exact = groups.find(g => String(g.name).toLowerCase() === sourceInput.value.trim().toLowerCase());
+            if (exact) { pickSourceGroup(exact.id); return; }
+            if (sourceGroup) extractIdentities();
+            return;
+        } else if (e.key === 'Escape') {
+            sourceList.classList.add('hidden');
+            return;
+        } else {
+            return;
+        }
+        items.forEach((el, i) => el.classList.toggle('highlighted', i === acHighlight));
+        if (items[acHighlight]) items[acHighlight].scrollIntoView({ block: 'nearest' });
+    });
+
+    sourceList.addEventListener('click', (e) => {
+        const item = e.target.closest('.autocomplete-item');
+        if (item) pickSourceGroup(item.dataset.id);
+    });
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('#sourceSearch') && !e.target.closest('#sourceList')) {
+            sourceList.classList.add('hidden');
+        }
+    });
+
+    document.getElementById('extractBtn').addEventListener('click', extractIdentities);
+    document.getElementById('reloadGroupsBtn').addEventListener('click', () => loadGroups());
+
+    // Destination filtering
+    document.getElementById('destSearch').addEventListener('input', renderDestList);
+
+    document.getElementById('destList').addEventListener('change', (e) => {
+        const cb = e.target.closest('input[type="checkbox"]');
+        if (!cb) return;
+        const id = String(cb.dataset.id);
+        const g = groups.find(x => String(x.id) === id);
+        if (cb.checked && g) selectedDest.set(id, { id: g.id, name: g.name });
+        else selectedDest.delete(id);
+        document.getElementById('matchCount').textContent =
+            `${visibleDestGroups().length} matches · ${selectedDest.size} selected`;
+        renderSelectedTags();
+    });
+
+    document.getElementById('selectedTags').addEventListener('click', (e) => {
+        const id = e.target.dataset && e.target.dataset.remove;
+        if (!id) return;
+        selectedDest.delete(String(id));
+        renderDestList();
+    });
+
+    document.getElementById('selectMatchingBtn').addEventListener('click', () => {
+        const visible = visibleDestGroups();
+        if (!visible.length) { showToast('Nothing matches that pattern', 'warning'); return; }
+        for (const g of visible) selectedDest.set(String(g.id), { id: g.id, name: g.name });
+        renderDestList();
+        showToast(`Selected ${visible.length} group(s)`, 'success');
+    });
+
+    document.getElementById('clearSelectionBtn').addEventListener('click', () => {
+        selectedDest.clear();
+        renderDestList();
+    });
+
+    document.getElementById('applyDefaultsBtn').addEventListener('click', async () => {
+        try { await apiFetch('/api/config', { method: 'DELETE' }); } catch (e) { /* non-fatal */ }
+        await applyDefaults();
+    });
+
+    document.querySelectorAll('input[name="pushMode"]').forEach(input => {
+        input.addEventListener('change', syncModeStyles);
+    });
+
+    document.getElementById('saveJobBtn').addEventListener('click', () => saveJob(true));
+    document.getElementById('pushBtn').addEventListener('click', pushIdentities);
+    document.getElementById('exportResultsBtn').addEventListener('click', exportResultsCsv);
+
+    // Step navigation
+    document.getElementById('backToStep1').addEventListener('click', () => setStep(1));
+    document.getElementById('backToStep2').addEventListener('click', () => setStep(2));
+    document.querySelectorAll('.step').forEach(s => {
+        s.addEventListener('click', () => {
+            const target = parseInt(s.dataset.step, 10);
+            if (target === 1) setStep(1);
+            else if (target === 2 && extracted && extracted.found) setStep(2);
+            else if (target === 3 && lastResults) setStep(3);
+        });
+    });
+
+    // Settings modal
+    document.getElementById('settingsBtn').addEventListener('click', openSettings);
+    document.getElementById('closeSettingsBtn').addEventListener('click', closeSettings);
+    document.getElementById('cancelSettingsBtn').addEventListener('click', closeSettings);
+    document.getElementById('settingsModal').addEventListener('click', (e) => {
+        if (e.target.id === 'settingsModal') closeSettings();
+    });
+
+    document.getElementById('applySettingsBtn').addEventListener('click', async () => {
+        const creds = {
+            X_CP_API_ID: document.getElementById('cpApiId').value.trim(),
+            X_CP_API_KEY: document.getElementById('cpApiKey').value.trim(),
+            X_ECM_API_ID: document.getElementById('ecmApiId').value.trim(),
+            X_ECM_API_KEY: document.getElementById('ecmApiKey').value.trim(),
+        };
+        showLoading('Applying credentials...');
+        try {
+            const data = await apiFetch('/api/credentials/apply', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(creds)
+            });
+            closeSettings();
+            await refreshCredentialStatus();
+            hideLoading();
+            if (data.has_credentials) {
+                showToast('Credentials saved to config.json', 'success');
+                if (await loadGroups()) await restoreOrDefault();
+            } else {
+                showToast('All four credential fields are required', 'warning');
+            }
+        } catch (e) {
+            hideLoading();
+            showToast(e.message, 'error');
+        }
+    });
+
+    document.getElementById('saveProfileBtn').addEventListener('click', async () => {
+        const name = document.getElementById('profileName').value.trim();
+        if (!name) { showToast('Enter a profile name', 'warning'); return; }
+        try {
+            await apiFetch('/api/profiles', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name,
+                    X_CP_API_ID: document.getElementById('cpApiId').value.trim(),
+                    X_CP_API_KEY: document.getElementById('cpApiKey').value.trim(),
+                    X_ECM_API_ID: document.getElementById('ecmApiId').value.trim(),
+                    X_ECM_API_KEY: document.getElementById('ecmApiKey').value.trim(),
+                })
+            });
+            showToast(`Profile "${name}" saved`, 'success');
+            document.getElementById('profileName').value = '';
+            loadProfiles();
+        } catch (e) {
+            showToast(e.message, 'error');
+        }
+    });
+
+    document.getElementById('loadProfileBtn').addEventListener('click', async () => {
+        const name = document.getElementById('profileSelect').value;
+        if (!name) { showToast('Select a profile first', 'warning'); return; }
+        try {
+            await apiFetch('/api/profiles/load', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name })
+            });
+            showToast(`Profile "${name}" loaded`, 'success');
+            await loadCurrentCredentials();
+            await refreshCredentialStatus();
+            if (await loadGroups()) await restoreOrDefault();
+        } catch (e) {
+            showToast(e.message, 'error');
+        }
+    });
+
+    document.getElementById('deleteProfileBtn').addEventListener('click', async () => {
+        const name = document.getElementById('profileSelect').value;
+        if (!name) { showToast('Select a profile first', 'warning'); return; }
+        if (!confirm(`Delete profile "${name}"?`)) return;
+        try {
+            await apiFetch(`/api/profiles/${encodeURIComponent(name)}`, { method: 'DELETE' });
+            showToast(`Profile "${name}" deleted`, 'success');
+            loadProfiles();
+        } catch (e) {
+            showToast(e.message, 'error');
+        }
+    });
+
+    // Boot
+    const hasCreds = await refreshCredentialStatus();
+    await fetchSavedConfig();
+    if (hasCreds) {
+        if (await loadGroups(true)) await restoreOrDefault();
+    } else {
+        renderDestList();
+        showToast('Add your NCM API keys in Settings (gear icon) to begin', 'warning');
+        openSettings();
+    }
+});
+    </script>
+</body>
+</html>
