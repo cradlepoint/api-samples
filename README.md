@@ -1,4 +1,4 @@
-# API Samples
+# Ericsson NCM API Samples
 
 A collection of Python scripts and web applications for interacting with Ericsson NetCloud Manager APIs.
 
