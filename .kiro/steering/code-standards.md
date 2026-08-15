@@ -55,6 +55,6 @@ if __name__ == '__main__':
 
 - **Auth**: Never hardcode keys. Use env vars or `scripts/utils/credentials.py`.
 - **Error handling**: Wrap API calls in try/except. Retry on 408, 429, 503, 504 with backoff.
-- **Output**: CSV for tabular, JSON for structured. Print progress on long ops. Store exports in `scripts/script_manager/csv_files/`.
+- **Output**: CSV for tabular, JSON for structured. Print progress on long ops. Store exports in `web_apps/script_manager/csv_files/`.
 - **Dependencies**: Check `requirements.txt` before adding new ones.
 - **Web servers**: Always set `socketserver.TCPServer.allow_reuse_address = True` before creating instance.

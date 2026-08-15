@@ -178,9 +178,23 @@ If you import a third-party package in new code, confirm it is in
 
 ### Running web apps
 
-Web apps live in `web_apps/<name>/`. Each has a `serve.py` and a fixed port — see
+Web apps live in `web_apps/<name>/` and each has a fixed port — see
 `web_apps/README.md` for the port table. Start them in the background, not the
 foreground, and tell the user the URL.
+
+**Do not assume the entry point is `serve.py`.** Five of the twelve apps use a
+different filename:
+
+| Entry point | Apps |
+|---|---|
+| `serve.py` | `inventory_dashboard`, `cellular_health_dashboard`, `alert_dashboard`, `geo_ip_blocker`, `host_identity_copier`, `assign_sdk`, `web_app_template` |
+| `config_builder.py` | `config_builder` |
+| `script_manager.py` | `script_manager` |
+| `ncm_api_key_encryptor.py` | `ncm_api_key_encryptor` |
+| `router_lookup.py` | `netcloud_router_lookup` |
+| `app.py` | `cisco_to_cradlepoint_zfw_converter` |
+
+`ls web_apps/<name>/` settles it in one call.
 
 Freeing a port in use:
 
@@ -189,7 +203,9 @@ lsof -ti:<port> | xargs kill                                    # macOS / Linux
 netstat -ano | findstr :<port>  &&  taskkill /PID <pid> /F       # Windows
 ```
 
-Ports 8000 and 8065 are shared by more than one app, so run those one at a time.
+Port 8000 is shared by four apps (`script_manager`, `ncm_api_key_encryptor`,
+`netcloud_router_lookup`, `web_app_template`) and 8065 by two (`alert_dashboard`,
+`geo_ip_blocker`), so run those one at a time.
 
 ---
 
@@ -282,7 +298,7 @@ Available helpers in `scripts/utils/`: `env_check.py`, `env_status.py`,
 - **Error handling** — wrap API calls in try/except. Retry on 408, 429, 503, 504 with
   exponential backoff.
 - **Output** — CSV for tabular data, JSON for structured. Print progress on long
-  operations. Store exports in `scripts/script_manager/csv_files/`.
+  operations. Store exports in `web_apps/script_manager/csv_files/`.
 - **Dependencies** — check `requirements.txt` before adding new ones.
 - **Web servers** — always set `socketserver.TCPServer.allow_reuse_address = True`
   before creating the instance.

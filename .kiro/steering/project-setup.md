@@ -168,7 +168,23 @@ If you import a third-party package in new code, confirm it is in
 
 ## Running web apps
 
-Web apps live in `web_apps/<name>/`. Each has a `serve.py` and a fixed port
-(see `README.md`). Start them in the background, not the foreground, and tell
-the user the URL. Ports in use: `lsof -ti:<port> | xargs kill` on macOS/Linux,
-`netstat -ano | findstr :<port>` then `taskkill /PID <pid> /F` on Windows.
+Web apps live in `web_apps/<name>/` and each has a fixed port. **Do not assume the
+entry point is `serve.py`** — five of the twelve apps use a different filename, so
+check before launching:
+
+| Entry point | Apps |
+|---|---|
+| `serve.py` | `inventory_dashboard`, `cellular_health_dashboard`, `alert_dashboard`, `geo_ip_blocker`, `host_identity_copier`, `assign_sdk`, `web_app_template` |
+| `config_builder.py` | `config_builder` |
+| `script_manager.py` | `script_manager` |
+| `ncm_api_key_encryptor.py` | `ncm_api_key_encryptor` |
+| `router_lookup.py` | `netcloud_router_lookup` |
+| `app.py` | `cisco_to_cradlepoint_zfw_converter` |
+
+`ls web_apps/<name>/` settles it in one call. See `web_apps/README.md` for the port
+table.
+
+Start them in the background, not the foreground, and tell the user the URL. Ports
+in use: `lsof -ti:<port> | xargs kill` on macOS/Linux, `netstat -ano | findstr
+:<port>` then `taskkill /PID <pid> /F` on Windows. Port 8000 is shared by four apps
+and 8065 by two, so run those one at a time.

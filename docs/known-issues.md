@@ -706,7 +706,7 @@ did not receive them, so this drift is visible at write time rather than silent.
 Absence of `activate.bat` on macOS/Linux is expected — `python -m venv` only
 creates it on Windows.
 
-### Web App Settings Modals Are a Third Credential Store, and Two Are Committed (discovered 2026-08-14)
+### Web App Settings Modals Are a Third Credential Store (discovered 2026-08-14, tracking resolved 2026-08-14)
 Credentials live in more places than `.env` and the venv activate scripts. Every
 web app with a Settings modal writes what you type into a per-app JSON file beside
 its `serve.py`, in plaintext:
@@ -723,18 +723,26 @@ Consequences worth knowing:
 - They are a plaintext credential store in the working tree. Apps that write them
   should `chmod 0600` on POSIX; not all do.
 
-**`.gitignore` does not retroactively untrack.** As of 2026-08-14 these two are
-still tracked:
+**`.gitignore` does not retroactively untrack — the mechanism, kept because it will
+recur.** `web_apps/*/config.json` and `web_apps/*/profiles.json` were added to
+`.gitignore` on 2026-08-13. That stops *new* files being committed but has no effect
+on files already in the index, so
+`web_apps/cellular_health_dashboard/profiles.json` and
+`web_apps/inventory_dashboard/profiles.json` stayed tracked and unprotected. Fixing
+that requires `git rm --cached <path>`; after that the pattern takes over.
 
-```
-web_apps/cellular_health_dashboard/profiles.json   # holds 4 real key values in the working tree
-web_apps/inventory_dashboard/profiles.json         # {} in the working tree
-```
+**Resolved 2026-08-14.** No `profiles.json` is tracked, present in `HEAD`, or on disk
+anywhere in the repo. The two above were removed in commit `364fbff`. A third,
+`web_apps/geo_ip_blocker/profiles.json`, appeared later the same day holding four
+real key values; it was never tracked (the pattern worked, because it was new) and
+was deleted after confirming all four values were byte-identical to `.env`, so the
+app keeps working from environment variables.
 
-`web_apps/*/config.json` and `web_apps/*/profiles.json` were added to `.gitignore`
-on 2026-08-13, which stops *new* files being committed but has no effect on files
-already in the index. Removing them needs `git rm --cached <path>`; after that the
-existing pattern takes over and works.
+Do not read the resolution as "this cannot happen again." Any app with a Settings
+modal recreates its `profiles.json` the moment someone saves a profile. Deleting the
+file is not the protection — the `.gitignore` pattern is, and it only works for files
+that are not already tracked. Before committing, `git status` is the check that
+matters.
 
 **Committed history is clean — do not rotate on this basis.** An earlier version of
 this entry claimed the values were already in committed history and the keys should
@@ -746,8 +754,9 @@ be rotated. That was wrong, and it is an expensive thing to get wrong. Verified
 - every one of the 645 blobs across all 262 commits was searched for the four exact
   secret strings from the working-tree file: zero matches
 
-So the live keys exist only in the working tree. The risk is prospective — a
-`git add -A` or `git commit -a` would commit them — not historical.
+The live keys existed only in the working tree, never in a commit. The risk was
+prospective — a `git add -A` or `git commit -a` would have committed them — not
+historical. No rotation was needed, and none was done.
 
 **Diagnostic subtlety: `git check-ignore` lies about tracked files.** It skips paths
 present in the index and reports them as not-ignored, which reads as "your pattern
@@ -821,3 +830,71 @@ paths are:
 This is a useful boundary rather than only a limitation: any channel an agent
 could prompt through would place API keys in the agent's context and in the
 session transcript. The `isatty` gate is what keeps them out.
+### Repo Layout Claims in Steering Are Stale — Wrong Entry Points, Dead fileMatch Patterns (discovered 2026-08-14)
+Several always-loaded and fileMatch steering claims describe a layout the repo no
+longer has. These matter more than ordinary doc rot, because agents act on them
+without checking.
+
+**1. Not every web app has a `serve.py`.** `project-setup.md` and `AGENTS.md` both
+stated "Each has a `serve.py` and a fixed port." That is false for five of the
+twelve apps in `web_apps/`:
+
+| Entry point | Apps |
+|---|---|
+| `serve.py` | `inventory_dashboard`, `cellular_health_dashboard`, `alert_dashboard`, `geo_ip_blocker`, `host_identity_copier`, `assign_sdk`, `web_app_template` |
+| `config_builder.py` | `config_builder` |
+| `script_manager.py` | `script_manager` |
+| `ncm_api_key_encryptor.py` | `ncm_api_key_encryptor` |
+| `router_lookup.py` | `netcloud_router_lookup` |
+| `app.py` | `cisco_to_cradlepoint_zfw_converter` |
+
+`web_apps/README.md` compounded it with a generic
+`python3 web_apps/<app_name>/serve.py`. Run `ls web_apps/<name>/` before launching.
+Both files now carry the table.
+
+**2. `ncm-api-development.md` never loaded for web app code.** Its pattern was:
+
+```
+fileMatchPattern: "{scripts/**/*.py,ncm/**/*.py,ncm2/**/*.py,dashboards/**/*.py}"
+```
+
+`dashboards/` does not exist, and `web_apps/**/*.py` was absent — so the endpoint
+routing table, the trailing-slash rule, the pagination and deprecation rules did not
+auto-load when editing web app Python, which is where most of this repo's API calls
+live. `AGENTS.md` meanwhile advertised the section as applying to `web_apps/`, so the
+mirror promised coverage the Kiro config did not deliver. Pattern corrected to
+`{scripts/**/*.py,ncm/**/*.py,ncm2/**/*.py,web_apps/**/*.py}`.
+
+Worth generalizing: a `fileMatchPattern` naming a directory that does not exist fails
+silently. Nothing warns you; the steering simply never activates. When adding or
+renaming a top-level directory, grep `.kiro/steering/*.md` front matter for the old
+name.
+
+**3. `dashboards/cellular_health/` does not exist.** `web-ui-standards.md` pointed
+its dashboard reference implementation at that path; the real one is
+`web_apps/cellular_health_dashboard/`. Its own `fileMatchPattern` also carried a dead
+`**/dashboards/**` clause. Both fixed.
+
+**4. `scripts/script_manager/csv_files/` does not exist.** `code-standards.md` and
+`AGENTS.md` both instructed storing CSV exports there. The real path is
+`web_apps/script_manager/csv_files/`. Both fixed. The same stale path was also sitting
+in `.gitignore`, protecting nothing while the real `csv_files/` went unignored; removed
+2026-08-14.
+
+**5. `ncm2/` is untracked.** It is referenced by `ncm-api-development.md`'s
+`fileMatchPattern` and by `AGENTS.md`, but `git ls-files ncm2/` returns zero files
+while `ncm/` returns eleven. It exists only in this working tree, so a fresh clone
+will not have it. Do not `import` from `ncm2` in committed code, and do not cite it
+in docs as though contributors have it. Use `ncm/` — that is the packaged SDK.
+
+**6. `web_apps/mac_whitelist_copier/` is an empty directory.** Zero files, so it is
+not an app and git does not see it at all (git does not track empty directories).
+Excluded from the README tables.
+
+**7. Entry-point docstrings drift too.** `web_apps/alert_dashboard/serve.py`'s
+docstring told you to run `web_apps/custom_alert_dashboard/serve.py` and open port
+8060; the directory is `alert_dashboard` and `PORT = 8065`. Fixed 2026-08-14, and its
+usage line now uses the activate form rather than `.venv/bin/python`, since a
+long-running server launched the bare way boots fine and then fails every API call.
+The other eleven entry points were swept the same day — docstring path and port now
+match source in all twelve, so treat a mismatch as a regression rather than the norm.

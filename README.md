@@ -4,21 +4,55 @@ A collection of Python scripts and web applications for interacting with Ericsso
 
 ## Getting Started
 
-Three steps: clone, run setup, start chatting with Kiro.
+Fork, clone your fork in Kiro, run setup, then start chatting. If you build
+something worth sharing, open a pull request back to this repo.
 
 ### 1. Prerequisites
 
 - Python 3.9 or higher (3.12 recommended) — Windows users, see the [Windows Python Setup Guide](WINDOWS_PYTHON_SETUP.md)
 - Git
+- A GitHub account
+- [Kiro](https://kiro.dev)
 
-### 2. Clone the repository
+### 2. Fork the repository
+
+Forking gives you your own copy to experiment in, and it's what lets you
+contribute changes back later.
+
+1. Go to [github.com/cradlepoint/api-samples](https://github.com/cradlepoint/api-samples)
+2. Click **Fork** (top right), then **Create fork**
+
+You now have `https://github.com/<your-username>/api-samples`.
+
+### 3. Clone your fork in Kiro
+
+In Kiro, open the Command Palette (`Cmd+Shift+P` on macOS, `Ctrl+Shift+P` on
+Windows/Linux), run **Git: Clone**, and paste your fork's URL:
+
+```
+https://github.com/<your-username>/api-samples.git
+```
+
+Pick a local folder, then choose **Open** when Kiro offers to open the cloned
+repository.
+
+Prefer the terminal? Same result:
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/<your-username>/api-samples.git
 cd api-samples
 ```
 
-### 3. Run setup
+Then add the original repo as `upstream` so you can pull in later changes:
+
+```bash
+git remote add upstream https://github.com/cradlepoint/api-samples.git
+```
+
+Clone your fork, not this repo directly — you won't have push access here, and
+you'd have nowhere to put your branch when it's time to open a pull request.
+
+### 4. Run setup
 
 **macOS / Linux**
 
@@ -44,16 +78,27 @@ source .venv/bin/activate          # macOS / Linux
 .venv\Scripts\activate.bat         # Windows cmd
 ```
 
-### 4. Start chatting with Kiro
+### 5. Build apps by chatting with Kiro
 
-Open the folder in Kiro and ask for what you want:
+Open the Kiro chat panel and describe what you want in plain language:
 
 - "Build me a dashboard showing routers with poor signal"
 - "Export all my routers to CSV"
 - "Which devices have subscriptions expiring in the next 30 days?"
+- "Add a CSV export button to the inventory dashboard"
 
-Kiro reads the API docs in `docs/`, uses the venv, and picks up your credentials
-automatically.
+Kiro reads the API references in `docs/`, follows the conventions in `.kiro/steering/`,
+uses the `.venv` interpreter, and picks up your credentials automatically. New web
+apps get scaffolded into `web_apps/` using the shared style template, so they match
+the existing dashboards.
+
+A few things that make the results better:
+
+- Point at files with `#File` or `#Folder` when you want Kiro to follow an existing
+  pattern — for example, "build a dashboard like #Folder web_apps/cellular_health_dashboard"
+- Type `#setup-environment` if the environment needs repairing
+- Ask for a spec first on anything large: "write a spec for a firmware compliance
+  dashboard." You review requirements and design before code gets written.
 
 ### Setup script options
 
@@ -118,7 +163,6 @@ api-samples/
 ├── web_apps/            # Web applications and dashboards
 ├── scripts/             # Standalone Python scripts and utilities
 ├── ncm/                 # NCM Python SDK source (also pip installable)
-├── ncm2/                # NCM Python SDK v2+v3 variant
 ├── docs/                # API documentation and references
 └── postman-collection/  # Postman API collection
 ```
@@ -127,23 +171,39 @@ api-samples/
 
 All web applications live in `web_apps/`. See [web_apps/README.md](web_apps/README.md) for full details.
 
-| App | Port | Description |
-|-----|------|-------------|
-| [inventory_dashboard](web_apps/inventory_dashboard/) | 8060 | Device inventory with license status, subscriptions, modem info |
-| [cellular_health_dashboard](web_apps/cellular_health_dashboard/) | 8055 | Cellular health scores and signal metrics |
-| [script_manager](web_apps/script_manager/) | 8000 | CSV editor and NCM script runner with web UI |
-| [config_builder](web_apps/config_builder/) | 8100 | Build JSON configurations from templates |
-| [assign_sdk](web_apps/assign_sdk/) | 9000 | Assign SDK app versions to router groups |
-| [cisco_to_cradlepoint_zfw_converter](web_apps/cisco_to_cradlepoint_zfw_converter/) | 5001 | Convert Cisco configs to Cradlepoint zone firewall |
-| [ncm_api_key_encryptor](web_apps/ncm_api_key_encryptor/) | 8000 | Encrypt API keys for SDK app configs |
-| [netcloud_router_lookup](web_apps/netcloud_router_lookup/) | 8000 | Look up router info by serial/MAC |
+| App | Port | Entry point | Description |
+|-----|------|-------------|-------------|
+| [inventory_dashboard](web_apps/inventory_dashboard/) | 8060 | `serve.py` | Device inventory with license status, subscriptions, modem info |
+| [cellular_health_dashboard](web_apps/cellular_health_dashboard/) | 8055 | `serve.py` | Cellular health scores and signal metrics — RSRP, SINR, health scores |
+| [alert_dashboard](web_apps/alert_dashboard/) | 8065 | `serve.py` | Custom alerts with type/account filters, ACK tracking, auto-refresh, export |
+| [geo_ip_blocker](web_apps/geo_ip_blocker/) | 8065 | `serve.py` | Turn country IP ranges into zone firewall deny rules and push to groups |
+| [host_identity_copier](web_apps/host_identity_copier/) | 8070 | `serve.py` | Copy host address identities from a master group to many destinations |
+| [config_builder](web_apps/config_builder/) | 8100 | `config_builder.py` | Build Cradlepoint JSON configurations from templates with per-site variables |
+| [assign_sdk](web_apps/assign_sdk/) | 9000 | `serve.py` | Assign SDK app versions to router groups |
+| [script_manager](web_apps/script_manager/) | 8000 | `script_manager.py` | CSV editor and NCM script runner with web UI |
+| [ncm_api_key_encryptor](web_apps/ncm_api_key_encryptor/) | 8000 | `ncm_api_key_encryptor.py` | Encrypt API keys for embedding in SDK app configs |
+| [netcloud_router_lookup](web_apps/netcloud_router_lookup/) | 8000 | `router_lookup.py` | Search routers across multiple accounts |
+| [cisco_to_cradlepoint_zfw_converter](web_apps/cisco_to_cradlepoint_zfw_converter/) | 5001 | `app.py` | Convert Cisco router configs to Cradlepoint zone firewall format |
+| [web_app_template](web_apps/web_app_template/) | 8000 | `serve.py` | Style/layout starting point for new apps, not a tool in itself |
+
+Ports 8000 and 8065 are each shared by more than one app, so run those one at a time.
 
 ### Running a Web App
 
+Most apps use `serve.py`, but five don't — check the Entry point column above.
+
 ```bash
-python3 web_apps/inventory_dashboard/serve.py    # macOS/Linux
-python web_apps/inventory_dashboard/serve.py     # Windows
+python3 web_apps/inventory_dashboard/serve.py           # macOS/Linux
+python web_apps/inventory_dashboard/serve.py            # Windows
+
+python3 web_apps/config_builder/config_builder.py       # non-serve.py example
 ```
+
+Then open the app's port in your browser, e.g. http://localhost:8060.
+
+These apps bind a local port with no authentication, which is fine on `localhost`.
+Don't expose one on a shared network — anyone who can reach the port can read the
+credentials stored in its Settings panel.
 
 ## Sample Scripts
 
@@ -185,6 +245,59 @@ The `docs/` folder contains detailed API references:
 - [SDK Reference](docs/ncm-sdk-reference.md) — Python SDK methods
 - [Known Issues](docs/known-issues.md) — API gotchas and workarounds
 - [Common Patterns](docs/common-patterns.md) — reusable code patterns
+
+## Contributing Back
+
+Built something useful in your fork? Open a pull request.
+
+### 1. Work on a branch
+
+```bash
+git checkout -b my-new-dashboard
+```
+
+### 2. Commit and push to your fork
+
+```bash
+git add web_apps/my_new_dashboard/
+git commit -m "Add dashboard for firmware compliance"
+git push -u origin my-new-dashboard
+```
+
+Stage specific paths rather than `git add -A`. This repo keeps local credential and
+state files in the working tree, and a couple of them are still tracked from an
+earlier commit, so a blanket add can pick up API keys. Check `git status` before you
+commit.
+
+### 3. Open the pull request
+
+Either use the GitHub CLI:
+
+```bash
+gh pr create --repo cradlepoint/api-samples --web
+```
+
+Or visit your fork on GitHub and click **Compare & pull request**. Set the base to
+`cradlepoint/api-samples` and describe what you built and how you tested it.
+
+You can ask Kiro to do the whole sequence for you — "commit this on a branch and open
+a PR against upstream" — and it will handle the branch, commit, push, and PR.
+
+### Keeping your fork current
+
+```bash
+git fetch upstream
+git checkout master
+git merge upstream/master
+git push
+```
+
+### Before you submit
+
+- No credentials in the diff — no `.env`, no `profiles.json` or `config.json` with real keys
+- A new app includes a short `readme.md` and any extra deps in `requirements.txt`
+- New web apps follow the shared style template, including light/dark mode
+- The code runs against a real NCM tenant
 
 ## Troubleshooting
 

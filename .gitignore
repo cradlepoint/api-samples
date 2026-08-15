@@ -1,7 +1,6 @@
 .venv
 .DS_Store
 .vscode/settings.json
-.gitignore
 
 # API credentials written by setup_env.py - never commit
 .env
