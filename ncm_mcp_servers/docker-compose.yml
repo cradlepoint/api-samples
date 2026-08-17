@@ -1,0 +1,14 @@
+services:
+  ncm-mcp:
+    build: .
+    ports:
+      - "3001:3001"
+      - "3002:3002"
+      - "3003:3003"
+    environment:
+      - MCP_TRANSPORT=streamable-http
+      - NCM_FLEET_PORT=3001
+      - NCM_MONITORING_PORT=3002
+      - NCM_CLOUD_SERVICES_PORT=3003
+    volumes:
+      - ./credentials.json:/app/credentials.json:ro
