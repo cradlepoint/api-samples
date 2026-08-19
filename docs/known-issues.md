@@ -21,9 +21,66 @@ The `configuration_managers` endpoint has its own `id` field that may differ fro
 router's `id`. Always use `get_configuration_manager_id(router_id)` to look up the
 correct config manager ID before making PUT/PATCH calls.
 
-### PATCH Cannot Remove Config Items
-PATCH only adds or updates. To remove config items, you must use PUT with the
-removals list in the diff.
+### PATCH CAN Remove Config Items — via the Removals List (corrected 2026-08-14)
+**This entry previously said the opposite.** It claimed "PATCH only adds or
+updates. To remove config items, you must use PUT with the removals list," and a
+2026-08-13 caveat built further on that mistake. Both were wrong.
+
+PATCH accepts the removals list, and NCM's own web UI uses it. Removing a single
+address from a host identity produces this PATCH body — empty updates dict, one
+removal path:
+
+```json
+[
+    {},
+    [["identities", "ip", "0897fa24-b4a4-4aa2-9cab-0bed9507c233", "members", 2]]
+]
+```
+
+Adding or changing addresses in the same identity produces an updates-only PATCH:
+
+```json
+[
+    {
+        "identities": {
+            "ip": {
+                "0897fa24-b4a4-4aa2-9cab-0bed9507c233": {
+                    "members": {"2": {"address": "4.5.6.7"}, "3": {"address": "5.6.7.8"}},
+                    "_id_": "0897fa24-b4a4-4aa2-9cab-0bed9507c233"
+                }
+            }
+        }
+    },
+    []
+]
+```
+
+Both slots can be populated in one PATCH: set values via updates and prune via
+removals in a single call.
+
+**Array elements are addressed by integer index in removal paths, not by string
+key.** Note the asymmetry against updates, where the same array position is a
+string key:
+
+- update: `{"members": {"2": {...}}}` — string `"2"`
+- removal: `["identities", "ip", "<uuid>", "members", 2]` — integer `2`
+
+Practical consequences:
+
+- You do **not** need PUT to delete one branch of a group config. Prefer PATCH
+  with removals — PUT resets unmentioned fields to defaults, which at
+  `/groups/{id}/` scope wipes every other group-level setting.
+- UUID-keyed collections (`identities.*`, `lan`, `vpn.tunnels`,
+  `security.zfw.zones`, ...) **can** be mirrored exactly between groups. Remove a
+  whole entry with a path ending at its UUID: `["identities", "ip", "<uuid>"]`.
+- When removing several elements from the same array, emit the indices
+  highest-first. Whether NCM resolves removal paths against the pre-change config
+  or applies them sequentially with reindexing is unconfirmed, and descending
+  order is correct under either interpretation.
+
+Source: NCM UI request traffic reported by a user on 2026-08-14. The formats above
+are what the UI sends; they have not been independently replayed against the API
+from this repo.
 
 ### Arrays in PATCH Replace Entirely
 When using arrays (not objects) in a PATCH body, the entire array is replaced.
@@ -79,19 +136,35 @@ Either instantiate `NcmClientv3` directly and use v3 equivalents (e.g.
 `get_asset_endpoints()` instead of `get_routers()`), or ensure all four v2 API
 keys are set in the environment.
 
-### SDK `_return_handler` Returns Error Strings Instead of Raising Exceptions (discovered 2026-04-07)
-The SDK's `_return_handler` method returns error information as strings
-(e.g. `"ERROR: 400: {...}"`) for 400, 401, 404, and 500 status codes instead
-of raising exceptions. This means `try/except` blocks around SDK calls will
-NOT catch API errors. Callers must inspect the return value to detect failures.
-In v2's `__get_json`, non-2xx responses silently `break` out of the pagination
-loop and return partial (possibly empty) results with no error indication at all.
-In v3's `__get_json`, the error string is returned directly, so code expecting
-a list will receive a string instead.
+### SDK `_return_handler` Error Behavior (discovered 2026-04-07, corrected 2026-08-13)
+**Correction:** this entry previously stated that `_return_handler` returns error
+strings like `"ERROR: 400: {...}"` instead of raising. That is no longer true —
+the SDK now **raises `requests.exceptions.HTTPError`** for 400, 401, 404 and 500.
+Verified by calling `_return_handler` directly across status codes:
 
-Workaround: check return values explicitly. For v3 methods, check if the result
-is a string starting with `"ERROR:"` or is not a list. For v2 GET methods,
-an unexpectedly empty list may indicate a silent error.
+| Status | Behavior |
+|--------|----------|
+| 200 | returns `"<obj_type> operation successful."` |
+| 201, 204 | returns the response text |
+| 400, 401, 404, 500 | raises `requests.exceptions.HTTPError` as `"<code>: <body>"` |
+| anything else (403, 409, 429, 418, ...) | logs, then returns `None` |
+
+So `try/except` around SDK calls **does** catch those four error codes. Two
+traps remain:
+
+1. **Unhandled status codes return `None`,** silently. 403, 409 and 429 all fall
+   through the `else` branch — notably 429 (rate limit) and 409 (which v3 uses
+   for both rate limiting and validation errors). Code that assumes a truthy
+   return value or a list will misread these as success.
+2. **v2's `__get_json` still swallows errors independently of
+   `_return_handler`.** It checks `if not (200 <= status < 300): break` *before*
+   calling the handler, so a mid-pagination failure exits the loop and returns
+   partial (possibly empty) results with no exception and no indication. An
+   unexpectedly empty or short list from a v2 GET may be a silent error.
+
+Workaround: wrap SDK calls in `try/except requests.exceptions.HTTPError` (or bare
+`except Exception`) to catch 4xx/5xx on writes, and additionally treat `None` and
+suspiciously empty list results as failures.
 
 ### SDK `regrade()` Missing JSON:API Atomic Extension Header (discovered 2026-04-07)
 The `regrade()` method sends an `atomic:operations` payload but does not set
@@ -528,6 +601,31 @@ for a separate `/accounts/` fetch to resolve group account names. Known
 endpoints that support `expand`: `/routers/` (group, account), `/groups/`
 (account).
 
+### Long-Running Servers Need `source .venv/bin/activate`, Not Just `.venv/bin/python` (discovered 2026-08-04)
+`setup_env.py` injects real credential values (`X_CP_API_ID`, `X_CP_API_KEY`,
+`X_ECM_API_ID`, `X_ECM_API_KEY`) as `export` statements directly into
+`.venv/bin/activate`. If `.env` is missing or incomplete (e.g. deleted,
+partial setup), those exported values in `activate` are the only place the
+credentials exist.
+
+Calling `.venv/bin/python script.py` directly executes the interpreter
+without sourcing `activate`, so those exported vars are never set in the
+process environment — even though the venv itself (`sys.prefix`) is correctly
+active. For one-shot scripts that call `check_env()` at startup, this fails
+loudly and is easy to catch. For long-running servers (FastAPI/Flask
+dashboards under `web_apps/`) that read `os.environ` lazily per-request
+(e.g. via `_build_client()` on each API call) instead of validating at
+startup, the server boots fine and returns 200 on static routes, but every
+API call silently fails with a missing/empty credential error — there is no
+startup-time signal that credentials are missing.
+
+Workaround: always launch long-running dev servers with
+`source .venv/bin/activate && python path/to/serve.py`, not
+`.venv/bin/python path/to/serve.py`, whenever credentials may only be
+present in the activate script rather than `.env`. This is safe to run in a
+single non-interactive shell command (no prompts), unlike `setup_env.py`
+with no flags.
+
 ### v2 `/alerts/` Endpoint Does Not Support `order_by` (discovered 2026-06-26)
 The `/alerts/` endpoint returns `409 Conflict` with `"Invalid ordering field
 specified: created_at"` when using `order_by=-created_at` or any `order_by`
@@ -536,3 +634,267 @@ client-side. The endpoint does support `created_at__gt` for time filtering,
 but requires full ISO 8601 format with microseconds and timezone offset
 (e.g. `2026-06-26T15:00:37.703000+00:00`). The alert `type` field for
 custom alerts is `custom_alert` (not `custom`).
+
+### SDK `put_group_configuration()` Raises AttributeError After a Successful PUT (discovered 2026-08-13)
+`NcmClientv2.put_group_configuration()` calls `self.__return_handler(...)` with
+two leading underscores. Inside the class body that name-mangles to
+`self._NcmClientv2__return_handler`, which does not exist — the real method is
+`_return_handler` (defined on `BaseNcmClient`). Every other config method
+(`patch_group_configuration`, `put_configuration_managers`,
+`patch_configuration_managers`) uses the correct single-underscore name.
+
+Verified by stubbing `session.put` and calling the method:
+
+```
+patch_group_configuration -> 'Configuration Manager operation successful.'
+put_group_configuration   -> AttributeError: 'NcmClientv2' object has no
+                             attribute '_NcmClientv2__return_handler'
+```
+
+The critical detail: **the HTTP PUT is sent before the exception is raised.**
+The group config is already modified in NCM by the time the caller sees the
+error, so treating the `AttributeError` as "the write failed" and retrying will
+apply the PUT twice.
+
+Workaround: use `patch_group_configuration()` when a merge is acceptable. When a
+true PUT is required (the only way to honor the removals list and reset
+unmentioned fields), issue it directly and skip the wrapper:
+
+```python
+resp = client.session.put(
+    f'{client.base_url}/groups/{group_id}/',
+    data=json.dumps({'configuration': [updates, removals]})
+)
+resp.raise_for_status()
+```
+
+### Credentials Can Drift Between `.env` and Individual Activate Scripts (discovered 2026-08-14)
+`setup_env.py` stores credentials in two places: `.env`, which scripts read
+directly, and the venv activate scripts, which only an activated shell picks up.
+These can fall out of sync, and each activate script is independent — a venv can
+have some populated and others not.
+
+Confirmed instance: a venv whose credentials were last written on Jun 24 had all
+four variables in `activate`, `activate.fish` and `activate.csh`, but zero in
+`Activate.ps1` (no marker comments at all, file untouched since venv creation),
+and no `.env` at all. `Activate.ps1` injection was added to `setup_env.py` on
+2026-08-04 (`8be9817`), after that credential run — so any venv whose credentials
+predate a change to the injection code will be missing whatever was added since.
+
+Why it bites: nothing fails at setup time. A `bash`/`zsh` user sees a working
+environment indefinitely. The failure lands on whoever uses a different shell — a
+PowerShell user gets an activated venv with no credentials and no warning — or on
+anyone running `.venv/bin/python` directly when `.env` is absent, which resolves
+zero of four keys.
+
+Diagnose with `setup_env.py --check`, which reports `.env` presence and per-script
+credential status:
+
+```
+[warn] .env: not found - only activated shells will have credentials
+[warn] activate scripts without all credentials: Activate.ps1 (none)
+```
+
+Fix by re-running `setup_env.py --credentials-only` (prompts, hidden input), which
+rewrites `.env` and every activate script with the current code. From a shell that
+already has the credentials exported, `setup_env.py --skip-credentials` achieves
+the same thing non-interactively by reusing what is in `os.environ`.
+
+`update_activate_scripts()` now reports every script by name with its outcome,
+reads the values back to confirm they landed, and warns when a script that exists
+did not receive them, so this drift is visible at write time rather than silent.
+Absence of `activate.bat` on macOS/Linux is expected — `python -m venv` only
+creates it on Windows.
+
+### Web App Settings Modals Are a Third Credential Store (discovered 2026-08-14, tracking resolved 2026-08-14)
+Credentials live in more places than `.env` and the venv activate scripts. Every
+web app with a Settings modal writes what you type into a per-app JSON file beside
+its `serve.py`, in plaintext:
+
+- `profiles.json` — named credential profiles (`alert_dashboard`,
+  `cellular_health_dashboard`, `geo_ip_blocker`, `inventory_dashboard`)
+- `config.json` — active credentials plus saved job state (`host_identity_copier`)
+
+Consequences worth knowing:
+
+- These files survive `rm -rf .venv`, so an app can keep authenticating after the
+  venv-injected credentials are gone. Convenient, and easy to forget when you
+  think you have removed every copy of a key.
+- They are a plaintext credential store in the working tree. Apps that write them
+  should `chmod 0600` on POSIX; not all do.
+
+**`.gitignore` does not retroactively untrack — the mechanism, kept because it will
+recur.** `web_apps/*/config.json` and `web_apps/*/profiles.json` were added to
+`.gitignore` on 2026-08-13. That stops *new* files being committed but has no effect
+on files already in the index, so
+`web_apps/cellular_health_dashboard/profiles.json` and
+`web_apps/inventory_dashboard/profiles.json` stayed tracked and unprotected. Fixing
+that requires `git rm --cached <path>`; after that the pattern takes over.
+
+**Resolved 2026-08-14.** No `profiles.json` is tracked, present in `HEAD`, or on disk
+anywhere in the repo. The two above were removed in commit `364fbff`. A third,
+`web_apps/geo_ip_blocker/profiles.json`, appeared later the same day holding four
+real key values; it was never tracked (the pattern worked, because it was new) and
+was deleted after confirming all four values were byte-identical to `.env`, so the
+app keeps working from environment variables.
+
+Do not read the resolution as "this cannot happen again." Any app with a Settings
+modal recreates its `profiles.json` the moment someone saves a profile. Deleting the
+file is not the protection — the `.gitignore` pattern is, and it only works for files
+that are not already tracked. Before committing, `git status` is the check that
+matters.
+
+**Committed history is clean — do not rotate on this basis.** An earlier version of
+this entry claimed the values were already in committed history and the keys should
+be rotated. That was wrong, and it is an expensive thing to get wrong. Verified
+2026-08-14:
+
+- only one commit (`426d2fa`) ever touched either path, and the blob is `{}` in both
+- `git log --all --full-history -p -- <both paths>` adds no credential-valued lines
+- every one of the 645 blobs across all 262 commits was searched for the four exact
+  secret strings from the working-tree file: zero matches
+
+The live keys existed only in the working tree, never in a commit. The risk was
+prospective — a `git add -A` or `git commit -a` would have committed them — not
+historical. No rotation was needed, and none was done.
+
+**Diagnostic subtlety: `git check-ignore` lies about tracked files.** It skips paths
+present in the index and reports them as not-ignored, which reads as "your pattern
+is broken" when the pattern is fine. Separate the two questions:
+
+```bash
+git check-ignore -v --no-index <path>   # is the PATTERN right?      -> yes, matches line 13
+git ls-files -c <path>                  # is the file TRACKED?       -> yes, that's the problem
+```
+
+Checking only the first form is what makes a tracked credential file look protected.
+Also note `git check-ignore` needs `git` on `PATH`; if it is missing, the command
+fails and a naive `if git check-ignore -q "$f"` shell test silently reports every
+path as unignored.
+
+When adding a Settings modal to a new app: write to a gitignored filename, set
+`0600` on POSIX, mask secrets on read-back (return `"***"` rather than the value),
+and never echo values into logs or responses.
+
+### Bare `setup_env.py` Hangs From an Agent Tool Call — Tool Calls Get a TTY (discovered 2026-08-14)
+Interactivity in `setup_env.py` is gated on one line:
+
+```python
+interactive = sys.stdin is not None and sys.stdin.isatty() and not args.skip_credentials
+```
+
+Measured from inside an agent tool call in this repo:
+
+```
+stdin isatty: True
+stdout isatty: True
+```
+
+So the bare form takes the interactive branch and blocks in `getpass`. Nobody is
+on the other end of that tty — command output is only returned to the agent when
+the command exits, so the user never sees the prompt and cannot answer it. The
+run hangs until the tool timeout. It does not skip gracefully.
+
+**The misleading evidence that makes this easy to get backwards.** Running
+`setup_env.py --skip-credentials` prints:
+
+```
+[warn] Skipping credentials (non-interactive mode)
+```
+
+That message proves nothing about `isatty`. The flag sets `interactive` to False
+by itself through the `and not args.skip_credentials` clause, so the
+non-interactive branch is taken whether or not a terminal is present. Do not
+read it as evidence that tool calls lack a tty. They have one.
+
+The module docstring's "safe to run from automation and from Kiro hooks" is
+correct for hooks but should not be extended to agent tool calls.
+
+Hook `command` actions are the opposite case: they receive the session JSON piped
+on stdin, so stdin is a pipe, `isatty()` is False, and the non-interactive branch
+runs. A hook therefore will not hang — but it also collects nothing, beyond
+reusing whatever `os.environ` already holds. (Reasoned from the hook contract;
+the tty result above is measured, this is not.)
+
+Consequence worth stating plainly: **credentials cannot be collected by
+automation at all.** Not from a tool call, not from a manual hook. The working
+paths are:
+
+- a human terminal, including the IDE's integrated terminal:
+  `setup_env.py --credentials-only` (input hidden by `getpass`)
+- a shell that already exports the four variables, then
+  `setup_env.py --skip-credentials`, which reuses `os.environ` non-interactively
+- a web app's Settings modal — subject to the plaintext-storage caveats in the
+  entry above
+
+This is a useful boundary rather than only a limitation: any channel an agent
+could prompt through would place API keys in the agent's context and in the
+session transcript. The `isatty` gate is what keeps them out.
+### Repo Layout Claims in Steering Are Stale — Wrong Entry Points, Dead fileMatch Patterns (discovered 2026-08-14)
+Several always-loaded and fileMatch steering claims describe a layout the repo no
+longer has. These matter more than ordinary doc rot, because agents act on them
+without checking.
+
+**1. Not every web app has a `serve.py`.** `project-setup.md` and `AGENTS.md` both
+stated "Each has a `serve.py` and a fixed port." That is false for five of the
+twelve apps in `web_apps/`:
+
+| Entry point | Apps |
+|---|---|
+| `serve.py` | `inventory_dashboard`, `cellular_health_dashboard`, `alert_dashboard`, `geo_ip_blocker`, `host_identity_copier`, `assign_sdk`, `web_app_template` |
+| `config_builder.py` | `config_builder` |
+| `script_manager.py` | `script_manager` |
+| `ncm_api_key_encryptor.py` | `ncm_api_key_encryptor` |
+| `router_lookup.py` | `netcloud_router_lookup` |
+| `app.py` | `cisco_to_cradlepoint_zfw_converter` |
+
+`web_apps/README.md` compounded it with a generic
+`python3 web_apps/<app_name>/serve.py`. Run `ls web_apps/<name>/` before launching.
+Both files now carry the table.
+
+**2. `ncm-api-development.md` never loaded for web app code.** Its pattern was:
+
+```
+fileMatchPattern: "{scripts/**/*.py,ncm/**/*.py,ncm2/**/*.py,dashboards/**/*.py}"
+```
+
+`dashboards/` does not exist, and `web_apps/**/*.py` was absent — so the endpoint
+routing table, the trailing-slash rule, the pagination and deprecation rules did not
+auto-load when editing web app Python, which is where most of this repo's API calls
+live. `AGENTS.md` meanwhile advertised the section as applying to `web_apps/`, so the
+mirror promised coverage the Kiro config did not deliver. Pattern corrected to
+`{scripts/**/*.py,ncm/**/*.py,ncm2/**/*.py,web_apps/**/*.py}`.
+
+Worth generalizing: a `fileMatchPattern` naming a directory that does not exist fails
+silently. Nothing warns you; the steering simply never activates. When adding or
+renaming a top-level directory, grep `.kiro/steering/*.md` front matter for the old
+name.
+
+**3. `dashboards/cellular_health/` does not exist.** `web-ui-standards.md` pointed
+its dashboard reference implementation at that path; the real one is
+`web_apps/cellular_health_dashboard/`. Its own `fileMatchPattern` also carried a dead
+`**/dashboards/**` clause. Both fixed.
+
+**4. `scripts/script_manager/csv_files/` does not exist.** `code-standards.md` and
+`AGENTS.md` both instructed storing CSV exports there. The real path is
+`web_apps/script_manager/csv_files/`. Both fixed. The same stale path was also sitting
+in `.gitignore`, protecting nothing while the real `csv_files/` went unignored; removed
+2026-08-14.
+
+**5. `ncm2/` is untracked.** It is referenced by `ncm-api-development.md`'s
+`fileMatchPattern` and by `AGENTS.md`, but `git ls-files ncm2/` returns zero files
+while `ncm/` returns eleven. It exists only in this working tree, so a fresh clone
+will not have it. Do not `import` from `ncm2` in committed code, and do not cite it
+in docs as though contributors have it. Use `ncm/` — that is the packaged SDK.
+
+**6. `web_apps/mac_whitelist_copier/` is an empty directory.** Zero files, so it is
+not an app and git does not see it at all (git does not track empty directories).
+Excluded from the README tables.
+
+**7. Entry-point docstrings drift too.** `web_apps/alert_dashboard/serve.py`'s
+docstring told you to run `web_apps/custom_alert_dashboard/serve.py` and open port
+8060; the directory is `alert_dashboard` and `PORT = 8065`. Fixed 2026-08-14, and its
+usage line now uses the activate form rather than `.venv/bin/python`, since a
+long-running server launched the bare way boots fine and then fails every API call.
+The other eleven entry points were swept the same day — docstring path and port now
+match source in all twelve, so treat a mismatch as a regression rather than the norm.

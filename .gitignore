@@ -1,6 +1,14 @@
 .venv
 .DS_Store
-scripts/script_manager/csv_files/
-scripts/script_manager/.last_file.txt
 .vscode/settings.json
-.gitignore
+
+# API credentials written by setup_env.py - never commit
+.env
+
+# Per-app credential/state files written by web apps - never commit
+web_apps/*/config.json
+web_apps/*/profiles.json
+
+# Python caches
+__pycache__/
+*.pyc

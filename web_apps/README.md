@@ -4,24 +4,38 @@ Interactive web applications for managing, configuring, and monitoring Cradlepoi
 
 ## Available Web Apps
 
-| App | Port | Description |
-|-----|------|-------------|
-| [inventory_dashboard](inventory_dashboard/) | 8060 | Device inventory with license status, subscription details, and modem info |
-| [cellular_health_dashboard](cellular_health_dashboard/) | 8055 | Cellular health metrics — signal strength, RSRP, SINR, health scores |
-| [alert_dashboard](alert_dashboard/) | 8065 | Alert dashboard with type/account filters, ACK tracking, auto-refresh, and export |
-| [config_builder](config_builder/) | 8100 | Build Cradlepoint JSON configurations from templates with per-site variables |
-| [script_manager](script_manager/) | 8000 | CSV file editor and NCM script runner with a web UI |
-| [ncm_api_key_encryptor](ncm_api_key_encryptor/) | 8000 | Encrypt NCM API keys for embedding in SDK app configurations |
-| [cisco_to_cradlepoint_zfw_converter](cisco_to_cradlepoint_zfw_converter/) | 5001 | Convert Cisco router configs to Cradlepoint zone firewall format |
-| [netcloud_router_lookup](netcloud_router_lookup/) | 8000 | Search routers across multiple accounts |
-| [assign_sdk](assign_sdk/) | 9000 | Assign SDK app versions to router groups |
+| App | Port | Entry point | Description |
+|-----|------|-------------|-------------|
+| [inventory_dashboard](inventory_dashboard/) | 8060 | `serve.py` | Device inventory with license status, subscription details, and modem info |
+| [cellular_health_dashboard](cellular_health_dashboard/) | 8055 | `serve.py` | Cellular health metrics — signal strength, RSRP, SINR, health scores |
+| [alert_dashboard](alert_dashboard/) | 8065 | `serve.py` | Alert dashboard with type/account filters, ACK tracking, auto-refresh, and export |
+| [geo_ip_blocker](geo_ip_blocker/) | 8065 | `serve.py` | Convert country IP ranges into zone firewall deny rules and push to groups |
+| [host_identity_copier](host_identity_copier/) | 8070 | `serve.py` | Copy host address identities from a master group to many destination groups |
+| [config_builder](config_builder/) | 8100 | `config_builder.py` | Build Cradlepoint JSON configurations from templates with per-site variables |
+| [assign_sdk](assign_sdk/) | 9000 | `serve.py` | Assign SDK app versions to router groups |
+| [script_manager](script_manager/) | 8000 | `script_manager.py` | CSV file editor and NCM script runner with a web UI |
+| [ncm_api_key_encryptor](ncm_api_key_encryptor/) | 8000 | `ncm_api_key_encryptor.py` | Encrypt NCM API keys for embedding in SDK app configurations |
+| [netcloud_router_lookup](netcloud_router_lookup/) | 8000 | `router_lookup.py` | Search routers across multiple accounts |
+| [cisco_to_cradlepoint_zfw_converter](cisco_to_cradlepoint_zfw_converter/) | 5001 | `app.py` | Convert Cisco router configs to Cradlepoint zone firewall format |
+| [web_app_template](web_app_template/) | 8000 | `serve.py` | Style/layout starting point for new apps, not a tool in itself |
+
+Some ports are shared by more than one app (8000 and 8065), so run those apps one at a time.
 
 ## Running a Web App
+
+Most apps use `serve.py`, but five have a differently named entry point — see the
+table above.
 
 ```bash
 python3 web_apps/<app_name>/serve.py    # macOS/Linux
 python web_apps/<app_name>/serve.py     # Windows
+
+python3 web_apps/config_builder/config_builder.py    # non-serve.py example
 ```
+
+These apps bind a local port with no authentication. That's fine for `localhost`, but
+don't expose one on a shared network — anyone who can reach the port can read the
+credentials held in its Settings panel.
 
 Make sure your API credentials are set (via environment variables or the Settings panel in dashboard apps):
 

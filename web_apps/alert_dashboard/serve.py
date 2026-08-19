@@ -3,9 +3,9 @@ Custom Alert Dashboard — displays custom alerts from NCM API with
 configurable timeframe, auto-refresh, and export capabilities.
 
 Usage:
-    .venv/bin/python web_apps/custom_alert_dashboard/serve.py
+    source .venv/bin/activate && python web_apps/alert_dashboard/serve.py
 
-Then open http://localhost:8060 in your browser.
+Then open http://localhost:8065 in your browser.
 """
 
 import os

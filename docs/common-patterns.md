@@ -177,6 +177,158 @@ def push_config_to_routers(client, router_ids, config):
     return results
 ```
 
+## Copying a Config Subtree Between Groups
+
+Copying one branch of a group config (a MAC filter, an identity set, WAN rules)
+from a "master" group to others. Two asymmetries make this trickier than it looks:
+
+1. **On read, NCM returns config arrays as index-keyed objects** —
+   `{"0": {...}, "1": {...}}`, not `[{...}, {...}]`. Normalize before reasoning
+   about the list.
+2. **On write, PATCH merges objects but replaces arrays entirely.** That is the
+   lever for choosing mirror-vs-merge semantics: send the same data as a JSON
+   array to replace the destination list outright, or as an index-keyed object to
+   overwrite position-by-position and leave extra destination entries in place.
+
+```python
+def extract_subtree(configuration, *path):
+    """Pull a branch out of a group's [updates, removals] config diff."""
+    if not isinstance(configuration, list) or not configuration:
+        return None
+    node = configuration[0]
+    for key in path:
+        if not isinstance(node, dict):
+            return None
+        node = node.get(key)
+    return node if isinstance(node, dict) else None
+
+
+def normalize_entries(value):
+    """Index-keyed object OR real array -> ordered list of dicts."""
+    if isinstance(value, dict):
+        keys = sorted(value, key=lambda k: (0, int(k)) if str(k).isdigit() else (1, k))
+        return [dict(value[k]) for k in keys if isinstance(value[k], dict)]
+    if isinstance(value, list):
+        return [dict(v) for v in value if isinstance(v, dict)]
+    return []
+
+
+# Read the source branch
+src = client.get_groups(id=master_id, fields='id,name,configuration')[0]
+macfilter = extract_subtree(src['configuration'], 'firewall', 'macfilter')
+entries = normalize_entries(macfilter.get('macs'))
+
+# mirror: array -> destination list is replaced wholesale
+# merge:  index-keyed object -> per-index overwrite, extras survive
+macs = entries if mirror else {str(i): e for i, e in enumerate(entries)}
+
+payload = {'configuration': [{'firewall': {'macfilter': {
+    'enabled': macfilter.get('enabled'),
+    'whitelist': macfilter.get('whitelist'),
+    'macs': macs,
+}}}, []]}
+
+for gid in destination_ids:
+    try:
+        client.patch_group_configuration(gid, payload)
+    except Exception as e:      # keep going; one bad group must not abort the batch
+        log_failure(gid, e)
+```
+
+Send only the branch you intend to copy. Building the payload from the extracted
+subtree (rather than forwarding the whole `configuration[0]`) keeps unrelated
+source settings from riding along into the destinations.
+
+### UUID-keyed collections copy differently than index-keyed ones
+
+The example above is an index-keyed array. Collections that support `_id_`
+(`identities.ip`/`mac`/`port`, `lan`, `vpn.tunnels`, `security.zfw.zones`,
+`wan.rules`, and the rest of the list in `api-configuration.md`) are keyed by
+UUID instead, and that changes what a copy means:
+
+- **Index-keyed** (`macs`, `members`): positions are meaningful, so sending an
+  array replaces the list.
+- **UUID-keyed** (`identities.ip`): PATCH merges by key, so the updates dict alone
+  only *adds* the source entries and overwrites any sharing a UUID. Entries
+  existing only in the destination have no matching key and would survive.
+
+An updates-only PATCH is therefore additive. To make a destination *equal* the
+source, add a removals list (second diff element) — PATCH honors it, so an exact
+mirror is achievable without PUT. See "Mirroring a collection" below.
+
+Real subtrees nest the two styles, so one copy touches both levels. In
+`identities.ip` the outer collection is UUID-keyed while each entry's `members`
+is an index-keyed array — the outer level is always a merge, and the mirror/merge
+choice applies to the inner address list:
+
+```python
+identities = extract_subtree(src['configuration'], 'identities')['ip']
+
+out = {}
+for key, entry in identities.items():
+    identity_id = entry.get('_id_') or key      # _id_ wins if they disagree
+    copied = dict(entry)
+    copied['_id_'] = identity_id                # required inside the object too
+    members = normalize_entries(entry.get('members'))
+    copied['members'] = members if mirror else {str(i): m for i, m in enumerate(members)}
+    out[identity_id] = copied                   # key must equal _id_
+
+payload = {'configuration': [{'identities': {'ip': out}}, []]}
+```
+
+Key the output dict by `_id_` rather than by whatever key you read it under. The
+two normally agree, but if they ever diverge, NCM validates against the `_id_`
+inside the object.
+
+### Mirroring a collection (not just copying it)
+
+To make the destination *equal* the source, read the destination too and emit
+removals for whatever it has that the source does not. This is the same shape
+NCM's own UI sends. Remember that removal paths address array positions with
+**integer** indices, while the updates dict uses **string** keys for the same
+positions:
+
+```python
+def build_mirror_payload(src_identities, dst_identities):
+    """-> (payload, plan). Mirrors identities.ip onto one destination group."""
+    src = {e.get('_id_') or k: e for k, e in (src_identities or {}).items()}
+    dst = {e.get('_id_') or k: e for k, e in (dst_identities or {}).items()}
+
+    updates, removals = {}, []
+
+    for identity_id, entry in src.items():
+        members = normalize_entries(entry.get('members'))
+        copied = {k: v for k, v in entry.items() if k != 'members'}
+        copied['_id_'] = identity_id
+        copied['members'] = {str(i): m for i, m in enumerate(members)}   # string keys
+        updates[identity_id] = copied
+
+        dst_entry = dst.get(identity_id)
+        if dst_entry:
+            dst_members = normalize_entries(dst_entry.get('members'))
+            # Drop surplus positions, highest index first
+            for index in range(len(dst_members) - 1, len(members) - 1, -1):
+                removals.append(['identities', 'ip', identity_id, 'members', index])
+
+    # Drop destination-only entries wholesale
+    for identity_id in dst:
+        if identity_id not in src:
+            removals.append(['identities', 'ip', identity_id])
+
+    return {'configuration': [{'identities': {'ip': updates}}, removals]}
+```
+
+This costs one extra GET per destination, since removals depend on each
+destination's current contents — the payload is no longer identical across groups.
+Skip the PATCH entirely when a destination already matches, and compute a per-group
+summary of what changed so a dry-run mode can show it before anything is sent.
+
+Prefer PATCH over PUT here even when removing things: PATCH honors the removals
+list, whereas PUT additionally resets every unmentioned field to defaults, which at
+`/groups/{id}/` scope means wiping unrelated group settings. If you do need a real
+PUT, note that `put_group_configuration()` raises `AttributeError` after the write
+lands; see the entry in `known-issues.md`.
+
 ## Date Filtering Pattern
 
 ```python

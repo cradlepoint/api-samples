@@ -1,6 +1,6 @@
 ---
 inclusion: fileMatch
-fileMatchPattern: "{**/*.html,**/*.css,**/web_apps/**,**/dashboards/**}"
+fileMatchPattern: "{**/*.html,**/*.css,**/web_apps/**}"
 description: Web UI standards — template references, dark mode, dashboard requirements.
 ---
 
@@ -38,9 +38,9 @@ Breakpoints at 1024px and 768px. Sidebar collapses on smaller screens.
 
 ## Dashboard Pattern
 
-For data-driven dashboards, use `dashboards/cellular_health/` as reference:
-- Backend: `dashboards/cellular_health/serve.py` (FastAPI)
-- Frontend: `dashboards/cellular_health/index.html`
+For data-driven dashboards, use `web_apps/cellular_health_dashboard/` as reference:
+- Backend: `web_apps/cellular_health_dashboard/serve.py` (FastAPI)
+- Frontend: `web_apps/cellular_health_dashboard/index.html`
 
 ### Required Dashboard Features
 

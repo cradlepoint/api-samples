@@ -1,6 +1,6 @@
 ---
 inclusion: fileMatch
-fileMatchPattern: "{scripts/**/*.py,ncm/**/*.py,ncm2/**/*.py,dashboards/**/*.py}"
+fileMatchPattern: "{scripts/**/*.py,ncm/**/*.py,ncm2/**/*.py,web_apps/**/*.py}"
 description: NCM API development — endpoint routing, SDK usage, critical rules. Pull in #reflexion-workflow for the full self-improving docs loop.
 ---
 

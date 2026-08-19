@@ -50,7 +50,11 @@ python serve.py -ro -p "Name"  # Read-only with specific profile
 ## Settings Panel
 
 - **Profiles** — Save, Load, Delete, ★ Default (for read-only mode)
-- **Auto Refresh** — toggle + interval in minutes
+- **Display Options**
+  - Group interfaces by device (shade rows)
+  - Remove devices with health score 0
+  - Only show connected devices
+  - Auto Refresh — toggle + interval in minutes
 - **Clear History** — wipe all recorded samples
 
 ## History
