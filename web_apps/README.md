@@ -16,6 +16,7 @@ Interactive web applications for managing, configuring, and monitoring Cradlepoi
 | [script_manager](script_manager/) | 8000 | `script_manager.py` | CSV file editor and NCM script runner with a web UI |
 | [ncm_api_key_encryptor](ncm_api_key_encryptor/) | 8000 | `ncm_api_key_encryptor.py` | Encrypt NCM API keys for embedding in SDK app configurations |
 | [netcloud_router_lookup](netcloud_router_lookup/) | 8000 | `router_lookup.py` | Search routers across multiple accounts |
+| [rma_wizard](rma_wizard/) | 8080 | `rma_wizard.py` | Step-by-step wizard for migrating configuration from a failed router to its RMA replacement |
 | [cisco_to_cradlepoint_zfw_converter](cisco_to_cradlepoint_zfw_converter/) | 5001 | `app.py` | Convert Cisco router configs to Cradlepoint zone firewall format |
 | [web_app_template](web_app_template/) | 8000 | `serve.py` | Style/layout starting point for new apps, not a tool in itself |
 
