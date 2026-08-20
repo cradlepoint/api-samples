@@ -12,7 +12,7 @@ A suite of three focused MCP (Model Context Protocol) servers for the Ericsson E
 | `ncm-monitoring` | 3002 | Net devices, alerts/logs, speed tests | 6 |
 | `ncm-cloud-services` | 3003 | Users, subscriptions, private cellular, exchange | 13 |
 
-All servers default to **Streamable HTTP transport** and run together in a single container.
+All servers default to **Streamable HTTP transport** with **stateless mode** enabled, supporting both the MCP 2026-07-28 (stateless) and 2025-11-25 (legacy session-based) protocol versions simultaneously. Servers run together in a single container.
 
 ## Quick Start
 
@@ -90,21 +90,22 @@ NCM_CLOUD_SERVICES_PORT=4003 ncm-cloud-services
 
 ### 5. Transport Options
 
-The default transport is **Streamable HTTP**. Supported transports:
+The default transport is **Streamable HTTP** with stateless mode enabled. This means:
+- **MCP 2026-07-28 clients** connect without a handshake — each request is self-describing and can be served by any replica behind a load balancer.
+- **Legacy (2025-11-25) clients** are also served statelessly — no session stickiness required.
+- Both protocol versions are auto-negotiated per-request on the same endpoint.
 
 | Transport | Value | Use case |
 |-----------|-------|----------|
-| Streamable HTTP | `streamable-http` (default) | Recommended for all MCP clients |
-| SSE | `sse` | Legacy MCP clients using Server-Sent Events |
+| Streamable HTTP | `streamable-http` (default) | Recommended for all MCP clients (stateless, load-balancer friendly) |
 | Stdio | `stdio` | Piped MCP clients (single server only) |
 
 ```bash
-# Use SSE transport (legacy)
-MCP_TRANSPORT=sse ncm-mcp-servers
-
 # Use stdio (only works with individual servers, not the unified runner)
 MCP_TRANSPORT=stdio ncm-fleet
 ```
+
+> **Note:** The SSE transport was removed in this version. All clients should use Streamable HTTP.
 
 ## MCP Client Configuration
 

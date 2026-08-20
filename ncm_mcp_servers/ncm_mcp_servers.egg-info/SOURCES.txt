@@ -1,0 +1,8 @@
+README.md
+pyproject.toml
+ncm_mcp_servers.egg-info/PKG-INFO
+ncm_mcp_servers.egg-info/SOURCES.txt
+ncm_mcp_servers.egg-info/dependency_links.txt
+ncm_mcp_servers.egg-info/entry_points.txt
+ncm_mcp_servers.egg-info/requires.txt
+ncm_mcp_servers.egg-info/top_level.txt

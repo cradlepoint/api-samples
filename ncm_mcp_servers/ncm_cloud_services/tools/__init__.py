@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from mcp.server.fastmcp import FastMCP
+    from mcp.server import MCPServer
     from ncm_mcp_servers.shared.ncm import NcmClientv3
 
 from ncm_mcp_servers.ncm_cloud_services.tools import (
@@ -14,7 +14,7 @@ from ncm_mcp_servers.ncm_cloud_services.tools import (
 )
 
 
-def register_all(mcp: "FastMCP", client: "NcmClientv3") -> None:
+def register_all(mcp: "MCPServer", client: "NcmClientv3") -> None:
     """Registers all cloud services tools with the MCP server."""
     users.register(mcp, client)
     subscriptions.register(mcp, client)
