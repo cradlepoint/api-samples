@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from mcp.server.fastmcp import FastMCP
+    from mcp.server import MCPServer
     from ncm_mcp_servers.shared.ncm import NcmClientv2
 
 from ncm_mcp_servers.ncm_monitoring.tools import (
@@ -13,7 +13,7 @@ from ncm_mcp_servers.ncm_monitoring.tools import (
 )
 
 
-def register_all(mcp: "FastMCP", client: "NcmClientv2") -> None:
+def register_all(mcp: "MCPServer", client: "NcmClientv2") -> None:
     """Registers all monitoring tools with the MCP server."""
     net_devices.register(mcp, client)
     alerts.register(mcp, client)

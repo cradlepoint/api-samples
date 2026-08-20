@@ -1,0 +1,5 @@
+[console_scripts]
+ncm-cloud-services = ncm_mcp_servers.ncm_cloud_services.server:main
+ncm-fleet = ncm_mcp_servers.ncm_fleet.server:main
+ncm-mcp-servers = ncm_mcp_servers.__main__:main
+ncm-monitoring = ncm_mcp_servers.ncm_monitoring.server:main
