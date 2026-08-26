@@ -340,6 +340,27 @@ body.dark-mode .app-logo { content: url('/static/logo_dark.png'); }
 .tag i { cursor: pointer; color: var(--text-light); }
 .tag i:hover { color: var(--danger-color); }
 
+/* Top-level app mode tabs (Copy Mode / Consolidate Mode) */
+.app-mode-tabs { display: flex; gap: 0.5rem; justify-content: center; margin-bottom: 1.5rem; }
+.app-mode-tab {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    border: 1px solid var(--border-color); border-radius: var(--radius-md);
+    background: var(--light-surface); color: var(--text-secondary);
+    font-size: 0.875rem; font-weight: 600; cursor: pointer;
+    transition: var(--transition);
+}
+.app-mode-tab:hover { border-color: var(--primary-color); }
+.app-mode-tab.active {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    color: #fff; border-color: transparent;
+}
+.app-mode-section { display: none; }
+.app-mode-section.active { display: block; }
+
+.merge-source-tag { display: inline-flex; align-items: center; gap: 0.3rem; }
+.merge-source-tag .src-count { font-size: 0.7rem; color: var(--text-light); }
+
 .mode-options { display: flex; flex-direction: column; gap: 0.625rem; margin: 1rem 0; }
 .mode-option {
     display: flex; gap: 0.625rem; align-items: flex-start;
@@ -475,6 +496,17 @@ details.payload summary { cursor: pointer; font-size: 0.8125rem; color: var(--te
         </header>
 
         <main class="app-main">
+            <div class="app-mode-tabs">
+                <button type="button" class="app-mode-tab active" id="copyModeTab" data-app-mode="copy">
+                    <i class="fas fa-copy"></i> Copy Mode
+                </button>
+                <button type="button" class="app-mode-tab" id="consolidateModeTab" data-app-mode="consolidate">
+                    <i class="fas fa-object-group"></i> Consolidate Mode
+                </button>
+            </div>
+
+            <!-- ============================= COPY MODE ============================= -->
+            <div class="app-mode-section active" id="copyModeSection">
             <div class="stepper">
                 <div class="step active" data-step="1">
                     <span class="step-number">1</span>
@@ -634,6 +666,148 @@ details.payload summary { cursor: pointer; font-size: 0.8125rem; color: var(--te
                     </div>
                 </div>
             </div>
+            </div> <!-- /copyModeSection -->
+
+            <!-- ========================= CONSOLIDATE MODE ========================= -->
+            <div class="app-mode-section" id="consolidateModeSection">
+                <div class="stepper">
+                    <div class="step active" data-cstep="1">
+                        <span class="step-number">1</span>
+                        <span>Source Groups</span>
+                    </div>
+                    <div class="step-connector"></div>
+                    <div class="step" data-cstep="2">
+                        <span class="step-number">2</span>
+                        <span>Review &amp; Destination</span>
+                    </div>
+                    <div class="step-connector"></div>
+                    <div class="step" data-cstep="3">
+                        <span class="step-number">3</span>
+                        <span>Result</span>
+                    </div>
+                </div>
+
+                <!-- Consolidate step 1: pick source groups -->
+                <div class="step-panel active" id="cstep1-panel">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h2><i class="fas fa-layer-group"></i> Source Groups</h2>
+                            <span class="match-count" id="cMatchCount"></span>
+                        </div>
+                        <div class="panel-content">
+                            <p class="hint">
+                                Defaults to every group containing
+                                <code id="cSrcIncludeHint">(R)</code>, excluding any group whose
+                                name contains <code id="cSrcExcludeHint">Base</code>. Search with
+                                plain text or wildcards, then use
+                                <strong>Select All Matching</strong>.
+                            </p>
+                            <div class="dest-toolbar">
+                                <div class="autocomplete">
+                                    <input type="text" class="input-field" id="cSourceSearch"
+                                           placeholder="Filter groups, e.g. (R)" autocomplete="off">
+                                </div>
+                                <button class="btn btn-sm btn-secondary" id="cSelectMatchingBtn">
+                                    <i class="fas fa-check-double"></i> Select All Matching
+                                </button>
+                                <button class="btn btn-sm btn-secondary" id="cClearSelectionBtn">
+                                    <i class="fas fa-xmark"></i> Clear
+                                </button>
+                                <button class="btn btn-sm btn-secondary" id="cApplyDefaultsBtn"
+                                        title="Re-apply the (R)-excluding-Base default">
+                                    <i class="fas fa-wand-magic-sparkles"></i> Defaults
+                                </button>
+                            </div>
+                            <div class="group-list" id="cSourceList"></div>
+                            <div class="selected-tags" id="cSelectedTags"></div>
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-content panel-actions">
+                            <div></div>
+                            <div class="right">
+                                <button class="btn btn-primary" id="cPreviewBtn" disabled>
+                                    <i class="fas fa-magnifying-glass"></i> Consolidate &amp; Preview
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Consolidate step 2: review merged list + destination -->
+                <div class="step-panel" id="cstep2-panel">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h2><i class="fas fa-object-group"></i> Consolidated Master List</h2>
+                        </div>
+                        <div class="panel-content">
+                            <div id="cPreviewResult"></div>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h2><i class="fas fa-crown"></i> Destination Group</h2>
+                        </div>
+                        <div class="panel-content">
+                            <p class="hint">
+                                Defaults to the group with <code id="cDstPatternHint">Base</code>
+                                in its name. This is where the merged, deduped identity list gets
+                                pushed. Its current <code>identities.ip</code> will be replaced to
+                                match the consolidated list exactly (destination-only identities
+                                not present in any source are removed).
+                            </p>
+                            <div class="search-row">
+                                <div class="autocomplete">
+                                    <input type="text" class="input-field" id="cDestSearch"
+                                           placeholder="Search group names..." autocomplete="off">
+                                    <div class="autocomplete-list hidden" id="cDestList"></div>
+                                </div>
+                            </div>
+                            <div id="cDestChosen"></div>
+                            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.8125rem;margin-top:1rem;">
+                                <input type="checkbox" id="cDryRunCheck" style="accent-color:var(--primary-color);">
+                                Dry run — show exactly what would change, send nothing to NCM
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-content panel-actions">
+                            <button class="btn btn-secondary" id="cBackToStep1">
+                                <i class="fas fa-arrow-left"></i> Back
+                            </button>
+                            <div class="right">
+                                <button class="btn btn-secondary" id="cSaveJobBtn">
+                                    <i class="fas fa-floppy-disk"></i> Save Selection
+                                </button>
+                                <button class="btn btn-success" id="cPushBtn" disabled>
+                                    <i class="fas fa-paper-plane"></i> Push to Destination
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Consolidate step 3: result -->
+                <div class="step-panel" id="cstep3-panel">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h2><i class="fas fa-clipboard-check"></i> Consolidation Result</h2>
+                        </div>
+                        <div class="panel-content">
+                            <div id="cResultBox"></div>
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-content panel-actions">
+                            <button class="btn btn-secondary" id="cBackToStep2">
+                                <i class="fas fa-arrow-left"></i> Back to Review
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div> <!-- /consolidateModeSection -->
         </main>
     </div>
 
@@ -712,6 +886,17 @@ let destPattern = '(R)';
 let currentStep = 1;
 let acHighlight = -1;
 
+// --- Consolidate mode state ---
+let appMode = 'copy';                    // 'copy' | 'consolidate'
+let cSelectedSources = new Map();        // id -> {id, name}
+let cSourceIncludePattern = '(R)';
+let cSourceExcludePattern = 'Base';
+let cDestPattern = 'Base';
+let cDestGroup = null;                   // {id, name}
+let cMerged = null;                      // last preview response
+let cCurrentStep = 1;
+let cAcHighlight = -1;
+
 // --- Utilities ---
 function showLoading(text = 'Loading...') {
     document.getElementById('loadingText').textContent = text;
@@ -755,6 +940,36 @@ function setStep(step) {
         else if (sStep < step) s.classList.add('completed');
     });
     document.querySelectorAll('.step-connector').forEach((c, i) => {
+        c.classList.toggle('completed', i < step - 1);
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// --- App mode switching ---
+function setAppMode(mode) {
+    appMode = mode === 'consolidate' ? 'consolidate' : 'copy';
+    document.getElementById('copyModeTab').classList.toggle('active', appMode === 'copy');
+    document.getElementById('consolidateModeTab').classList.toggle('active', appMode === 'consolidate');
+    document.getElementById('copyModeSection').classList.toggle('active', appMode === 'copy');
+    document.getElementById('consolidateModeSection').classList.toggle('active', appMode === 'consolidate');
+    apiFetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ app_mode: appMode })
+    }).catch(() => {});
+}
+
+function cSetStep(step) {
+    cCurrentStep = step;
+    document.querySelectorAll('#consolidateModeSection .step-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById(`cstep${step}-panel`).classList.add('active');
+    document.querySelectorAll('#consolidateModeSection .step').forEach(s => {
+        const sStep = parseInt(s.dataset.cstep, 10);
+        s.classList.remove('active', 'completed');
+        if (sStep === step) s.classList.add('active');
+        else if (sStep < step) s.classList.add('completed');
+    });
+    document.querySelectorAll('#consolidateModeSection .step-connector').forEach((c, i) => {
         c.classList.toggle('completed', i < step - 1);
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1352,6 +1567,18 @@ async function fetchSavedConfig() {
         document.querySelector('input[name="pushMode"][value="additive"]').checked = true;
         syncModeStyles();
     }
+
+    cSourceIncludePattern = savedConfig.consolidate_source_include_pattern || cSourceIncludePattern;
+    cSourceExcludePattern = savedConfig.consolidate_source_exclude_pattern || cSourceExcludePattern;
+    cDestPattern = savedConfig.consolidate_destination_default_pattern || cDestPattern;
+    document.getElementById('cSrcIncludeHint').textContent = cSourceIncludePattern;
+    document.getElementById('cSrcExcludeHint').textContent = cSourceExcludePattern;
+    document.getElementById('cDstPatternHint').textContent = cDestPattern;
+    document.getElementById('cSourceSearch').placeholder = `Filter groups, e.g. ${cSourceIncludePattern}`;
+
+    if (savedConfig.app_mode === 'consolidate') {
+        setAppMode('consolidate');
+    }
 }
 
 /**
@@ -1402,6 +1629,348 @@ function syncModeStyles() {
         const input = label.querySelector('input');
         label.classList.toggle('selected', input.checked);
     });
+}
+
+// ============================= Consolidate Mode =============================
+
+function cVisibleGroups() {
+    const pattern = document.getElementById('cSourceSearch').value;
+    return groups.filter(g => {
+        if (cDestGroup && String(g.id) === String(cDestGroup.id)) return false;
+        return matchesPattern(g.name, pattern);
+    });
+}
+
+function cRenderSourceList() {
+    const list = document.getElementById('cSourceList');
+    if (!list) return;
+
+    if (!groups.length) {
+        list.innerHTML = `<div class="empty-state">
+            <i class="fas fa-plug-circle-exclamation"></i>
+            No groups loaded. Add credentials in Settings, then reload.
+        </div>`;
+        document.getElementById('cMatchCount').textContent = '';
+        cRenderSelectedTags();
+        return;
+    }
+
+    const visible = cVisibleGroups();
+    document.getElementById('cMatchCount').textContent =
+        `${visible.length} match${visible.length === 1 ? '' : 'es'} · ${cSelectedSources.size} selected`;
+
+    if (!visible.length) {
+        list.innerHTML = `<div class="empty-state">
+            <i class="fas fa-magnifying-glass"></i> No groups match that pattern.
+        </div>`;
+        cRenderSelectedTags();
+        return;
+    }
+
+    list.innerHTML = visible.slice(0, 500).map(g => `
+        <div class="group-item">
+            <input type="checkbox" id="csrc-${esc(g.id)}" data-id="${esc(g.id)}"
+                   ${cSelectedSources.has(String(g.id)) ? 'checked' : ''}>
+            <label for="csrc-${esc(g.id)}">
+                <div>${esc(g.name)}</div>
+                <div class="gi-meta">${esc(groupLabel(g))}</div>
+            </label>
+        </div>`).join('') +
+        (visible.length > 500
+            ? `<div class="empty-state">Showing the first 500 of ${visible.length} matches — narrow the pattern to see the rest.</div>`
+            : '');
+
+    cRenderSelectedTags();
+}
+
+function cRenderSelectedTags() {
+    const wrap = document.getElementById('cSelectedTags');
+    if (!wrap) return;
+    if (!cSelectedSources.size) { wrap.innerHTML = ''; cUpdatePreviewButton(); return; }
+    wrap.innerHTML = [...cSelectedSources.values()].map(g => `
+        <span class="tag">${esc(g.name)}
+            <i class="fas fa-times" data-cremove="${esc(g.id)}" title="Remove"></i>
+        </span>`).join('');
+    cUpdatePreviewButton();
+}
+
+function cUpdatePreviewButton() {
+    const btn = document.getElementById('cPreviewBtn');
+    if (!btn) return;
+    btn.disabled = cSelectedSources.size === 0;
+    btn.innerHTML = cSelectedSources.size
+        ? `<i class="fas fa-magnifying-glass"></i> Consolidate &amp; Preview ${cSelectedSources.size} Group${cSelectedSources.size === 1 ? '' : 's'}`
+        : `<i class="fas fa-magnifying-glass"></i> Consolidate &amp; Preview`;
+}
+
+/**
+ * Apply the (R)-excluding-Base source default and the Base destination
+ * default for consolidate mode.
+ */
+function cApplyDefaults() {
+    if (!groups.length) return;
+    document.getElementById('cSourceSearch').value = cSourceIncludePattern;
+    const matches = groups.filter(g =>
+        matchesPattern(g.name, cSourceIncludePattern) &&
+        !matchesPattern(g.name, cSourceExcludePattern));
+    cSelectedSources.clear();
+    for (const g of matches) cSelectedSources.set(String(g.id), { id: g.id, name: g.name });
+    cRenderSourceList();
+    if (matches.length) {
+        showToast(`${matches.length} group(s) matching "${cSourceIncludePattern}" (excluding "${cSourceExcludePattern}") selected as sources`, 'info');
+    } else {
+        showToast(`No group name matches "${cSourceIncludePattern}" while excluding "${cSourceExcludePattern}"`, 'warning');
+    }
+
+    // Destination default: single unambiguous "Base" match
+    const destCandidates = groups.filter(g => matchesPattern(g.name, cDestPattern));
+    if (destCandidates.length === 1) {
+        cPickDestGroup(destCandidates[0].id);
+    }
+}
+
+function cPickDestGroup(id) {
+    const g = groups.find(x => String(x.id) === String(id));
+    if (!g) return false;
+    cDestGroup = { id: g.id, name: g.name };
+    document.getElementById('cDestSearch').value = g.name;
+    document.getElementById('cDestList').classList.add('hidden');
+    cSelectedSources.delete(String(g.id));
+    cRenderDestChosen();
+    cUpdatePushButton();
+    return true;
+}
+
+function cRenderDestSuggestions() {
+    const input = document.getElementById('cDestSearch');
+    const list = document.getElementById('cDestList');
+    const query = input.value.trim();
+    if (!query) { list.classList.add('hidden'); list.innerHTML = ''; return; }
+    if (!groups.length) {
+        list.innerHTML = '<div class="autocomplete-empty">No groups loaded — check credentials in Settings.</div>';
+        list.classList.remove('hidden');
+        return;
+    }
+    const matches = groups.filter(g => matchesPattern(g.name, query)).slice(0, 50);
+    if (!matches.length) {
+        list.innerHTML = '<div class="autocomplete-empty">No matching groups</div>';
+        list.classList.remove('hidden');
+        return;
+    }
+    list.innerHTML = matches.map(g => `
+        <div class="autocomplete-item" data-id="${esc(g.id)}">
+            <div class="ac-name">${esc(g.name)}</div>
+            <div class="ac-meta">${esc(groupLabel(g))}</div>
+        </div>`).join('');
+    list.classList.remove('hidden');
+}
+
+function cRenderDestChosen() {
+    const box = document.getElementById('cDestChosen');
+    if (!box) return;
+    if (!cDestGroup) { box.innerHTML = ''; return; }
+    box.innerHTML = `
+        <div class="notice">
+            <i class="fas fa-crown"></i>
+            <div>Pushing to <strong>${esc(cDestGroup.name)}</strong> (id ${esc(cDestGroup.id)}).
+            It is automatically excluded from the source list.</div>
+        </div>`;
+}
+
+async function consolidatePreview() {
+    if (!cSelectedSources.size) { showToast('Select at least one source group', 'warning'); return; }
+    const ids = [...cSelectedSources.keys()];
+    showLoading(`Reading configuration for ${ids.length} group(s)...`);
+    try {
+        const data = await apiFetch('/api/consolidate-preview', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source_group_ids: ids })
+        });
+        cMerged = data;
+        cRenderPreview(data);
+        cSetStep(2);
+        cRenderDestChosen();
+        cUpdatePushButton();
+        const { stats } = data;
+        showToast(
+            `Consolidated ${stats.identity_count} identit${stats.identity_count === 1 ? 'y' : 'ies'} ` +
+            `(${stats.address_count} addresses, ${stats.duplicates_removed} duplicate(s) removed)`,
+            'success'
+        );
+    } catch (e) {
+        showToast(e.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+function cRenderPreview(data) {
+    const box = document.getElementById('cPreviewResult');
+    const { sources, merged, stats } = data;
+
+    const withoutIdentities = sources.filter(s => !s.has_identities && !s.error);
+    const withErrors = sources.filter(s => s.error);
+
+    const cards = merged.map(m => `
+        <div class="identity-card">
+            <div class="id-name"><i class="fas fa-address-book"></i> ${esc(m.name)}</div>
+            <div class="id-meta">
+                ${m.address_count} address${m.address_count === 1 ? '' : 'es'}
+                · from ${m.contributing_groups.length} group${m.contributing_groups.length === 1 ? '' : 's'}
+            </div>
+            <div class="addr-list">
+                ${m.addresses.map(a => `<span class="addr-chip">${esc(a)}</span>`).join('')}
+            </div>
+        </div>`).join('');
+
+    box.innerHTML = `
+        <div class="stat-row">
+            <div class="stat-card"><div class="stat-value">${stats.source_count}</div><div class="stat-label">Sources</div></div>
+            <div class="stat-card"><div class="stat-value">${stats.identity_count}</div><div class="stat-label">Identities</div></div>
+            <div class="stat-card"><div class="stat-value">${stats.address_count}</div><div class="stat-label">Addresses</div></div>
+            <div class="stat-card ${stats.duplicates_removed ? 'ok' : ''}"><div class="stat-value">${stats.duplicates_removed}</div><div class="stat-label">Dupes removed</div></div>
+        </div>
+        ${withErrors.length ? `
+        <div class="notice warn">
+            <i class="fas fa-triangle-exclamation"></i>
+            <div>Could not read: ${withErrors.map(s => esc(s.group_name) + ' (' + esc(s.error) + ')').join(', ')}</div>
+        </div>` : ''}
+        ${withoutIdentities.length ? `
+        <div class="notice warn">
+            <i class="fas fa-circle-info"></i>
+            <div>No host address identities found in: ${withoutIdentities.map(s => esc(s.group_name)).join(', ')}</div>
+        </div>` : ''}
+        <div class="identity-grid">${cards || '<div class="empty-state">No identities found across the selected sources.</div>'}</div>
+        <details class="payload">
+            <summary>Raw consolidated identities.ip</summary>
+            <pre class="json-view">${esc(JSON.stringify(merged, null, 2))}</pre>
+        </details>`;
+}
+
+function cUpdatePushButton() {
+    const btn = document.getElementById('cPushBtn');
+    if (!btn) return;
+    const ready = !!(cMerged && cMerged.merged && cMerged.merged.length && cDestGroup);
+    btn.disabled = !ready;
+}
+
+async function cSaveJob(showFeedback = true) {
+    const payload = {
+        consolidate_source_groups: [...cSelectedSources.values()],
+        consolidate_source_filter: document.getElementById('cSourceSearch').value,
+        consolidate_destination_group: cDestGroup,
+        consolidate_destination_filter: document.getElementById('cDestSearch').value,
+    };
+    try {
+        await apiFetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (showFeedback) showToast('Selection saved to config.json', 'success');
+    } catch (e) {
+        if (showFeedback) showToast(`Could not save selection: ${e.message}`, 'error');
+    }
+}
+
+async function consolidatePush() {
+    if (!cMerged || !cMerged.merged || !cMerged.merged.length) {
+        showToast('Preview a consolidation first', 'warning'); return;
+    }
+    if (!cDestGroup) { showToast('Choose a destination group', 'warning'); return; }
+
+    const dryRun = document.getElementById('cDryRunCheck').checked;
+    if (!dryRun) {
+        const count = cMerged.merged.length;
+        if (!confirm(
+            `This will replace the identities.ip config on "${cDestGroup.name}" with the ` +
+            `consolidated list of ${count} identit${count === 1 ? 'y' : 'ies'}. Destination-only ` +
+            `identities not part of this merge will be removed.\n\nContinue?`
+        )) return;
+    }
+
+    showLoading(dryRun ? 'Comparing destination...' : 'Pushing consolidated list...');
+    try {
+        const data = await apiFetch('/api/consolidate-push', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                destination_group_id: cDestGroup.id,
+                destination_group: cDestGroup,
+                merged: cMerged.merged,
+                dry_run: dryRun
+            })
+        });
+        cRenderResult(data);
+        cSetStep(3);
+        if (dryRun) showToast('Dry run complete — nothing was sent', 'info');
+        else if (data.result.status === 'error') showToast(`Push failed: ${data.result.detail}`, 'error');
+        else showToast(`Pushed consolidated list to "${cDestGroup.name}"`, 'success');
+    } catch (e) {
+        showToast(e.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+function cRenderResult(data) {
+    const box = document.getElementById('cResultBox');
+    const r = data.result;
+    const plan = r.plan || { added: [], updated: [], unchanged: [], removed: [], addresses_removed: 0 };
+    box.innerHTML = `
+        <div class="stat-row">
+            <div class="stat-card"><div class="stat-value" style="font-size:1rem;">${esc(r.status)}</div><div class="stat-label">Status</div></div>
+            <div class="stat-card"><div class="stat-value">${plan.added.length}</div><div class="stat-label">Added</div></div>
+            <div class="stat-card"><div class="stat-value">${plan.updated.length}</div><div class="stat-label">Updated</div></div>
+            <div class="stat-card"><div class="stat-value">${plan.unchanged.length}</div><div class="stat-label">Unchanged</div></div>
+            <div class="stat-card ${plan.removed.length ? 'bad' : ''}"><div class="stat-value">${plan.removed.length}</div><div class="stat-label">Removed</div></div>
+            <div class="stat-card ${plan.addresses_removed ? 'bad' : ''}"><div class="stat-value">${plan.addresses_removed}</div><div class="stat-label">Addresses removed</div></div>
+        </div>
+        <div class="result-card ${r.status === 'error' ? 'err' : (r.status === 'skipped' ? 'info' : 'ok')}">
+            <h3><i class="fas fa-${r.status === 'error' ? 'circle-xmark' : (r.status === 'skipped' ? 'circle-info' : 'circle-check')}"></i>
+                ${esc(r.group_name)} (id ${esc(r.group_id)})</h3>
+            <div>${esc(r.detail)}</div>
+            ${plan.added.length ? `<div style="margin-top:0.5rem;font-size:0.8125rem;">added: ${plan.added.map(esc).join(', ')}</div>` : ''}
+            ${plan.updated.length ? `<div style="font-size:0.8125rem;">updated: ${plan.updated.map(esc).join(', ')}</div>` : ''}
+            ${plan.removed.length ? `<div style="font-size:0.8125rem;">removed: ${plan.removed.map(esc).join(', ')}</div>` : ''}
+        </div>
+        <details class="payload">
+            <summary>Payload sent to the destination group</summary>
+            <pre class="json-view">${esc(JSON.stringify(r.payload, null, 2))}</pre>
+        </details>`;
+}
+
+/** Restore any saved consolidate-mode selection, falling back to defaults. */
+async function cRestoreOrDefault() {
+    const hasSavedSources = !!(savedConfig && (savedConfig.consolidate_source_groups || []).length);
+    const hasSavedDest = !!(savedConfig && savedConfig.consolidate_destination_group
+                            && savedConfig.consolidate_destination_group.id != null);
+
+    if (hasSavedSources) {
+        if (savedConfig.consolidate_source_filter) {
+            document.getElementById('cSourceSearch').value = savedConfig.consolidate_source_filter;
+        }
+        for (const g of savedConfig.consolidate_source_groups) {
+            if (g && g.id != null) cSelectedSources.set(String(g.id), { id: g.id, name: g.name });
+        }
+    }
+    if (hasSavedDest) {
+        const g = savedConfig.consolidate_destination_group;
+        if (!cPickDestGroup(g.id)) {
+            cDestGroup = { id: g.id, name: g.name };
+            document.getElementById('cDestSearch').value = g.name || '';
+        }
+    }
+
+    if (!hasSavedSources || !hasSavedDest) {
+        cApplyDefaults();
+    } else {
+        cRenderSourceList();
+        cRenderDestChosen();
+    }
+    cUpdatePreviewButton();
+    cUpdatePushButton();
 }
 
 // --- Dark Mode ---
@@ -1564,7 +2133,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             hideLoading();
             if (data.has_credentials) {
                 showToast('Credentials saved to config.json', 'success');
-                if (await loadGroups()) await restoreOrDefault();
+                if (await loadGroups()) { await restoreOrDefault(); await cRestoreOrDefault(); }
             } else {
                 showToast('All four credential fields are required', 'warning');
             }
@@ -1609,7 +2178,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             showToast(`Profile "${name}" loaded`, 'success');
             await loadCurrentCredentials();
             await refreshCredentialStatus();
-            if (await loadGroups()) await restoreOrDefault();
+            if (await loadGroups()) { await restoreOrDefault(); await cRestoreOrDefault(); }
         } catch (e) {
             showToast(e.message, 'error');
         }
@@ -1628,13 +2197,91 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
+    // App mode tabs
+    document.getElementById('copyModeTab').addEventListener('click', () => setAppMode('copy'));
+    document.getElementById('consolidateModeTab').addEventListener('click', () => setAppMode('consolidate'));
+
+    // Consolidate mode: source list
+    document.getElementById('cSourceSearch').addEventListener('input', cRenderSourceList);
+    document.getElementById('cSourceList').addEventListener('change', (e) => {
+        const cb = e.target.closest('input[type="checkbox"]');
+        if (!cb) return;
+        const id = String(cb.dataset.id);
+        const g = groups.find(x => String(x.id) === id);
+        if (cb.checked && g) cSelectedSources.set(id, { id: g.id, name: g.name });
+        else cSelectedSources.delete(id);
+        document.getElementById('cMatchCount').textContent =
+            `${cVisibleGroups().length} matches · ${cSelectedSources.size} selected`;
+        cRenderSelectedTags();
+    });
+    document.getElementById('cSelectedTags').addEventListener('click', (e) => {
+        const id = e.target.dataset && e.target.dataset.cremove;
+        if (!id) return;
+        cSelectedSources.delete(String(id));
+        cRenderSourceList();
+    });
+    document.getElementById('cSelectMatchingBtn').addEventListener('click', () => {
+        const visible = cVisibleGroups();
+        if (!visible.length) { showToast('Nothing matches that pattern', 'warning'); return; }
+        for (const g of visible) cSelectedSources.set(String(g.id), { id: g.id, name: g.name });
+        cRenderSourceList();
+        showToast(`Selected ${visible.length} group(s)`, 'success');
+    });
+    document.getElementById('cClearSelectionBtn').addEventListener('click', () => {
+        cSelectedSources.clear();
+        cRenderSourceList();
+    });
+    document.getElementById('cApplyDefaultsBtn').addEventListener('click', async () => {
+        try { await apiFetch('/api/config?mode=consolidate', { method: 'DELETE' }); } catch (e) { /* non-fatal */ }
+        cApplyDefaults();
+    });
+    document.getElementById('cPreviewBtn').addEventListener('click', consolidatePreview);
+
+    // Consolidate mode: destination autocomplete
+    const cDestInput = document.getElementById('cDestSearch');
+    const cDestListEl = document.getElementById('cDestList');
+    cDestInput.addEventListener('input', () => {
+        cDestGroup = null;
+        cRenderDestChosen();
+        cUpdatePushButton();
+        cRenderDestSuggestions();
+    });
+    cDestInput.addEventListener('focus', cRenderDestSuggestions);
+    cDestListEl.addEventListener('click', (e) => {
+        const item = e.target.closest('.autocomplete-item');
+        if (item) cPickDestGroup(item.dataset.id);
+    });
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('#cDestSearch') && !e.target.closest('#cDestList')) {
+            cDestListEl.classList.add('hidden');
+        }
+    });
+
+    document.getElementById('cSaveJobBtn').addEventListener('click', () => cSaveJob(true));
+    document.getElementById('cPushBtn').addEventListener('click', consolidatePush);
+
+    document.getElementById('cBackToStep1').addEventListener('click', () => cSetStep(1));
+    document.getElementById('cBackToStep2').addEventListener('click', () => cSetStep(2));
+    document.querySelectorAll('#consolidateModeSection .step').forEach(s => {
+        s.addEventListener('click', () => {
+            const target = parseInt(s.dataset.cstep, 10);
+            if (target === 1) cSetStep(1);
+            else if (target === 2 && cMerged) cSetStep(2);
+            else if (target === 3 && cMerged && cCurrentStep === 3) cSetStep(3);
+        });
+    });
+
     // Boot
     const hasCreds = await refreshCredentialStatus();
     await fetchSavedConfig();
     if (hasCreds) {
-        if (await loadGroups(true)) await restoreOrDefault();
+        if (await loadGroups(true)) {
+            await restoreOrDefault();
+            await cRestoreOrDefault();
+        }
     } else {
         renderDestList();
+        cRenderSourceList();
         showToast('Add your NCM API keys in Settings (gear icon) to begin', 'warning');
         openSettings();
     }

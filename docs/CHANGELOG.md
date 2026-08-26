@@ -245,3 +245,16 @@ Mostly bookkeeping: fixes from earlier in the day landed, which left several ent
 - Corrected the history-is-clean paragraph to past tense — the live keys existed only in the working tree, never in a commit, so no rotation was needed and none was done.
 - Closed out two stale notes in the repo-layout entry: the `scripts/script_manager/csv_files/` line has now been removed from `.gitignore`, and the `alert_dashboard` docstring is fixed.
 - Promoted the `alert_dashboard` docstring note from an app-specific aside to item 7, "Entry-point docstrings drift too," after sweeping all twelve entry points: docstring path and port now match source everywhere, so a mismatch is a regression rather than the norm. Its usage line also switched from `.venv/bin/python` to the activate form, since a long-running server launched the bare way boots cleanly and then fails every API call.
+
+## 2026-08-26 — Fan-in consolidation pattern for UUID-keyed collections
+
+- Added a `common-patterns.md` section ("Consolidating (fan-in) a UUID-keyed
+  collection from many sources into one") covering the reverse of the existing
+  mirror pattern: merging a UUID-keyed collection like `identities.ip` from many
+  source groups into one destination. Key generalizable points: merge by the
+  collection's natural key (e.g. `name`), not by `_id_` (UUIDs are per-source-group
+  and never shared across groups), and when writing the merged result back, match
+  the destination by that same natural key and reuse its existing UUID rather than
+  minting a new one — otherwise every run regenerates every identity's UUID, which
+  breaks anything elsewhere in the config that references the old UUID. Discovered
+  while building Consolidate Mode for `host_identity_copier`.

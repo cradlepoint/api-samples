@@ -329,6 +329,72 @@ list, whereas PUT additionally resets every unmentioned field to defaults, which
 PUT, note that `put_group_configuration()` raises `AttributeError` after the write
 lands; see the entry in `known-issues.md`.
 
+### Consolidating (fan-in) a UUID-keyed collection from many sources into one
+
+The reverse of mirroring: instead of one master feeding many destinations, many
+source groups feed one destination. Two extra rules make this safe to repeat:
+
+1. **Merge by the collection's natural key (e.g. `name`), not by `_id_`.** UUIDs
+   are per-source-group and unrelated across groups — the "IPs" identity in group
+   A and the "IPs" identity in group B do not share a UUID, but they should merge
+   into one bucket. Bucket by the lowercased/trimmed name instead.
+2. **When writing the merged result, match the destination by the same natural
+   key and reuse its existing UUID for that name.** Only mint a fresh UUID for a
+   name that doesn't exist on the destination yet. Otherwise every run replaces
+   every identity with a new UUID, which is not just wasteful — anything on the
+   device referencing the old UUID (rules, other config sections) breaks.
+
+```python
+import uuid
+
+def merge_by_name(sources):
+    """sources: list of raw identities.ip dicts (one per source group)."""
+    buckets = {}   # lower(name) -> {'name', 'addresses': [...], 'seen': set()}
+    for ip_identities in sources:
+        for _, entry in (ip_identities or {}).items():
+            name = (entry.get('name') or '').strip() or '(unnamed)'
+            key = name.lower()
+            bucket = buckets.setdefault(key, {'name': name, 'addresses': [], 'seen': set()})
+            for member in normalize_entries(entry.get('members')):
+                addr = member.get('address')
+                addr_key = (addr or '').strip().lower()
+                if addr and addr_key not in bucket['seen']:
+                    bucket['seen'].add(addr_key)
+                    bucket['addresses'].append(addr)
+    return list(buckets.values())
+
+
+def build_consolidate_payload(merged, destination_identities):
+    """Push the merged list onto one destination, matched by name to keep UUIDs stable."""
+    dst_by_name = {
+        (e.get('name') or '').strip().lower(): (k, e)
+        for k, e in (destination_identities or {}).items()
+    }
+    updates, removals, matched = {}, [], set()
+
+    for bucket in merged:
+        key = bucket['name'].strip().lower()
+        existing = dst_by_name.get(key)
+        identity_id = existing[0] if existing else str(uuid.uuid4())   # reuse, don't regenerate
+        matched.add(identity_id)
+        updates[identity_id] = {
+            '_id_': identity_id,
+            'name': bucket['name'],
+            'members': {str(i): {'address': a} for i, a in enumerate(bucket['addresses'])},
+        }
+
+    for identity_id, entry in (destination_identities or {}).items():
+        if identity_id not in matched:
+            removals.append(['identities', 'ip', identity_id])   # destination-only name, prune it
+
+    return {'configuration': [{'identities': {'ip': updates}}, removals]}
+```
+
+Because matching is by name rather than by UUID, re-running the consolidation
+after a small change (one new address added to one source) only touches the
+affected identity's `members` — it does not regenerate every UUID on the
+destination, so nothing else that references those UUIDs is disturbed.
+
 ## Date Filtering Pattern
 
 ```python

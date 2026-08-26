@@ -1,7 +1,14 @@
 # Host Identity Copier
 
-Copy the host address identities (`identities.ip`) from a master NCM group to any
-number of destination groups.
+Two modes for managing host address identities (`identities.ip`) across NCM groups:
+
+- **Copy Mode** — copy identities from one master group to any number of
+  destination groups.
+- **Consolidate Mode** — the reverse: collect identities from many source
+  groups, merge and dedupe them into one master list, and push that master
+  list to a single destination group.
+
+Switch modes with the tabs at the top of the page.
 
 <img width="1369" height="636" alt="image" src="https://github.com/user-attachments/assets/ec0737a6-5ba0-4474-8c1b-2ce81ac7b0f4" />
 <img width="1369" height="749" alt="image" src="https://github.com/user-attachments/assets/64d65def-63cb-49ce-92aa-de8429097110" />
@@ -109,6 +116,42 @@ sequentially with reindexing.
 Nothing outside `identities.ip` is touched, and the source group is never written
 to.
 
+## Consolidate Mode
+
+Consolidate Mode works backwards from Copy Mode: instead of one master feeding
+many, many source groups feed one master.
+
+| Selection | Default | Behavior |
+|-----------|---------|----------|
+| Source groups | name contains `(R)`, excluding any name containing `Base` | Every match is pre-selected. Adjust with search, wildcards, **Select All Matching**, or individual checkboxes/chips. |
+| Destination group | name contains `Base` (case-insensitive) | One match is selected automatically. Several or no matches leave the search box for you to pick manually. |
+
+### Workflow
+
+1. **Source groups** — pick the groups to fold together (defaults to every
+   `(R)` group except `Base` groups). Click **Consolidate & Preview**.
+2. **Review** — the app reads `identities.ip` from every selected source,
+   merges identities by name (`IPs`, `URLs`, ...), and dedupes addresses within
+   each name (case-insensitive, trimmed). The merged, deduped result is shown
+   for review before anything is written.
+3. **Destination** — pick the group to receive the consolidated list (defaults
+   to the `Base` group). It is automatically excluded from the source list, so
+   it can never consolidate into itself.
+4. **Push** — optionally dry run first to see exactly what would change. The
+   push replaces the destination's `identities.ip` to match the consolidated
+   list: identities already present (matched by name) are updated in place and
+   keep their UUID; new names are added with a fresh UUID; destination-only
+   identities not covered by the merge are removed, along with any surplus
+   addresses — the destination ends up with exactly the merged, deduped list.
+
+Because matching by name preserves existing UUIDs, running a consolidation
+repeatedly (e.g. after adding an address to one region's group) does not
+churn identity IDs on the destination — only the affected members change.
+
+The selected sources, source search pattern, and destination group are saved
+to `config.json` independently of Copy Mode's job, so both modes can be run
+side by side without clobbering each other's saved selections.
+
 ## Config file
 
 `config.json` (created on first use, `0600` on POSIX, gitignored):
@@ -117,16 +160,24 @@ to.
 {
   "credentials": { "X_CP_API_ID": "...", "X_CP_API_KEY": "...", "X_ECM_API_ID": "...", "X_ECM_API_KEY": "..." },
   "profiles": { "Production": { "X_CP_API_ID": "..." } },
+  "app_mode": "copy",
   "source_group": { "id": 123456, "name": "Base Group" },
   "destination_groups": [ { "id": 234567, "name": "Store 12 (R)" } ],
   "destination_filter": "(R)",
-  "push_mode": "mirror"
+  "push_mode": "mirror",
+  "consolidate_source_groups": [ { "id": 234567, "name": "Store 12 (R)" } ],
+  "consolidate_source_filter": "(R)",
+  "consolidate_destination_group": { "id": 123456, "name": "Base Group" },
+  "consolidate_destination_filter": "Base"
 }
 ```
 
-The source group is saved when you extract; destinations, search pattern and copy
-mode are saved when you push or click **Save Selection**. On the next run the app
-restores all of it so the same job can be repeated.
+Copy Mode's source group is saved when you extract; its destinations, search
+pattern and copy mode are saved when you push or click **Save Selection**.
+Consolidate Mode's sources are saved when you preview; its destination is saved
+when you push or click **Save Selection**. `app_mode` remembers which tab was
+active. On the next run the app restores all of it so the same job can be
+repeated in either mode.
 
 ## Expected source config
 
