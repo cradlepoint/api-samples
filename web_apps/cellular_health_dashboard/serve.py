@@ -15,6 +15,7 @@ import ssl
 import sqlite3
 import asyncio
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager, asynccontextmanager
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -456,6 +457,28 @@ def _extract_id_from_url(url):
         return None
 
 
+def _fetch_chunks_parallel(fetch_fn, nd_ids, chunk_size=100, max_workers=8):
+    """Run fetch_fn(id_str) over nd_ids in chunks, concurrently.
+
+    fetch_fn receives a comma-joined chunk of IDs and returns a list of
+    records. Chunks are independent API calls (Cradlepoint's `__in` filter
+    limit is 100 IDs per call), so fanning them out over a thread pool cuts
+    wall-clock time roughly by max_workers vs. the previous sequential loop.
+    """
+    chunks = [
+        ','.join(nd_ids[i:i + chunk_size])
+        for i in range(0, len(nd_ids), chunk_size)
+    ]
+    if not chunks:
+        return []
+    results = []
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(fetch_fn, chunk) for chunk in chunks]
+        for future in as_completed(futures):
+            results.extend(future.result() or [])
+    return results
+
+
 def _get_cellular_health():
     """Fetch cellular health data for all devices.
 
@@ -463,6 +486,8 @@ def _get_cellular_health():
     1. Get net_device_health records (health score + net_device ref)
     2. Get net_device_metrics for those IDs (signal data: RSRP, SINR, dBm, etc.)
     3. Get net_devices with expand=router (carrier, model, inline router object)
+       — steps 2 and 3 run their chunked "__in" requests concurrently, since
+       each chunk is an independent API call
     4. Get groups for group name lookup (router.group is a URL, not expanded)
     5. Join everything by net_device ID (string)
     """
@@ -473,6 +498,9 @@ def _get_cellular_health():
     account_name = accounts[0].get('name', 'Unknown Account') if accounts else 'Unknown Account'
 
     # Step 1: Get net_device_health records (all pages)
+    # Note: net_device_health has no timestamp filter (no update_ts__gt/lt,
+    # no created_at), so this endpoint always requires a full pull — there's
+    # no incremental/delta option here.
     health_data = client.get_net_device_health(limit='all')
     if not health_data:
         return {"account_name": account_name, "devices": []}
@@ -487,25 +515,32 @@ def _get_cellular_health():
             health_by_nd[nd_id_str] = h
             nd_ids.append(nd_id_str)
 
-    # Step 2: Fetch net_device_metrics for signal data (chunked to 100)
-    metrics_by_nd = {}
-    for i in range(0, len(nd_ids), 100):
-        chunk = nd_ids[i:i+100]
-        id_str = ','.join(chunk)
-        metrics = client.get_net_device_metrics(net_device__in=id_str)
-        for m in metrics:
-            m_nd_id = _extract_id_from_url(m.get('net_device'))
-            if m_nd_id is not None:
-                metrics_by_nd[str(m_nd_id)] = m
+    # Steps 2 & 3: fetch net_device_metrics and net_devices concurrently.
+    # Each is itself chunked into groups of 100 IDs (API limit for __in
+    # filters), and those chunks are fanned out across a thread pool.
+    with ThreadPoolExecutor(max_workers=2) as outer:
+        future_metrics = outer.submit(
+            _fetch_chunks_parallel,
+            lambda id_str: client.get_net_device_metrics(net_device__in=id_str),
+            nd_ids,
+        )
+        future_devices = outer.submit(
+            _fetch_chunks_parallel,
+            lambda id_str: client.get_net_devices(id__in=id_str, expand='router'),
+            nd_ids,
+        )
+        metrics_list = future_metrics.result()
+        devices_list = future_devices.result()
 
-    # Step 3: Fetch net_devices with expand=router (chunked to 100)
+    metrics_by_nd = {}
+    for m in metrics_list:
+        m_nd_id = _extract_id_from_url(m.get('net_device'))
+        if m_nd_id is not None:
+            metrics_by_nd[str(m_nd_id)] = m
+
     nd_lookup = {}
-    for i in range(0, len(nd_ids), 100):
-        chunk = nd_ids[i:i+100]
-        id_str = ','.join(chunk)
-        devices = client.get_net_devices(id__in=id_str, expand='router')
-        for nd in devices:
-            nd_lookup[str(nd.get('id', ''))] = nd
+    for nd in devices_list:
+        nd_lookup[str(nd.get('id', ''))] = nd
 
     # Step 4: Combine everything
     results = []
@@ -523,10 +558,18 @@ def _get_cellular_health():
         if not device_name:
             device_name = nd.get('hostname') or nd.get('name') or 'Unknown'
 
+        # Online/offline is driven solely by THIS net_device's connection_state.
+        # The parent router's `state` is deliberately not consulted: a router can
+        # be online while a given modem interface is disconnected, connecting,
+        # standby, or unplugged. Only 'connected' counts as online; every other
+        # value is offline.
+        nd_connection_state = nd.get('connection_state', '')
+        iface_state = 'online' if nd_connection_state == 'connected' else 'offline'
+
         results.append({
             'router_name': device_name,
             'router_id': router_id,
-            'router_state': router.get('state', '') if router else nd.get('connection_state', 'unknown'),
+            'router_state': iface_state,
             'model': nd.get('model', ''),
             'mac': router.get('mac', '') if router else '',
             'interface_name': nd.get('name', ''),
