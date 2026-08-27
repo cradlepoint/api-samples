@@ -30,6 +30,7 @@ Then open http://localhost:8070 in your browser.
 import os
 import sys
 import json
+import uuid
 import asyncio
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -67,16 +68,29 @@ SECRET_KEYS = {'X_CP_API_KEY', 'X_ECM_API_KEY'}
 SOURCE_DEFAULT_PATTERN = "Base"
 DESTINATION_DEFAULT_PATTERN = "(R)"
 
+# Consolidate mode runs the copy backwards: many "(R)" groups feed a single
+# "Base" group. Sources match the include pattern and must NOT match the
+# exclude pattern (so the Base group(s) never get folded into themselves).
+CONSOLIDATE_SOURCE_INCLUDE_PATTERN = "(R)"
+CONSOLIDATE_SOURCE_EXCLUDE_PATTERN = "Base"
+CONSOLIDATE_DESTINATION_DEFAULT_PATTERN = "Base"
+
 
 # --- Config file -------------------------------------------------------------
 
 DEFAULT_CONFIG: Dict[str, Any] = {
     "credentials": {k: "" for k in CRED_KEYS},
     "profiles": {},
+    "app_mode": "copy",            # "copy" | "consolidate"
     "source_group": None,          # {"id": 123, "name": "..."}
     "destination_groups": [],      # [{"id": 456, "name": "..."}]
     "destination_filter": "",      # last search pattern, e.g. "(R)"
     "push_mode": "mirror",         # "mirror" | "additive"
+    # Consolidate mode: many sources feed one destination
+    "consolidate_source_groups": [],     # [{"id": 456, "name": "..."}]
+    "consolidate_source_filter": "",     # last search pattern, e.g. "(R)"
+    "consolidate_destination_group": None,  # {"id": 123, "name": "..."}
+    "consolidate_destination_filter": "",   # last search pattern, e.g. "Base"
 }
 
 
@@ -247,10 +261,177 @@ def key_by_id(ip_identities: Optional[Dict[str, Any]]) -> Dict[str, Dict[str, An
     return out
 
 
+def merge_source_identities(
+    sources: List[Dict[str, Any]],
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """
+    Consolidate identities.ip from several source groups into one master list.
+
+    Identities are merged by name (case-insensitive, trimmed) — matching NCM's
+    own convention of a handful of named identity buckets ("IPs", "URLs", ...)
+    that hold many addresses. Addresses are then deduped within each name
+    (case-insensitive, trimmed) so the same host contributed by two groups
+    only appears once.
+
+    :param sources: [{"group_id", "group_name", "ip_identities": <raw dict or None>}]
+    :return: (merged, stats) where merged is a list of
+        {"name", "friendly_name", "addresses": [...], "contributing_groups": [...]}
+        ordered alphabetically by name, and stats summarizes what happened.
+    """
+    buckets: Dict[str, Dict[str, Any]] = {}   # lower(name) -> merged entry
+    order: List[str] = []
+    seen_addr_total = 0
+    dup_addr_total = 0
+    groups_with_identities = 0
+    groups_without_identities: List[str] = []
+
+    for src in sources:
+        ip_identities = src.get('ip_identities')
+        group_name = src.get('group_name', '')
+        if not ip_identities:
+            groups_without_identities.append(group_name)
+            continue
+        groups_with_identities += 1
+
+        for _, entry in ip_identities.items():
+            if not isinstance(entry, dict):
+                continue
+            name = (entry.get('name') or '').strip() or '(unnamed)'
+            key = name.lower()
+            if key not in buckets:
+                buckets[key] = {
+                    'name': name,
+                    'friendly_name': entry.get('friendly_name', ''),
+                    'addresses': [],
+                    '_seen_lower': set(),
+                    'contributing_groups': set(),
+                }
+                order.append(key)
+            bucket = buckets[key]
+            bucket['contributing_groups'].add(group_name)
+
+            for member in normalize_members(entry.get('members')):
+                address = member.get('address')
+                if not address:
+                    continue
+                seen_addr_total += 1
+                addr_key = str(address).strip().lower()
+                if addr_key in bucket['_seen_lower']:
+                    dup_addr_total += 1
+                    continue
+                bucket['_seen_lower'].add(addr_key)
+                bucket['addresses'].append(address)
+
+    merged: List[Dict[str, Any]] = []
+    for key in sorted(order, key=lambda k: buckets[k]['name'].lower()):
+        b = buckets[key]
+        merged.append({
+            'name': b['name'],
+            'friendly_name': b['friendly_name'],
+            'addresses': b['addresses'],
+            'address_count': len(b['addresses']),
+            'contributing_groups': sorted(b['contributing_groups']),
+        })
+
+    stats = {
+        'source_count': len(sources),
+        'groups_with_identities': groups_with_identities,
+        'groups_without_identities': groups_without_identities,
+        'identity_count': len(merged),
+        'address_count': sum(m['address_count'] for m in merged),
+        'addresses_seen': seen_addr_total,
+        'duplicates_removed': dup_addr_total,
+    }
+    return merged, stats
+
+
+def merged_to_ip_identities(merged: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Turn a merged/deduped identity list back into an identities.ip dict, with
+    a fresh UUID per identity so it can be pushed as a normal group config."""
+    out: Dict[str, Any] = {}
+    for entry in merged:
+        identity_id = str(uuid.uuid4())
+        out[identity_id] = {
+            '_id_': identity_id,
+            'name': entry.get('name', ''),
+            'friendly_name': entry.get('friendly_name', ''),
+            'members': {str(i): {'address': a} for i, a in enumerate(entry.get('addresses', []))},
+        }
+    return out
+
+
 def empty_plan() -> Dict[str, Any]:
     """An empty change plan. Error results carry one so callers can sum blindly."""
     return {'added': [], 'updated': [], 'unchanged': [], 'removed': [],
             'addresses_removed': 0}
+
+
+def build_consolidate_payload(
+    merged: List[Dict[str, Any]],
+    destination_identities: Optional[Dict[str, Any]],
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """
+    Build the PATCH body that pushes a consolidated identity list onto the
+    destination group, replacing its identities.ip entirely (mirror semantics —
+    consolidation is meant to produce one master list, so leftover destination
+    identities that were not part of the merge are removed).
+
+    Identities are matched to the destination by name (case-insensitive), so an
+    identity that already exists there keeps its UUID and is updated in place
+    rather than being deleted and recreated. Brand new identity names get a
+    fresh UUID.
+    """
+    dst = key_by_id(destination_identities)
+    dst_by_name: Dict[str, Tuple[str, Dict[str, Any]]] = {}
+    for identity_id, entry in dst.items():
+        name_key = (entry.get('name') or '').strip().lower()
+        dst_by_name[name_key] = (identity_id, entry)
+
+    updates: Dict[str, Any] = {}
+    removals: List[List[Any]] = []
+    plan = empty_plan()
+    matched_ids = set()
+
+    for merged_entry in merged:
+        name = merged_entry.get('name', '') or '(unnamed)'
+        name_key = name.strip().lower()
+        addresses = merged_entry.get('addresses', [])
+        existing = dst_by_name.get(name_key)
+
+        identity_id = existing[0] if existing else str(uuid.uuid4())
+        matched_ids.add(identity_id)
+
+        updates[identity_id] = {
+            '_id_': identity_id,
+            'name': name,
+            'friendly_name': merged_entry.get('friendly_name', ''),
+            'members': {str(i): {'address': a} for i, a in enumerate(addresses)},
+        }
+
+        if existing is None:
+            plan['added'].append(name)
+            continue
+
+        dst_members = normalize_members(existing[1].get('members'))
+        dst_addresses = [m.get('address') for m in dst_members if m.get('address')]
+        if dst_addresses == addresses:
+            plan['unchanged'].append(name)
+        else:
+            plan['updated'].append(name)
+
+        surplus = len(dst_members) - len(addresses)
+        if surplus > 0:
+            for index in range(len(dst_members) - 1, len(addresses) - 1, -1):
+                removals.append(['identities', 'ip', identity_id, 'members', index])
+                plan['addresses_removed'] += 1
+
+    for identity_id, entry in dst.items():
+        if identity_id not in matched_ids:
+            removals.append(['identities', 'ip', identity_id])
+            plan['removed'].append(entry.get('name', '') or identity_id)
+
+    payload = {'configuration': [{'identities': {'ip': updates}}, removals]}
+    return payload, plan
 
 
 def build_mirror_payload(source_identities: Dict[str, Any],
@@ -352,13 +533,21 @@ async def get_saved_config():
     """Return the saved job config (credentials masked) plus the default patterns."""
     config = load_config()
     return JSONResponse({
+        "app_mode": config.get("app_mode", "copy"),
         "source_group": config.get("source_group"),
         "destination_groups": config.get("destination_groups", []),
         "destination_filter": config.get("destination_filter", ""),
         "push_mode": config.get("push_mode", "mirror"),
+        "consolidate_source_groups": config.get("consolidate_source_groups", []),
+        "consolidate_source_filter": config.get("consolidate_source_filter", ""),
+        "consolidate_destination_group": config.get("consolidate_destination_group"),
+        "consolidate_destination_filter": config.get("consolidate_destination_filter", ""),
         "has_credentials": credentials_present(),
         "source_default_pattern": SOURCE_DEFAULT_PATTERN,
         "destination_default_pattern": DESTINATION_DEFAULT_PATTERN,
+        "consolidate_source_include_pattern": CONSOLIDATE_SOURCE_INCLUDE_PATTERN,
+        "consolidate_source_exclude_pattern": CONSOLIDATE_SOURCE_EXCLUDE_PATTERN,
+        "consolidate_destination_default_pattern": CONSOLIDATE_DESTINATION_DEFAULT_PATTERN,
     })
 
 
@@ -366,10 +555,14 @@ async def get_saved_config():
 async def post_saved_config(request: Request):
     """
     Persist the current job selection so the next run can repeat it.
-    Body: {source_group, destination_groups, destination_filter, push_mode}
+    Body: {app_mode, source_group, destination_groups, destination_filter, push_mode,
+           consolidate_source_groups, consolidate_source_filter,
+           consolidate_destination_group, consolidate_destination_filter}
     """
     body = await request.json()
     fields = {}
+    if "app_mode" in body:
+        fields["app_mode"] = "consolidate" if body["app_mode"] == "consolidate" else "copy"
     if "source_group" in body:
         fields["source_group"] = body["source_group"]
     if "destination_groups" in body:
@@ -378,15 +571,27 @@ async def post_saved_config(request: Request):
         fields["destination_filter"] = body["destination_filter"] or ""
     if "push_mode" in body:
         fields["push_mode"] = "additive" if body["push_mode"] == "additive" else "mirror"
+    if "consolidate_source_groups" in body:
+        fields["consolidate_source_groups"] = body["consolidate_source_groups"] or []
+    if "consolidate_source_filter" in body:
+        fields["consolidate_source_filter"] = body["consolidate_source_filter"] or ""
+    if "consolidate_destination_group" in body:
+        fields["consolidate_destination_group"] = body["consolidate_destination_group"]
+    if "consolidate_destination_filter" in body:
+        fields["consolidate_destination_filter"] = body["consolidate_destination_filter"] or ""
     if fields:
         update_config(**fields)
     return JSONResponse({"status": "saved"})
 
 
 @app.delete("/api/config")
-async def clear_saved_config():
-    """Forget the saved job selection so the defaults apply again."""
-    update_config(source_group=None, destination_groups=[], destination_filter="")
+async def clear_saved_config(mode: str = "copy"):
+    """Forget the saved job selection for one mode so its defaults apply again."""
+    if mode == "consolidate":
+        update_config(consolidate_source_groups=[], consolidate_source_filter="",
+                     consolidate_destination_group=None, consolidate_destination_filter="")
+    else:
+        update_config(source_group=None, destination_groups=[], destination_filter="")
     return JSONResponse({"status": "cleared"})
 
 
@@ -496,6 +701,134 @@ async def extract_identities(request: Request):
         "address_count": sum(i['member_count'] for i in identities),
         "identities": identities,
         "raw": ip_identities,
+    })
+
+
+@app.post("/api/consolidate-preview")
+async def consolidate_preview(request: Request):
+    """
+    Read identities.ip from every selected source group and consolidate them
+    into one deduped master list, without writing anything.
+
+    Body: {"source_group_ids": [1, 2, 3]}
+    """
+    body = await request.json()
+    source_ids = body.get('source_group_ids') or []
+    if not source_ids:
+        raise HTTPException(status_code=400, detail="No source groups selected")
+
+    def _fetch():
+        client = _build_client()
+        sources = []
+        for gid in source_ids:
+            rows = client.get_groups(id=gid, fields='id,name,configuration')
+            if not rows:
+                sources.append({'group_id': gid, 'group_name': str(gid), 'ip_identities': None,
+                               'error': 'Group not found'})
+                continue
+            row = rows[0]
+            sources.append({
+                'group_id': gid,
+                'group_name': row.get('name', '') or str(gid),
+                'ip_identities': extract_ip_identities(row.get('configuration')),
+                'error': None,
+            })
+        return sources
+
+    loop = asyncio.get_event_loop()
+    try:
+        sources = await loop.run_in_executor(None, _fetch)
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Failed to read source groups: {e}")
+
+    merged, stats = merge_source_identities(sources)
+
+    # Remember the source selection for next run
+    update_config(consolidate_source_groups=[
+        {"id": s['group_id'], "name": s['group_name']} for s in sources
+    ])
+
+    return JSONResponse({
+        "sources": [{'group_id': s['group_id'], 'group_name': s['group_name'],
+                     'has_identities': bool(s.get('ip_identities')), 'error': s.get('error')}
+                    for s in sources],
+        "merged": merged,
+        "stats": stats,
+    })
+
+
+@app.post("/api/consolidate-push")
+async def consolidate_push(request: Request):
+    """
+    Push a consolidated identity list onto the destination group. The
+    destination's current identities.ip is read first so leftover
+    destination-only identities (not part of the merge) can be pruned,
+    matching mirror semantics.
+
+    Body: {"destination_group_id": 1, "merged": [...], "dry_run": false}
+    """
+    body = await request.json()
+    destination_id = body.get('destination_group_id')
+    merged = body.get('merged') or []
+    dry_run = bool(body.get('dry_run'))
+
+    if destination_id in (None, ''):
+        raise HTTPException(status_code=400, detail="No destination group selected")
+    if not merged:
+        raise HTTPException(status_code=400, detail="No consolidated identities to push")
+
+    def _push():
+        client = _build_client()
+        rows = client.get_groups(id=destination_id, fields='id,name,configuration')
+        if not rows:
+            raise LookupError(f"Destination group {destination_id} not found")
+        dst_identities = extract_ip_identities(rows[0].get('configuration'))
+        payload, plan = build_consolidate_payload(merged, dst_identities)
+
+        nothing_to_do = (not plan['added'] and not plan['updated']
+                         and not plan['removed'] and not plan['addresses_removed'])
+
+        result = {
+            'group_id': destination_id,
+            'group_name': rows[0].get('name', ''),
+            'plan': plan,
+            'payload': payload,
+        }
+        if dry_run:
+            result.update(status='skipped', detail='Dry run — nothing sent')
+        elif nothing_to_do:
+            result.update(status='success', detail='Already in sync — nothing sent')
+        else:
+            try:
+                detail = client.patch_group_configuration(destination_id, payload)
+                result.update(status='success', detail=str(detail) if detail else 'OK')
+            except Exception as e:
+                result.update(status='error', detail=str(e))
+        return result
+
+    loop = asyncio.get_event_loop()
+    try:
+        result = await loop.run_in_executor(None, _push)
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Push failed: {e}")
+
+    if not dry_run:
+        destination_group = body.get('destination_group') or {
+            'id': destination_id, 'name': result.get('group_name', '')
+        }
+        update_config(consolidate_destination_group=destination_group)
+
+    return JSONResponse({
+        "result": result,
+        "identity_count": len(merged),
+        "address_count": sum(m.get('address_count', len(m.get('addresses', []))) for m in merged),
+        "dry_run": dry_run,
     })
 
 
@@ -733,16 +1066,17 @@ if __name__ == "__main__":
         missing = [k for k in CRED_KEYS if not os.environ.get(k)]
         print(f"API credentials: MISSING — {', '.join(missing)}")
         print("  Enter them in the Settings panel (gear icon) in the UI")
+    print(f'Mode: {_startup_config.get("app_mode", "copy")} (switchable in the UI)')
     src = _startup_config.get("source_group")
     dests = _startup_config.get("destination_groups") or []
     if src:
-        print(f"Saved source group: {src.get('name')} (id {src.get('id')})")
+        print(f"Saved copy-mode source group: {src.get('name')} (id {src.get('id')})")
     else:
-        print(f'Source default: groups matching "{SOURCE_DEFAULT_PATTERN}"')
+        print(f'Copy-mode source default: groups matching "{SOURCE_DEFAULT_PATTERN}"')
     if dests:
-        print(f"Saved destination groups: {len(dests)}")
+        print(f"Saved copy-mode destination groups: {len(dests)}")
     else:
-        print(f'Destination default: groups matching "{DESTINATION_DEFAULT_PATTERN}"')
+        print(f'Copy-mode destination default: groups matching "{DESTINATION_DEFAULT_PATTERN}"')
     print("Press Ctrl+C to stop the server")
     print("=" * 60)
     uvicorn.run(app, host="0.0.0.0", port=PORT)
