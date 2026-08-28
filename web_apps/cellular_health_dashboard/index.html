@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cellular Health Dashboard</title>
+    <link rel="icon" type="image/png" href="/static/logo.png">
+    <link rel="apple-touch-icon" href="/static/logo.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -194,7 +196,7 @@
         </header>
         <main class="content-area">
             <div class="stats-row">
-                <div class="stat-card" data-filter="all"><div class="stat-label">Total Devices</div><div class="stat-value" id="statTotal">—</div></div>
+                <div class="stat-card" data-filter="all"><div class="stat-label">Total Cellular Modems</div><div class="stat-value" id="statTotal">—</div></div>
                 <div class="stat-card" data-filter="online"><div class="stat-label">Online</div><div class="stat-value online" id="statOnline">—</div></div>
                 <div class="stat-card" data-filter="offline"><div class="stat-label">Offline</div><div class="stat-value offline" id="statOffline">—</div></div>
                 <div class="stat-card" data-filter="excellent"><div class="stat-label">Excellent</div><div class="stat-value online" id="statExcellent">—</div></div>
@@ -219,7 +221,7 @@
             </div>
             <div class="table-panel">
                 <div class="panel-header">
-                    <h2>Device Cellular Health</h2>
+                    <h2>Cellular Modem Health</h2>
                     <span class="last-updated" id="lastUpdated"></span>
                 </div>
                 <div class="table-container" id="tableContainer">
@@ -227,7 +229,7 @@
                     <table class="health-table" id="healthTable" style="display:none;">
                         <thead><tr>
                             <th style="width:36px;cursor:default;"></th>
-                            <th data-key="router_name">Device Name <span class="sort-arrow">↕</span></th>
+                            <th data-key="router_name">Router Name <span class="sort-arrow">↕</span></th>
                             <th data-key="router_state">Status <span class="sort-arrow">↕</span></th>
                             <th data-key="model">Model <span class="sort-arrow">↕</span></th>
                             <th data-key="interface_name">Interface <span class="sort-arrow">↕</span></th>
@@ -284,15 +286,15 @@
                     <h3 style="font-size:0.875rem;font-weight:600;margin-bottom:0.75rem;">Display Options</h3>
                     <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;cursor:pointer;">
                         <input type="checkbox" id="groupByRouterToggle" style="width:1rem;height:1rem;cursor:pointer;">
-                        Group interfaces by device (shade rows)
+                        Group modems by router (shade rows)
                     </label>
                     <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;cursor:pointer;margin-top:0.75rem;">
                         <input type="checkbox" id="hideZeroScoreToggle" style="width:1rem;height:1rem;cursor:pointer;">
-                        Remove devices with health score 0
+                        Remove modems with health score 0
                     </label>
                     <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;cursor:pointer;margin-top:0.75rem;">
                         <input type="checkbox" id="onlyConnectedToggle" style="width:1rem;height:1rem;cursor:pointer;">
-                        Only show connected devices
+                        Only show connected modems
                     </label>
                     <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;cursor:pointer;margin-top:0.75rem;">
                         <input type="checkbox" id="autoRefreshToggle" style="width:1rem;height:1rem;cursor:pointer;">
@@ -314,7 +316,7 @@
     <div id="historyModal">
         <div class="history-modal-content">
             <div class="history-modal-header">
-                <h2 id="historyModalTitle">Device History</h2>
+                <h2 id="historyModalTitle">Cellular Modem History</h2>
                 <button id="closeHistoryBtn" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:var(--text-secondary);width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:var(--radius-sm);">×</button>
             </div>
             <div class="history-modal-body">
@@ -611,21 +613,34 @@
             });
         });
 
-        // Filtering
-        function applyFilters() {
+        // Rows passing the Display Options and the search box, but NOT the
+        // stat-card filter. The stat cards count from this set so they reflect
+        // the display options and search, while staying stable when you click
+        // between cards — counting the card filter too would zero out every
+        // other card as soon as one was selected.
+        function getBaseRows() {
             const search = searchInput.value.toLowerCase().trim();
-            filteredData = healthData.filter(row => {
+            return healthData.filter(row => {
                 if (hideZeroScore && row.health_score === 0) return false;
                 if (onlyConnected && row.router_state !== 'online') return false;
                 if (search) {
                     const hay = [row.router_name, row.carrier, row.mac, row.model, row.interface_name].join(' ').toLowerCase();
                     if (!hay.includes(search)) return false;
                 }
+                return true;
+            });
+        }
+
+        // Filtering
+        function applyFilters() {
+            const baseRows = getBaseRows();
+            filteredData = baseRows.filter(row => {
                 if (activeFilter === 'all') return true;
                 if (activeFilter === 'online') return row.router_state === 'online';
                 if (activeFilter === 'offline') return row.router_state === 'offline';
                 return getSignalQuality(row) === activeFilter;
             });
+            updateStats(baseRows);
             if (sortKey || groupByRouter) doSort();
             renderTable();
         }
@@ -706,7 +721,7 @@
             const prevBtn = document.getElementById('prevPageBtn');
             const nextBtn = document.getElementById('nextPageBtn');
             if (filteredData.length === 0) {
-                info.textContent = '0 devices';
+                info.textContent = '0 cellular modems';
                 prevBtn.disabled = true; nextBtn.disabled = true;
             } else {
                 info.textContent = `${start + 1}–${Math.min(start + PAGE_SIZE, filteredData.length)} of ${filteredData.length}`;
@@ -715,7 +730,7 @@
             }
 
             if (pageData.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="14" style="text-align:center;padding:2rem;color:var(--text-secondary);">No devices match the current filters.</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="14" style="text-align:center;padding:2rem;color:var(--text-secondary);">No cellular modems match the current filters.</td></tr>`;
                 return;
             }
 
@@ -754,14 +769,17 @@
             }).join('');
         }
 
-        function updateStats() {
-            document.getElementById('statTotal').textContent = healthData.length;
-            document.getElementById('statOnline').textContent = healthData.filter(r => r.router_state === 'online').length;
-            document.getElementById('statOffline').textContent = healthData.filter(r => r.router_state === 'offline').length;
-            document.getElementById('statExcellent').textContent = healthData.filter(r => getSignalQuality(r) === 'excellent').length;
-            document.getElementById('statGood').textContent = healthData.filter(r => getSignalQuality(r) === 'good').length;
-            document.getElementById('statFair').textContent = healthData.filter(r => getSignalQuality(r) === 'fair').length;
-            document.getElementById('statPoor').textContent = healthData.filter(r => getSignalQuality(r) === 'poor').length;
+        // Counts reflect the Display Options and search (see getBaseRows), so
+        // toggling e.g. "Only show connected modems" updates every card.
+        function updateStats(rows) {
+            const data = rows || getBaseRows();
+            document.getElementById('statTotal').textContent = data.length;
+            document.getElementById('statOnline').textContent = data.filter(r => r.router_state === 'online').length;
+            document.getElementById('statOffline').textContent = data.filter(r => r.router_state === 'offline').length;
+            document.getElementById('statExcellent').textContent = data.filter(r => getSignalQuality(r) === 'excellent').length;
+            document.getElementById('statGood').textContent = data.filter(r => getSignalQuality(r) === 'good').length;
+            document.getElementById('statFair').textContent = data.filter(r => getSignalQuality(r) === 'fair').length;
+            document.getElementById('statPoor').textContent = data.filter(r => getSignalQuality(r) === 'poor').length;
         }
 
         function showNotification(msg, type) {
@@ -774,7 +792,7 @@
         document.getElementById('exportCsvBtn').addEventListener('click', () => {
             if (!filteredData.length) return;
             const cols = ['router_name','router_state','model','interface_name','carrier','health_category','dbm','rsrp','rsrq','sinr','signal_strength','updated_at'];
-            const headers = ['Device Name','Status','Model','Interface','Carrier','Health','RSSI (dBm)','RSRP (dBm)','RSRQ (dB)','SINR (dB)','Signal %','Last Updated'];
+            const headers = ['Router Name','Status','Model','Interface','Carrier','Health','RSSI (dBm)','RSRP (dBm)','RSRQ (dB)','SINR (dB)','Signal %','Last Updated'];
             let csv = headers.join(',') + '\n';
             filteredData.forEach(row => {
                 csv += cols.map(c => { let v = row[c] != null ? String(row[c]) : ''; if (v.includes(',') || v.includes('"')) v = '"' + v.replace(/"/g, '""') + '"'; return v; }).join(',') + '\n';
@@ -795,13 +813,13 @@
             // Title
             doc.setFontSize(16);
             doc.setTextColor(79, 70, 229);
-            doc.text('Cellular Health Report', 14, 15);
+            doc.text('Cellular Modem Health Report', 14, 15);
 
             // Subtitle
             doc.setFontSize(9);
             doc.setTextColor(107, 114, 128);
             const acct = document.getElementById('accountName').textContent.replace('— ', '');
-            doc.text(`Account: ${acct}  |  Generated: ${new Date().toLocaleString()}  |  Devices: ${filteredData.length}`, 14, 22);
+            doc.text(`Account: ${acct}  |  Generated: ${new Date().toLocaleString()}  |  Cellular Modems: ${filteredData.length}`, 14, 22);
 
             // Summary stats
             const online = filteredData.filter(r => r.router_state === 'online').length;
@@ -813,7 +831,7 @@
             doc.text(`Online: ${online}  |  Offline: ${offline}  |  Excellent: ${excellent}  |  Good: ${good}  |  Fair: ${fair}  |  Poor: ${poor}`, 14, 27);
 
             // Table
-            const headers = ['Device Name', 'Status', 'Model', 'Carrier', 'Health', 'Score', 'RSSI', 'RSRP', 'RSRQ', 'SINR', 'Sig%'];
+            const headers = ['Router Name', 'Status', 'Model', 'Carrier', 'Health', 'Score', 'RSSI', 'RSRP', 'RSRQ', 'SINR', 'Sig%'];
             const rows = filteredData.map(r => [
                 r.router_name || '',
                 r.router_state || '',
@@ -922,11 +940,11 @@
                 if (json.status === 'error') throw new Error(json.message);
                 healthData = json.data || []; filteredData = [...healthData];
                 if (json.account_name) document.getElementById('accountName').textContent = '— ' + json.account_name;
-                updateStats(); applyFilters();
+                applyFilters();  // also refreshes the stat cards
                 lastUpdated.textContent = `Updated: ${new Date(json.timestamp).toLocaleString()}`;
                 healthTable.style.display = 'table'; loadingState.style.display = 'none';
                 if (!silent) {
-                    showNotification(`Loaded ${healthData.length} device(s)`, 'success');
+                    showNotification(`Loaded ${healthData.length} cellular modem(s)`, 'success');
                 }
 
                 // If this was a cached load, trigger a silent background refresh
@@ -972,7 +990,7 @@
             applyFilters();
         });
 
-        // Hide devices with health score 0
+        // Hide cellular modems with health score 0
         const hideZeroScoreToggle = document.getElementById('hideZeroScoreToggle');
         hideZeroScoreToggle.checked = hideZeroScore;
         hideZeroScoreToggle.addEventListener('change', () => {
@@ -982,7 +1000,7 @@
             applyFilters();
         });
 
-        // Only show connected devices
+        // Only show connected cellular modems
         const onlyConnectedToggle = document.getElementById('onlyConnectedToggle');
         onlyConnectedToggle.checked = onlyConnected;
         onlyConnectedToggle.addEventListener('change', () => {
