@@ -258,3 +258,25 @@ Mostly bookkeeping: fixes from earlier in the day landed, which left several ent
   minting a new one — otherwise every run regenerates every identity's UUID, which
   breaks anything elsewhere in the config that references the old UUID. Discovered
   while building Consolidate Mode for `host_identity_copier`.
+
+## 2026-08-28 — `locations` endpoint missing `router`/`router__in` in the generated reference
+
+Found while answering a question about retrieving router lat/long. No code was written
+and no API call was made; this is a doc-vs-shipped-code discrepancy only.
+
+- Added `router` and `router__in` rows to the `locations` query-parameter table in
+  `api-v2-full-reference.md`, which listed only `id`, `id__in`, `limit` and `offset`.
+  Evidence is in-repo: `get_locations()` in `ncm/ncm/ncm.py` declares both in
+  `allowed_params`, and `scripts/export_locations.py` plus
+  `web_apps/script_manager/scripts/Export Locations.py` both batch on
+  `router__in`. Every other router-scoped endpoint in that reference already
+  documented `router__in`, so `locations` was the outlier.
+- Marked the addition **UNVERIFIED against a live account** in the doc itself — the
+  evidence is shipped code, not an observed response. The `in: int / out: url` type
+  notation is inferred from the sibling endpoints' rows, and whether `router__in` has
+  its own page-size ceiling on this endpoint is unknown.
+- Added a `known-issues.md` entry generalizing the lesson: the generated query-param
+  tables are a floor, not a ceiling. Before concluding a filter does not exist, grep
+  the method's `allowed_params` in `ncm/ncm/ncm.py` and grep `scripts/` and
+  `web_apps/` for existing callers. Recorded explicitly that only this one endpoint
+  was found incomplete and the other 29 were not audited.
