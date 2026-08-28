@@ -898,3 +898,37 @@ usage line now uses the activate form rather than `.venv/bin/python`, since a
 long-running server launched the bare way boots fine and then fails every API call.
 The other eleven entry points were swept the same day — docstring path and port now
 match source in all twelve, so treat a mismatch as a regression rather than the norm.
+
+### `api-v2-full-reference.md` Query-Param Tables Can Be Incomplete — Cross-Check `ncm.py` (discovered 2026-08-28)
+The generated tables in `docs/api-v2-full-reference.md` are not guaranteed to list
+every filter an endpoint accepts. Read them as a floor, not a ceiling.
+
+**Confirmed instance: `locations`.** Its table listed only `id`, `id__in`, `limit`
+and `offset` — no `router` or `router__in`. Meanwhile the shipped client and two
+shipped scripts depend on a router filter:
+
+- `ncm/ncm/ncm.py` → `get_locations()` declares
+  `allowed_params = ['id', 'id__in', 'router', 'router__in', 'limit', 'offset']`
+- `scripts/export_locations.py` and
+  `web_apps/script_manager/scripts/Export Locations.py` both batch with
+  `n2.get_locations(router__in=batch)`
+
+Every other router-scoped endpoint in the same reference (`configuration_managers`,
+`device_app_states`, `net_devices`, `router_alerts`, `router_state_samples`,
+`router_stream_usage_samples`) does document `router__in`, so `locations` was the
+outlier rather than the rule. The two rows have been added to the reference with a
+note.
+
+Why it costs you: a reader who trusts the table concludes there is no server-side
+router filter for locations, and fetches the whole collection to filter client-side.
+On a large account that is many paginated requests instead of a batched query.
+
+**Verification status.** The discrepancy between the doc and the shipped code is
+directly observed. Whether `router__in` behaves as expected against a live account is
+**UNVERIFIED** — no request was made to `/api/v2/locations/` when this was written.
+Also UNVERIFIED: whether any endpoint *other* than `locations` has an incomplete
+table. One instance was found; the rest were not audited.
+
+Practical check before concluding a filter does not exist: grep the matching method's
+`allowed_params` in `ncm/ncm/ncm.py`, and grep `scripts/` and `web_apps/` for existing
+callers. Working code that predates the generated doc is the stronger evidence.

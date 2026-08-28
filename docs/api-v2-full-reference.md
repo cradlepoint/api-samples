@@ -565,8 +565,28 @@ GET /api/v2/locations/
 |------|------|----------|-------------|
 | `id` | int | False | ID of a locations record |
 | `id__in` | int | False | Filter for ID contains - a comma-separated list of locations record IDs |
+| `router` | in: int<br />out: url | False | Router ID. Not present in the Swagger-derived table; see note below. |
+| `router__in` | in: int<br />out: url | False | Filter for router ID contains - a comma-separated list of router-record IDs. Not present in the Swagger-derived table; see note below. |
 | `limit` | int | False | Restricts the number of records returned in a recordset to this value. Max value is 500. |
 | `offset` | int | False | Specifies where (an index) in a recordset to begin returning records. |
+
+**Note on `router` / `router__in` (added 2026-08-28).** These two rows were not in the
+generated table, which listed only `id`, `id__in`, `limit` and `offset`. They are added
+here because the shipped client and scripts depend on them:
+
+- `ncm/ncm/ncm.py` → `get_locations()` declares
+  `allowed_params = ['id', 'id__in', 'router', 'router__in', 'limit', 'offset']`
+- `scripts/export_locations.py` and `web_apps/script_manager/scripts/Export Locations.py`
+  both batch with `n2.get_locations(router__in=batch)`
+
+Every other router-scoped endpoint in this reference documents `router__in`, so `locations`
+was the outlier. Without these rows a reader concludes there is no server-side router
+filter and fetches all locations to filter client-side.
+
+**Verification status: UNVERIFIED against a live account.** The evidence above is
+in-repo code, not an observed API response — no request was made to `/api/v2/locations/`
+when this note was written. The type notation is inferred from the sibling endpoints'
+rows, and whether `router__in` has its own page-size ceiling is unknown.
 
 ### Response Fields
 
