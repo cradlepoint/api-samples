@@ -435,6 +435,100 @@ All web apps must support light mode and dark mode:
 
 See `.kiro/steering/web-ui-standards.md` for the full checklist and CSS variable reference.
 
+### Favicon
+
+Apps that mount the shared static folder get a favicon for free by reusing the
+existing logo — no new binary asset, no server change:
+
+```html
+<link rel="icon" type="image/png" href="/static/logo.png">
+<link rel="apple-touch-icon" href="/static/logo.png">
+```
+
+`logo.png` is 92x80 RGBA with transparency, near enough to square to scale
+acceptably to 16/32px. This works in any app whose `serve.py` already has:
+
+```python
+STATIC_DIR = Path(__file__).resolve().parent.parent / "script_manager" / "static"
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+```
+
+Apps serving their own `static/` directory need the path adjusted to wherever
+their logo lives. Note that as of 2026-08-27 only `cellular_health_dashboard`
+declares a favicon; the rest fall back to the browser default, so add these two
+lines when building a new app rather than assuming the template covers it.
+
+Browsers cache favicons more aggressively than HTML — if a change doesn't show,
+request the icon URL directly or hard-reload before assuming the tag is wrong.
+
+## Dashboard Stat Cards That Double as Filters — Two-Stage Filtering
+
+The dashboard pattern in `web-ui-standards.md` requires both "stat cards as
+filters" and display-option toggles plus a search box. Those two requirements
+conflict unless the filtering is split into two stages, and getting it wrong
+produces one of two bugs:
+
+- **Count from the full dataset** → the cards never react to the display options
+  or the search box. Toggling "only show connected" changes the table but the
+  numbers above it sit still, so they look broken or stale.
+- **Count from the fully-filtered dataset** → clicking one card zeroes every
+  other card, because the card filter is included in its own input. You then
+  cannot see the other counts or click between them.
+
+The fix is a base set that includes the display options and search but excludes
+the card filter:
+
+```javascript
+// Stage 1: display options + search. NOT the stat-card filter.
+function getBaseRows() {
+    const search = searchInput.value.toLowerCase().trim();
+    return allData.filter(row => {
+        if (hideZeroScore && row.health_score === 0) return false;
+        if (onlyConnected && row.state !== 'online') return false;
+        if (search) {
+            const hay = [row.name, row.carrier, row.mac].join(' ').toLowerCase();
+            if (!hay.includes(search)) return false;
+        }
+        return true;
+    });
+}
+
+// Stage 2: the stat-card filter, applied to the table only.
+function applyFilters() {
+    const baseRows = getBaseRows();
+    filteredData = baseRows.filter(row => {
+        if (activeFilter === 'all') return true;
+        if (activeFilter === 'online') return row.state === 'online';
+        return getQuality(row) === activeFilter;
+    });
+    updateStats(baseRows);   // cards read stage 1
+    doSort();
+    renderTable();           // table reads stage 2
+}
+
+function updateStats(rows) {
+    const data = rows || getBaseRows();
+    document.getElementById('statTotal').textContent = data.length;
+    // ...remaining cards counted from `data`
+}
+```
+
+Have every option toggle call `applyFilters()` (they generally already do) and
+the cards stay in sync for free — no separate wiring per toggle. Drop any
+standalone `updateStats()` call on the fetch path, since `applyFilters()` now
+covers it and calling both double-computes.
+
+Useful invariants to check when verifying: mutually exclusive cards should sum to
+the total card (e.g. Online + Offline == Total), category buckets should never
+exceed the total, and with no options set the total should equal the raw dataset
+length.
+
+**Known latent instances (as of 2026-08-27):** only
+`cellular_health_dashboard` implements the two-stage split. Both
+`inventory_dashboard` (`updateStats()` counts from `inventoryData`) and
+`alert_dashboard` (counts from `alertsData`) still count from the full dataset,
+so their cards do not respond to search or display options. Same fix applies.
+
 ## NCM SDK with FastAPI (async) — Avoiding Event Loop Blocking
 
 The NCM SDK uses synchronous `requests.Session` internally. Calling SDK methods
@@ -470,3 +564,63 @@ or any other function using the NCM SDK.
 
 **Also applies to:** SQLite writes, file I/O on large files, or any other
 blocking operation inside an async handler.
+
+## Parallelizing Chunked `__in` Requests
+
+The `__in` filter limit (100 IDs per request, see known-issues) means any join
+across more than 100 IDs — `net_device_metrics`, `net_devices`, `asset_endpoints`,
+etc. — becomes many chunked API calls. Each chunk is an independent request with
+no shared state, so fetching them sequentially in a `for` loop wastes wall-clock
+time for no benefit: on a 27,000-device account this is easily 250+ chunks per
+endpoint at ~100-200ms each, which adds up fast when done one at a time.
+
+Fan the chunks out over a thread pool instead. The NCM SDK's `requests.Session`
+is thread-safe for concurrent GETs (it's not mutated per-request), so this is
+safe with the synchronous SDK as-is — no async rewrite needed:
+
+```python
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+def fetch_chunks_parallel(fetch_fn, ids, chunk_size=100, max_workers=8):
+    """Run fetch_fn(id_str) over ids in chunks, concurrently.
+
+    fetch_fn receives one comma-joined chunk and returns a list of records.
+    """
+    chunks = [','.join(ids[i:i + chunk_size]) for i in range(0, len(ids), chunk_size)]
+    results = []
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(fetch_fn, chunk) for chunk in chunks]
+        for future in as_completed(futures):
+            results.extend(future.result() or [])
+    return results
+
+# Usage
+metrics = fetch_chunks_parallel(
+    lambda id_str: client.get_net_device_metrics(net_device__in=id_str),
+    nd_ids,
+)
+```
+
+If two independent chunked calls need to run (e.g. `net_device_metrics` and
+`net_devices` for the same ID list, as in the cellular health dashboard), submit
+both to an outer pool so they overlap too, rather than running one fully before
+starting the other:
+
+```python
+with ThreadPoolExecutor(max_workers=2) as outer:
+    future_a = outer.submit(fetch_chunks_parallel, fetch_fn_a, ids)
+    future_b = outer.submit(fetch_chunks_parallel, fetch_fn_b, ids)
+    result_a, result_b = future_a.result(), future_b.result()
+```
+
+Keep `max_workers` modest (5-10). The API enforces an approximate 500
+calls/minute limit account-wide (see the 409-as-rate-limit known issue) — too
+much concurrency just shifts the bottleneck to retry/backoff instead of actually
+finishing faster. This is the same pattern already used in `assign_sdk/serve.py`
+for fetching independent endpoints (apps, versions, accounts) in parallel;
+applying it to chunked `__in` pagination is the generalization.
+
+**Does not help `net_device_health`.** That endpoint takes no `__in` filter at
+all (only `net_device`, `id__gt/gte/lt/lte`, `limit`, `offset` — see
+api-v2-full-reference.md), so there's nothing to chunk or parallelize; it's a
+single sequential paginated pull regardless.
