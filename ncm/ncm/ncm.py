@@ -107,8 +107,38 @@ from datetime import datetime, timedelta
 import sys
 import os
 import json
+import time
 import uuid
+import re
 from typing import Union, Optional, Dict, Any, Tuple
+
+
+# NCM API v3 media types (JSON:API). The default type is applied to the v3
+# session in NcmClientv3.__init__; the atomic-operations extension type is used
+# as a per-request Content-Type/Accept override for endpoints that require the
+# JSON:API atomic operations extension (regrades). Centralized here so every
+# call site uses the identical string and the two cannot drift (Req 3.2, 3.4).
+V3_MEDIA_TYPE = 'application/vnd.api+json'
+V3_ATOMIC_MEDIA_TYPE = (
+    'application/vnd.api+json;ext="https://jsonapi.org/ext/atomic"'
+)
+
+# Retryable HTTP statuses for the NCM API v3 client only (Req 15.1, 15.2). The
+# base client's default forcelist is {408, 503, 504}; v3 widens it to also retry
+# rate-limit (429) and bad-gateway (502) responses. NcmClientv3.__init__ passes
+# this explicitly when no retry_on is supplied, so the v2 client's forcelist is
+# left unchanged. 409 is deliberately absent: it is overloaded on v3 (rate-limit
+# vs. JSON:API validation error) and cannot be expressed in the urllib3 Retry
+# forcelist without also retrying legitimate validation conflicts, so it is
+# disambiguated in the v3 request path instead (see NcmClientv3._v3_get / the
+# 409 handling in __get_json).
+V3_RETRY_ON = [
+    HTTPStatus.REQUEST_TIMEOUT,       # 408
+    HTTPStatus.TOO_MANY_REQUESTS,     # 429
+    HTTPStatus.BAD_GATEWAY,           # 502
+    HTTPStatus.SERVICE_UNAVAILABLE,   # 503
+    HTTPStatus.GATEWAY_TIMEOUT,       # 504
+]
 
 
 def __is_json(test_json):
@@ -2632,14 +2662,139 @@ class NcmClientv3(BaseNcmClient):
         """
         self.v3 = self # For backwards compatibility
         base_url = base_url or os.environ.get("CP_BASE_URL_V3", "https://api.cradlepointecm.com/api/v3")
+        # v3 widens the retryable status set to {408, 429, 502, 503, 504} with
+        # total=5 and backoff_factor=2 (the constructor defaults), so rate-limit
+        # (429) and bad-gateway (502) responses are retried with exponential
+        # backoff. This is applied only to the v3 adapter; the v2 client still
+        # passes retry_on=None and inherits the base default set unchanged
+        # (Req 15.1, 15.2). An explicit retry_on from the caller is honored.
+        if retry_on is None:
+            retry_on = list(V3_RETRY_ON)
         super().__init__(log_events, logger, retries, retry_backoff_factor, retry_on, base_url)
+        # Remember the backoff/attempt budget so the in-path 409 disambiguation
+        # (which the urllib3 adapter cannot express) mirrors the adapter's
+        # bounds (Req 15.2, 15.3).
+        self._retry_total = retries
+        self._retry_backoff_factor = retry_backoff_factor
         if api_key:
             token = {'Authorization': f'Bearer {api_key}'}
             self.session.headers.update(token)
+        # Content negotiation for JSON:API on every v3 request (Req 3.2). The
+        # Authorization header above carries the Bearer token when supplied
+        # (Req 3.1).
         self.session.headers.update({
-            'Content-Type': 'application/vnd.api+json',
-            'Accept': 'application/vnd.api+json'
+            'Content-Type': V3_MEDIA_TYPE,
+            'Accept': V3_MEDIA_TYPE
         })
+
+    @staticmethod
+    def _atomic_headers():
+        """
+        Per-request header override selecting the JSON:API atomic-operations
+        extension media type for both Content-Type and Accept, in place of the
+        default ``application/vnd.api+json`` (Req 3.4). Used by regrade-family
+        endpoints. Returns a fresh dict on each call so callers cannot mutate
+        shared state.
+        """
+        return {
+            'Content-Type': V3_ATOMIC_MEDIA_TYPE,
+            'Accept': V3_ATOMIC_MEDIA_TYPE
+        }
+
+    def _v3_host_root(self):
+        """
+        Derives the scheme+host root from ``self.base_url`` for endpoints whose
+        Swagger path sits outside the configured ``/api/v3`` base (Req 4.5,
+        4.6). ``exchange_resources`` is the sole in-scope endpoint of this kind:
+        its Swagger path is ``/beta/exchange_resources`` with no ``/api/v3``
+        prefix.
+
+        Behavior:
+          - If ``base_url`` ends with ``/api/v3`` (optionally with a trailing
+            slash), return the portion before that segment, e.g.
+            ``https://api.cradlepointecm.com/api/v3`` ->
+            ``https://api.cradlepointecm.com``.
+          - Otherwise, return ``base_url`` verbatim with any trailing slash
+            removed.
+
+        This keeps the derivation resilient to ``CP_BASE_URL_V3`` overrides
+        whose path is ``/api/v3`` (e.g. the test override
+        ``https://api.example.test/api/v3`` -> ``https://api.example.test``).
+        """
+        base = self.base_url.rstrip('/')
+        suffix = '/api/v3'
+        if base.endswith(suffix):
+            return base[:-len(suffix)]
+        return base
+
+    @staticmethod
+    def _response_has_errors_array(response):
+        """
+        Returns True if the response body is a JSON:API document carrying an
+        ``errors`` array (i.e. a genuine validation error). Any body that is not
+        valid JSON, or that lacks a list-valued ``errors`` member, returns
+        False. Used to disambiguate the overloaded ``409 Conflict`` status on
+        v3 (Req 15.2): a rate-limit 409 has no ``errors`` array, a validation
+        409 does.
+        """
+        try:
+            body = response.json()
+        except (ValueError, json.JSONDecodeError):
+            return False
+        return isinstance(body, dict) and isinstance(body.get('errors'), list)
+
+    def _v3_request(self, verb, url, **kwargs):
+        """
+        Issues a v3 HTTP request and applies the one piece of retry logic the
+        urllib3 adapter cannot express: ``409 Conflict`` disambiguation
+        (Req 15.2).
+
+        The adapter already retries {408, 429, 502, 503, 504} with exponential
+        backoff. ``409`` is overloaded on v3 -- it means either a rate-limit
+        ("Conflict with internal rules... invalid app-key.") or a genuine
+        JSON:API validation error -- and the two are distinguished only by the
+        response body:
+
+        - ``409`` WITHOUT an ``errors`` array -> transient/rate-limit; retry
+          manually with the same exponential backoff, bounded by the same
+          max-attempts budget as the adapter (``self._retry_total``).
+        - ``409`` WITH an ``errors`` array -> non-retryable validation error;
+          return immediately so the caller routes it through ``_return_handler``.
+
+        After exhausting the 409 retry budget, the last response is returned so
+        the caller hands it to ``_return_handler`` (Req 15.3). All other
+        statuses (including adapter-retried transients that have already been
+        exhausted) are returned to the caller unchanged; non-forcelist statuses
+        go straight to the handler (Req 15.4).
+
+        :param verb: session method name, e.g. ``'get'``, ``'post'``.
+        :param url: fully-qualified request URL.
+        :return: the final ``requests.Response``.
+        """
+        session_method = getattr(self.session, verb)
+        # total=5 retries means up to 6 attempts; mirror that budget for 409.
+        max_attempts = (self._retry_total or 0) + 1
+        backoff_factor = self._retry_backoff_factor or 0
+        response = None
+        for attempt in range(max_attempts):
+            response = session_method(url, **kwargs)
+            if response.status_code != int(HTTPStatus.CONFLICT):  # not 409
+                return response
+            if self._response_has_errors_array(response):
+                # Genuine JSON:API validation error: non-retryable.
+                return response
+            # Rate-limit-style 409 with no errors array: retry with backoff,
+            # bounded by the same attempt budget as the adapter.
+            if attempt >= max_attempts - 1:
+                break
+            # urllib3 backoff formula: backoff_factor * (2 ** attempt).
+            sleep_for = backoff_factor * (2 ** attempt)
+            if sleep_for > 0:
+                self.log('info',
+                         f'HTTP 409 (no errors array) - retrying in '
+                         f'{sleep_for}s (attempt {attempt + 1}/{max_attempts})')
+                time.sleep(sleep_for)
+        return response
 
     def __get_json(self, get_url, call_type, params=None):
         """
@@ -2665,20 +2820,29 @@ class NcmClientv3(BaseNcmClient):
             url = f'{url}?{query_string}'
 
         while url and (len(results) < limit):
-            ncm = self.session.get(url)
+            # Route through _v3_request so the overloaded 409 status is
+            # disambiguated (retry on rate-limit 409, surface validation 409)
+            # before pagination inspects the result (Req 15.2).
+            ncm = self._v3_request('get', url)
             if not (200 <= ncm.status_code < 300):
+                # Stop pagination on any non-2xx page and route the failing
+                # response through the shared handler, rather than returning the
+                # partially accumulated data as a successful result (Req 4.5).
                 return self._return_handler(ncm.status_code, ncm.json(), call_type)
-            data = ncm.json()['data']
+            body = ncm.json()
+            data = body.get('data', [])
             if isinstance(data, list):
-                self._return_handler(ncm.status_code, data, call_type)
                 for d in data:
                     results.append(d)
             else:
                 results.append(data)
-            if "links" in ncm.json():
-                url = ncm.json()['links']['next']
-            else:
-                url = None
+            # Follow links.next verbatim as returned by the server; stop when it
+            # is null or absent (Req 4.1, 4.3, 4.4).
+            url = (body.get('links') or {}).get('next')
+
+        # Never return more than an explicit limit's worth of records (Req 4.2).
+        if len(results) > limit:
+            results = results[:limit]
 
         if params is not None and "filter[fields]" in params.keys():
             data = []
@@ -2706,10 +2870,7 @@ class NcmClientv3(BaseNcmClient):
         if len(bad_params) > 0:
             raise ValueError("Invalid parameters: {}".format(bad_params))
 
-        if 'Authorization' not in self.session.headers:
-            raise KeyError(
-                "API key missing. "
-                "Please set API key before making API calls.")
+        self.__check_token()
 
         params = {}
 
@@ -2718,7 +2879,7 @@ class NcmClientv3(BaseNcmClient):
                 params[key] = val
 
             elif "__" in key:
-                split_key = key.split("__")
+                split_key = key.split("__", 1)
                 params[f'filter[{split_key[0]}][{split_key[1]}]'] = val
             else:
                 params[f'filter[{key}]'] = val
@@ -2735,10 +2896,7 @@ class NcmClientv3(BaseNcmClient):
         if len(bad_params) > 0:
             raise ValueError("Invalid parameters: {}".format(bad_params))
 
-        if 'Authorization' not in self.session.headers:
-            raise KeyError(
-                "API key missing. "
-                "Please set API key before making API calls.")
+        self.__check_token()
 
         params = {}
 
@@ -2763,12 +2921,94 @@ class NcmClientv3(BaseNcmClient):
         if len(bad_params) > 0:
             raise ValueError("Invalid parameters: {}".format(bad_params))
 
+        self.__check_token()
+
+        return kwargs
+
+    def __check_token(self):
+        """
+        Guards against a missing v3 Bearer token before any request is
+        dispatched. Raises the same exception type and message as the
+        ``__parse_*`` helpers so every v3 method signals a missing credential
+        uniformly (Req 2.5, 3.3, 6.5, 7.8, 13.4).
+        """
         if 'Authorization' not in self.session.headers:
             raise KeyError(
                 "API key missing. "
                 "Please set API key before making API calls.")
 
-        return kwargs
+    def __normalize_mac(self, mac):
+        """
+        Normalizes a MAC address to bare uppercase hexadecimal by stripping
+        the common separators (``:``, ``-``, ``.``) and upper-casing, i.e.
+        ``mac.upper().replace(':','').replace('-','').replace('.','')``.
+
+        The normalized value must match ``^[0-9A-Fa-f]{12}`` (exactly 12 hex
+        digits). If it does not, a ``ValueError`` is raised identifying the
+        offending MAC and nothing is sent (Req 8.3, 8.6).
+
+        :param mac: A MAC address, with or without separators.
+        :type mac: str
+        :return: The bare uppercase hexadecimal MAC (12 characters).
+        :rtype: str
+        """
+        normalized = str(mac).upper().replace(':', '').replace('-', '').replace('.', '')
+        if not re.match(r'^[0-9A-Fa-f]{12}$', normalized):
+            raise ValueError(
+                "Invalid MAC address: {}. A MAC address must resolve to "
+                "exactly 12 hexadecimal characters after separator removal."
+                .format(mac))
+        return normalized
+
+    def __validate_regrade_batch(self, subscription_id, macs, action):
+        """
+        Validates a regrade/unlicense batch before any HTTP dispatch and
+        returns the list of unique, normalized MAC addresses.
+
+        Enforces (all before sending — Req 8.6, 8.7):
+        - a non-empty/non-blank ``subscription_id``,
+        - an ``action`` in ``{UPGRADE, DOWNGRADE, UNLICENSE}``,
+        - each supplied MAC normalizes to bare uppercase hex (raises via
+          ``__normalize_mac`` otherwise),
+        - a batch of 1 to 100 MAC addresses (count of provided MACs).
+
+        Duplicate normalized MACs are removed while preserving first-seen
+        order, so callers building a payload get one entry per unique MAC.
+
+        :param subscription_id: Subscription/asset identifier.
+        :param macs: A single MAC (str) or a list of MACs.
+        :param action: One of ``UPGRADE``, ``DOWNGRADE``, ``UNLICENSE``.
+        :return: The list of unique normalized MAC addresses.
+        :rtype: list
+        """
+        if subscription_id is None or str(subscription_id).strip() == '':
+            raise ValueError(
+                "A non-empty subscription identifier is required.")
+
+        allowed_actions = {"UPGRADE", "DOWNGRADE", "UNLICENSE"}
+        if action not in allowed_actions:
+            raise ValueError(
+                "Invalid action: {}. Action must be one of {}."
+                .format(action, sorted(allowed_actions)))
+
+        mac_list = [macs] if isinstance(macs, str) else list(macs)
+
+        if not 1 <= len(mac_list) <= 100:
+            raise ValueError(
+                "Invalid batch size: {} MAC address(es). A regrade batch "
+                "must contain between 1 and 100 MAC addresses."
+                .format(len(mac_list)))
+
+        # Normalize (raises on invalid) and dedupe preserving order.
+        unique_macs = []
+        seen = set()
+        for mac in mac_list:
+            normalized = self.__normalize_mac(mac)
+            if normalized not in seen:
+                seen.add(normalized)
+                unique_macs.append(normalized)
+
+        return unique_macs
 
     def set_api_key(self, api_key):
         """
@@ -2789,7 +3029,7 @@ class NcmClientv3(BaseNcmClient):
         :return: A list of users with details.
         """
         call_type = 'Users'
-        get_url = f'{self.base_url}/beta/users'
+        get_url = f'{self.base_url}/users/'
 
         allowed_params = ['email',
                           'email__not',
@@ -2827,7 +3067,8 @@ class NcmClientv3(BaseNcmClient):
         :return: User creation result.
         """
         call_type = 'User'
-        post_url = f'{self.base_url}/beta/users'
+        self.__check_token()
+        post_url = f'{self.base_url}/users/'
 
         allowed_params = ['is_active',
                           'last_login',
@@ -2852,7 +3093,7 @@ class NcmClientv3(BaseNcmClient):
             }
         }
 
-        ncm = self.session.post(post_url, data=json.dumps(data))
+        ncm = self._v3_request('post', post_url, data=json.dumps(data))
         result = self._return_handler(ncm.status_code, ncm.json(), call_type)
         return result
 
@@ -2866,11 +3107,17 @@ class NcmClientv3(BaseNcmClient):
         :return: User update result.
         """
         call_type = 'Users'
+        self.__check_token()
 
-        user = self.get_users(email=email)[0]
-        user.pop('links')
+        users = self.get_users(email=email)
+        if not users:
+            raise ValueError(
+                f"User not found: no user matches email '{email}'. "
+                "No user was updated.")
+        user = users[0]
+        user.pop('links', None)
 
-        put_url = f'{self.base_url}/beta/users/{user["id"]}'
+        patch_url = f'{self.base_url}/users/{user["id"]}/'
 
         allowed_params = ['first_name',
                           'last_name',
@@ -2885,7 +3132,7 @@ class NcmClientv3(BaseNcmClient):
 
         user = {"data": user}
 
-        ncm = self.session.put(put_url, data=json.dumps(user))
+        ncm = self._v3_request('patch', patch_url, data=json.dumps(user))
         result = self._return_handler(ncm.status_code, ncm.json(), call_type)
         return result
 
@@ -2899,13 +3146,19 @@ class NcmClientv3(BaseNcmClient):
         :return: None unless error.
         """
         call_type = 'Users'
+        self.__check_token()
 
-        user = self.get_users(email=email)[0]
-        user.pop('links')
+        users = self.get_users(email=email)
+        if not users:
+            raise ValueError(
+                f"User not found: no user matches email '{email}'. "
+                "No user was deleted.")
+        user = users[0]
+        user.pop('links', None)
 
-        delete_url = f'{self.base_url}/beta/users/{user["id"]}'
+        delete_url = f'{self.base_url}/users/{user["id"]}/'
 
-        ncm = self.session.delete(delete_url)
+        ncm = self._v3_request('delete', delete_url)
         result = self._return_handler(ncm.status_code, ncm.text, call_type)
         return result
 
@@ -2917,7 +3170,7 @@ class NcmClientv3(BaseNcmClient):
         :return: A list of asset endpoints (routers) with details.
         """
         call_type = 'Asset Endpoints'
-        get_url = f'{self.base_url}/asset_endpoints'
+        get_url = f'{self.base_url}/asset_endpoints/'
 
         allowed_params = ['id',
                           'hardware_series',
@@ -2927,7 +3180,14 @@ class NcmClientv3(BaseNcmClient):
                           'fields',
                           'limit',
                           'sort']
-        
+
+        # Default the result-limit to 500 when the caller supplies none
+        # (Req 9.2). __get_json interprets this as a cap and applies a
+        # page[size] of 50 per page, so a default of 500 means "up to 500
+        # records, 50 per page".
+        if 'limit' not in kwargs:
+            kwargs['limit'] = 500
+
         params = self.__parse_kwargs(kwargs, allowed_params)
         return self.__get_json(get_url, call_type, params=params)
 
@@ -2939,7 +3199,7 @@ class NcmClientv3(BaseNcmClient):
         :return: A list of subscriptions with details.
         """
         call_type = 'Subscriptions'
-        get_url = f'{self.base_url}/subscriptions'
+        get_url = f'{self.base_url}/subscriptions/'
 
         allowed_params = ['end_time',
                           'end_time__lt',
@@ -2974,15 +3234,19 @@ class NcmClientv3(BaseNcmClient):
         """
 
         call_type = 'Subscription'
+        self.__check_token()
+
+        # Validate subscription id, action, MAC format, and batch bounds, and
+        # dedupe the normalized MACs — all before building or sending anything
+        # (Req 8.3, 8.4, 8.6, 8.7).
+        unique_macs = self.__validate_regrade_batch(subscription_id, mac, action)
+
         post_url = f'{self.base_url}/asset_endpoints/regrades'
 
         payload = {
             "atomic:operations": []
         }
-        mac = mac if isinstance(mac, list) else [mac]
-        for smac in mac:
-            # Normalize MAC to bare uppercase hex (strip colons, dashes, dots)
-            normalized = smac.upper().replace(':', '').replace('-', '').replace('.', '')
+        for normalized in unique_macs:
             data = {
                 "op": "add",
                 "data": {
@@ -2996,12 +3260,9 @@ class NcmClientv3(BaseNcmClient):
             }
             payload["atomic:operations"].append(data)
 
-        headers = {
-            'Content-Type': 'application/vnd.api+json;ext="https://jsonapi.org/ext/atomic"',
-            'Accept': 'application/vnd.api+json;ext="https://jsonapi.org/ext/atomic"'
-        }
+        headers = self._atomic_headers()
 
-        ncm = self.session.post(post_url, json=payload, headers=headers)
+        ncm = self._v3_request('post', post_url, json=payload, headers=headers)
         result = self._return_handler(ncm.status_code, ncm.json(), call_type)
         return result
 
@@ -3012,20 +3273,27 @@ class NcmClientv3(BaseNcmClient):
         :return: Result of the unlicense operation
         """
         call_type = 'Unlicense Device'
+        self.__check_token()
+
+        # Use the same normalization + batch validation as regrade; the action
+        # is fixed to UNLICENSE for this method. A subscription id is not
+        # required by unlicense, so pass a sentinel to satisfy the shared
+        # non-empty check while validating MACs and batch bounds identically
+        # (Req 8.3, 8.6, 8.7).
+        unique_macs = self.__validate_regrade_batch(
+            "UNLICENSE", mac_addresses, "UNLICENSE")
+
         post_url = f'{self.base_url}/asset_endpoints/regrades'
 
-        # Convert single MAC address to list for consistent processing
-        mac_addresses = [mac_addresses] if isinstance(mac_addresses, str) else mac_addresses
-
-        # Create atomic operations for each MAC address
+        # Create one atomic operation per unique normalized MAC address
         operations = []
-        for mac in mac_addresses:
+        for normalized in unique_macs:
             operations.append({
                 "op": "add",
                 "data": {
                     "type": "regrades",
                     "attributes": {
-                        "mac_address": mac.replace(':', ''),
+                        "mac_address": normalized,
                         "action": "UNLICENSE"
                     }
                 }
@@ -3035,12 +3303,9 @@ class NcmClientv3(BaseNcmClient):
             "atomic:operations": operations
         }
 
-        headers = {
-            'Content-Type': 'application/vnd.api+json;ext="https://jsonapi.org/ext/atomic"',
-            'Accept': 'application/vnd.api+json;ext="https://jsonapi.org/ext/atomic"'
-        }
+        headers = self._atomic_headers()
 
-        response = self.session.post(post_url, json=payload, headers=headers)
+        response = self._v3_request('post', post_url, json=payload, headers=headers)
         
         result = self._return_handler(response.status_code, response.json(), call_type)
         return result
@@ -3067,773 +3332,62 @@ class NcmClientv3(BaseNcmClient):
         params = self.__parse_kwargs(kwargs, allowed_params)
         return self.__get_json(get_url, call_type, params=params)
 
-    def get_private_cellular_networks(self, **kwargs):
+    def get_regrade(self, regrade_id):
         """
-        Returns information about your private cellular networks.
+        Returns a single regrade job by its identifier.
+        :param regrade_id: ID of the regrade job to retrieve.
+        :return: The regrade job with details.
+        """
+        call_type = 'Subscription'
+        get_url = f'{self.base_url}/asset_endpoints/regrades/{regrade_id}'
+
+        return self.__get_json(get_url, call_type)
+
+    def get_tenants(self, tenant_id=None, **kwargs):
+        """
+        Returns tenant information from the NCM API v3 tenants endpoint.
+
+        When called without ``tenant_id`` this issues a GET to
+        ``/tenants`` and returns the aggregated, paginated list of tenant
+        ``data`` objects. When called with ``tenant_id`` it issues a GET to
+        ``/tenants/{id}`` and returns that tenant's ``data`` object; if no
+        tenant matches the identifier it returns a not-found indicator (an
+        empty list) rather than fabricating a tenant object.
+
+        Supported query parameters are the documented list filters ``name`` and
+        ``type`` plus ``sort`` and ``limit``. Any other parameter raises a
+        ``ValueError`` before a request is dispatched. A missing v3 Bearer token
+        raises before dispatch via the shared token guard.
+
+        :param tenant_id: ID of a specific tenant to retrieve. Optional.
+        :type tenant_id: str
         :param kwargs: A set of zero or more allowed parameters
           in the allowed_params list.
-        :return: A list of PCNs with details.
+        :return: A list of tenants, or a single tenant's data when
+          ``tenant_id`` is provided (an empty list when no tenant matches).
         """
-        call_type = 'Private Cellular Networks'
-        get_url = f'{self.base_url}/beta/private_cellular_networks'
+        call_type = 'Tenants'
 
-        allowed_params = ['core_ip',
-                          'created_at',
-                          'created_at__lt',
-                          'created_at__lte',
-                          'created_at__gt',
-                          'created_at__gte',
-                          'created_at__ne',
-                          'ha_enabled',
-                          'id',
-                          'mobility_gateways',
-                          'mobility_gateway_virtual_ip',
-                          'name',
-                          'state',
-                          'status',
-                          'tac',
-                          'type',
-                          'updated_at',
-                          'updated_at__lt',
-                          'updated_at__lte',
-                          'updated_at__gt',
-                          'updated_at__gte',
-                          'updated_at__ne',
-                          'fields',
-                          'limit',
-                          'sort']
-        
+        allowed_params = ['name', 'type', 'sort', 'limit']
         params = self.__parse_kwargs(kwargs, allowed_params)
+
+        if tenant_id:
+            get_url = f'{self.base_url}/tenants/{tenant_id}'
+            # __get_json returns a list of accumulated ``data`` objects on
+            # success, or an error string routed through _return_handler on a
+            # non-2xx page. Treat a bare 'ERROR' string or an empty result as
+            # "no matching tenant" rather than fabricating an object (Req 5.6).
+            response = self.__get_json(get_url, call_type, params=params)
+            if isinstance(response, str):
+                if response.startswith('ERROR'):
+                    return []
+                return response
+            if not response:
+                return []
+            return response
+
+        get_url = f'{self.base_url}/tenants'
         return self.__get_json(get_url, call_type, params=params)
-
-    def get_private_cellular_network(self, network_id, **kwargs):
-        """
-        Returns information about a private cellular network.
-        :param network_id: ID of the private_cellular_networks record
-        :param kwargs: A set of zero or more allowed parameters
-          in the allowed_params list.
-        :return: An individual PCN network with details.
-        """
-        call_type = 'Private Cellular Networks'
-        get_url = f'{self.base_url}/beta/private_cellular_networks/{network_id}'
-
-        allowed_params = ['name',
-                          'segw_ip',
-                          'ha_enabled',
-                          'mobility_gateway_virtual_ip',
-                          'state',
-                          'status',
-                          'tac',
-                          'created_at',
-                          'updated_at',
-                          'fields']
-
-        params = self.__parse_kwargs(kwargs, allowed_params)
-        return self.__get_json(get_url, call_type, params=params)
-
-    def update_private_cellular_network(self, id=None, name=None, **kwargs):
-        """
-        Make changes to a private cellular network.
-        :param id: PCN network ID. Specify either this or name.
-        :type id: str
-        :param name: PCN network name
-        :param kwargs: A set of zero or more allowed parameters
-          in the allowed_params list.
-        :return: PCN update result.
-        """
-        call_type = 'Private Cellular Network'
-
-        if not id and not name:
-            return "ERROR: no network specified. Must specify either network_id or network_name"
-
-        if id:
-            net = self.get_private_cellular_networks(id=id)[0]
-        elif name:
-            net = self.get_private_cellular_networks(name=name)[0]
-
-        if name:
-            kwargs['name'] = name
-
-        net.pop('links')
-
-        put_url = f'{self.base_url}/beta/private_cellular_networks/{net["id"]}'
-
-        allowed_params = ['core_ip',
-                          'ha_enabled',
-                          'id',
-                          'mobility_gateways',
-                          'mobility_gateway_virtual_ip',
-                          'name',
-                          'state',
-                          'status',
-                          'tac',
-                          'type']
-        params = self.__parse_put_kwargs(kwargs, allowed_params)
-
-        for k, v in params.items():
-            net['attributes'][k] = v
-
-        data = {"data": net}
-
-        ncm = self.session.put(put_url, data=json.dumps(data))
-        result = self._return_handler(ncm.status_code, ncm.json(), call_type)
-        return result
-
-    def create_private_cellular_network(self, name, core_ip, ha_enabled=False, mobility_gateway_virtual_ip=None, mobility_gateways=None):
-        """
-        Make changes to a private cellular network.
-        :param name: Name of the networks.
-        :type name: str
-        :param core_ip: IP address to reach core network.
-        :type core_ip: str
-        :param ha_enabled: High availability (HA) of network.
-        :type ha_enabled: bool
-        :param mobility_gateway_virtual_ip: Virtual IP address to reach core when HA is enabled. Nullable.
-        :type mobility_gateway_virtual_ip: str
-        :param mobility_gateways: Comma separated list of private_cellular_cores IDs to add as mobility gateways. Nullable.
-        :type mobility_gateways: str
-        :param kwargs: A set of zero or more allowed parameters
-          in the allowed_params list.
-        :return: Create PCN result..
-        """
-        call_type = 'Private Cellular Network'
-
-        post_url = f'{self.base_url}/beta/private_cellular_networks'
-
-        data = {
-            "data": {
-                "type": "private_cellular_networks",
-                "attributes": {
-                    "name": name,
-                    "core_ip": core_ip,
-                    "ha_enabled": ha_enabled,
-                    "mobility_gateway_virtual_ip": mobility_gateway_virtual_ip
-                }
-            }
-        }
-
-        if mobility_gateways:
-            relationships = {
-                "mobility_gateways": {
-                    "data": []
-                }
-            }
-            gateways = mobility_gateways.split(",")
-
-            for gateway in gateways:
-                relationships['mobility_gateways']['data'].append({"type": "private_cellular_cores", "id": gateway})
-
-            data['data']['relationships'] = relationships
-
-        ncm = self.session.post(post_url, data=json.dumps(data))
-        result = self._return_handler(ncm.status_code, ncm.json(), call_type)
-        return result
-
-    def delete_private_cellular_network(self, id):
-        """
-        Returns information about a private cellular network.
-        :param id: ID of the private_cellular_networks record
-        :type id: str
-        :return: None unless error.
-        """
-        # TODO support deletion by network name
-        call_type = 'Private Cellular Network'
-        delete_url = f'{self.base_url}/beta/private_cellular_networks/{id}'
-
-        ncm = self.session.delete(delete_url)
-        result = self._return_handler(ncm.status_code, ncm.text, call_type)
-        return result
-
-    def get_private_cellular_cores(self, **kwargs):
-        """
-        Returns information about a private cellular core.
-        :param kwargs: A set of zero or more allowed parameters
-          in the allowed_params list.
-        :return: A list of Mobility Gateways with details.
-        """
-        call_type = 'Private Cellular Cores'
-        get_url = f'{self.base_url}/beta/private_cellular_cores'
-
-        allowed_params = ['created_at',
-                          'id',
-                          'management_ip',
-                          'network',
-                          'router',
-                          'status',
-                          'type',
-                          'updated_at',
-                          'url',
-                          'fields',
-                          'limit',
-                          'sort']
-
-        params = self.__parse_kwargs(kwargs, allowed_params)
-        return self.__get_json(get_url, call_type, params=params)
-
-    def get_private_cellular_core(self, core_id, **kwargs):
-        """
-        Returns information about a private cellular core.
-        :param core_id: ID of the private_cellular_cores record
-        :param kwargs: A set of zero or more allowed parameters
-          in the allowed_params list.
-        :return: An individual Mobility Gateway with details.
-        """
-        call_type = 'Private Cellular Core'
-        get_url = f'{self.base_url}/beta/private_cellular_cores/{core_id}'
-
-        allowed_params = ['created_at',
-                          'id',
-                          'management_ip',
-                          'network',
-                          'router',
-                          'status',
-                          'type',
-                          'updated_at',
-                          'url',
-                          'fields',
-                          'sort']
-
-        params = self.__parse_kwargs(kwargs, allowed_params)
-        return self.__get_json(get_url, call_type, params=params)
-
-    def get_private_cellular_radios(self, **kwargs):
-        """
-        Returns information about a private cellular radio.
-        :param kwargs: A set of zero or more allowed parameters
-          in the allowed_params list.
-        :return: A list of Cellular APs with details.
-        """
-        call_type = 'Private Cellular Radios'
-        get_url = f'{self.base_url}/beta/private_cellular_radios'
-
-        allowed_params = ['admin_state',
-                          'antenna_azimuth',
-                          'antenna_beamwidth',
-                          'antenna_downtilt',
-                          'antenna_gain',
-                          'bandwidth',
-                          'category',
-                          'cpi_id',
-                          'cpi_name',
-                          'cpi_signature',
-                          'created_at',
-                          'description',
-                          'fccid',
-                          'height',
-                          'height_type',
-                          'id',
-                          'indoor_deployment',
-                          'latitude',
-                          'location',
-                          'longitude',
-                          'mac',
-                          'name',
-                          'network',
-                          'serial_number',
-                          'tdd_mode',
-                          'tx_power',
-                          'type',
-                          'updated_at',
-                          'fields',
-                          'limit',
-                          'sort']
-
-        params = self.__parse_kwargs(kwargs, allowed_params)
-        return self.__get_json(get_url, call_type, params=params)
-
-    def get_private_cellular_radio(self, id, **kwargs):
-        """
-        Returns information about a private cellular radio.
-        :param id: ID of the private_cellular_radios record
-        :param kwargs: A set of zero or more allowed parameters
-          in the allowed_params list.
-        :return: An individual Cellular AP with details.
-        """
-        call_type = 'Private Cellular Radios'
-        get_url = f'{self.base_url}/beta/private_cellular_radios/{id}'
-
-        allowed_params = ['admin_state',
-                          'antenna_azimuth',
-                          'antenna_beamwidth',
-                          'antenna_downtilt',
-                          'antenna_gain',
-                          'bandwidth',
-                          'category',
-                          'cpi_id',
-                          'cpi_name',
-                          'cpi_signature',
-                          'created_at',
-                          'description',
-                          'fccid',
-                          'height',
-                          'height_type',
-                          'id',
-                          'indoor_deployment',
-                          'latitude',
-                          'location',
-                          'longitude',
-                          'mac',
-                          'name',
-                          'network',
-                          'serial_number',
-                          'tdd_mode',
-                          'tx_power',
-                          'type',
-                          'updated_at',
-                          'fields',
-                          'limit',
-                          'sort']
-
-        params = self.__parse_kwargs(kwargs, allowed_params)
-        return self.__get_json(get_url, call_type, params=params)
-
-    def update_private_cellular_radio(self, id=None, name=None, **kwargs):
-        """
-        Updates a Cellular AP's data.
-        :param id: ID of the private_cellular_radio record. Must specify this or name.
-        :type id: str
-        :param name: Name of the Cellular AP. Must specify this or id.
-        type id: str
-        :param kwargs: A set of zero or more allowed parameters
-          in the allowed_params list.
-        :return: Update Cellular AP results.
-        """
-        call_type = 'Private Cellular Radio'
-
-        if id:
-            radio = self.get_private_cellular_radios(id=id)[0]
-        elif name:
-            radio = self.get_private_cellular_radios(name=name)[0]
-        else:
-            return "ERROR: Must specify either ID or name"
-
-        if name:
-            kwargs['name'] = name
-
-        put_url = f'{self.base_url}/beta/private_cellular_radios/{radio["id"]}'
-
-        if "network" in kwargs.keys():
-            relationships = {
-                "network": {
-                    "data": {
-                        "type": "private_cellular_networks",
-                        "id": kwargs['network']
-                    }
-                }
-            }
-            kwargs.pop("network")
-
-            radio['data']['relationships'] = relationships
-
-        if "location" in kwargs.keys():
-            location = {
-                "data": {
-                    "type": "private_cellular_radio_groups",
-                    "id": kwargs['location']
-                }
-            }
-            kwargs.pop("location")
-            radio['data']['location'] = location
-
-        allowed_params = ['admin_state',
-                          'antenna_azimuth',
-                          'antenna_beamwidth',
-                          'antenna_downtilt',
-                          'antenna_gain',
-                          'bandwidth',
-                          'category',
-                          'cpi_id',
-                          'cpi_name',
-                          'cpi_signature',
-                          'created_at',
-                          'description',
-                          'fccid',
-                          'height',
-                          'height_type',
-                          'id',
-                          'indoor_deployment',
-                          'latitude',
-                          'location',
-                          'longitude',
-                          'mac',
-                          'name',
-                          'network',
-                          'serial_number',
-                          'tdd_mode',
-                          'tx_power']
-        params = self.__parse_put_kwargs(kwargs, allowed_params)
-
-        for k, v in params.items():
-            radio['attributes'][k] = v
-
-        radio = {"data": radio}
-
-        ncm = self.session.put(put_url, data=json.dumps(radio))
-        result = self._return_handler(ncm.status_code, ncm.json(), call_type)
-        return result
-
-    def get_private_cellular_radio_groups(self, **kwargs):
-        """
-        Returns information about a private cellular core.
-        :param kwargs: A set of zero or more allowed parameters
-          in the allowed_params list.
-        :return: A list of Cellular AP Groups with details.
-        """
-        call_type = 'Private Cellular Radio Groups'
-        get_url = f'{self.base_url}/beta/private_cellular_radio_groups'
-
-        allowed_params = ['created_at',
-                          'created_at__lt',
-                          'created_at__lte',
-                          'created_at__gt',
-                          'created_at__gte',
-                          'created_at__ne',
-                          'description',
-                          'id',
-                          'name',
-                          'network',
-                          'type',
-                          'updated_at',
-                          'updated_at__lt',
-                          'updated_at__lte',
-                          'updated_at__gt',
-                          'updated_at__gte',
-                          'updated_at__ne',
-                          'fields',
-                          'limit',
-                          'sort']
-
-        params = self.__parse_kwargs(kwargs, allowed_params)
-        return self.__get_json(get_url, call_type, params=params)
-
-    def get_private_cellular_radio_group(self, group_id, **kwargs):
-        """
-        Returns information about a private cellular core.
-        :param group_id: ID of the private_cellular_radio_groups record
-        :param kwargs: A set of zero or more allowed parameters
-          in the allowed_params list.
-        :return: An individual Cellular AP Group with details.
-        """
-        call_type = 'Private Cellular Radio Group'
-        get_url = f'{self.base_url}/beta/private_cellular_radio_groups/{group_id}'
-
-        allowed_params = ['created_at',
-                          'description',
-                          'id',
-                          'name',
-                          'network',
-                          'type',
-                          'updated_at',
-                          'fields',
-                          'limit',
-                          'sort']
-        if "search" not in kwargs.keys():
-            params = self.__parse_kwargs(kwargs, allowed_params)
-        else:
-            if kwargs['search']:
-                params = self.__parse_search_kwargs(kwargs, allowed_params)
-            else:
-                params = self.__parse_kwargs(kwargs, allowed_params)
-
-        results = self.__get_json(get_url, call_type, params=params)
-        return results
-
-    def update_private_cellular_radio_group(self, id=None, name=None, **kwargs):
-        """
-        Updates a Radio Group.
-        :param id: ID of the private_cellular_radio_groups record. Must specify this or name.
-        :type id: str
-        :param name: Name of the Radio Group. Must specify this or id.
-        type name: str
-        :param kwargs: A set of zero or more allowed parameters
-          in the allowed_params list.
-        :return: Update Cellular AP Group results.
-        """
-        call_type = 'Private Cellular Radio Group'
-
-        if id:
-            group = self.get_private_cellular_radio_groups(id=id)[0]
-        elif name:
-            group = self.get_private_cellular_radio_groups(name=name)[0]
-        else:
-            return "ERROR: Must specify either ID or name"
-
-        if name:
-            kwargs['name'] = name
-
-        put_url = f'{self.base_url}/beta/private_cellular_sims/{group["id"]}'
-
-        if "network" in kwargs.keys():
-            relationships = {
-                "network": {
-                    "data": {
-                        "type": "private_cellular_networks",
-                        "id": kwargs['network']
-                    }
-                }
-            }
-            kwargs.pop("network")
-
-            group['data']['relationships'] = relationships
-
-        allowed_params = ['name',
-                          'description']
-        params = self.__parse_put_kwargs(kwargs, allowed_params)
-
-        for k, v in params.items():
-            group['attributes'][k] = v
-
-        group = {"data": group}
-
-        ncm = self.session.put(put_url, data=json.dumps(group))
-        result = self._return_handler(ncm.status_code, ncm.json(), call_type)
-        return result
-
-    def create_private_cellular_radio_group(self, name, description, network=None):
-        """
-        Creates a Radio Group.
-        :param name: Name of the Radio Group.
-        type name: str
-        :param description: Description of the Radio Group.
-        :type description: str
-        param network: ID of the private_cellular_network to belong to. Optional.
-        :type network: str
-        :return: Create Private Cellular Radio Group results.
-        """
-        call_type = 'Private Cellular Radio Group'
-
-        post_url = f'{self.base_url}/beta/private_cellular_radio_groups'
-
-        group = {
-            "data": {
-                "type": "private_cellular_radio_groups",
-                "attributes": {
-                    "name": name,
-                    "description": description
-                }
-            }
-        }
-
-        if network:
-            relationships = {
-                "network": {
-                    "data": {
-                        "type": "private_cellular_networks",
-                        "id": network
-                    }
-                }
-            }
-
-            group['data']['relationships'] = relationships
-
-        ncm = self.session.post(post_url, data=json.dumps(group))
-        result = self._return_handler(ncm.status_code, ncm.json(), call_type)
-        return result
-
-    def delete_private_cellular_radio_group(self, id):
-        """
-        Deletes a private_cellular_radio_group record.
-        :param id: ID of the private_cellular_radio_group record
-        :type id: str
-        :return: None unless error.
-        """
-        #TODO support deletion by group name
-        call_type = 'Private Cellular Radio Group'
-        delete_url = f'{self.base_url}/beta/private_cellular_radio_group/{id}'
-
-        ncm = self.session.delete(delete_url)
-        result = self._return_handler(ncm.status_code, ncm.text, call_type)
-        return result
-
-    def get_private_cellular_sims(self, **kwargs):
-        """
-        Returns information about a private cellular core.
-        :param kwargs: A set of zero or more allowed parameters
-          in the allowed_params list.
-        :return: A list of PCN SIMs with details.
-        """
-        call_type = 'Private Cellular SIMs'
-        get_url = f'{self.base_url}/beta/private_cellular_sims'
-
-        allowed_params = ['created_at',
-                          'created_at__lt',
-                          'created_at__lte',
-                          'created_at__gt',
-                          'created_at__gte',
-                          'created_at__ne',
-                          'iccid',
-                          'id',
-                          'imsi',
-                          'last_contact_at',
-                          'last_contact_at__lt',
-                          'last_contact_at__lte',
-                          'last_contact_at__gt',
-                          'last_contact_at__gte',
-                          'last_contact_at__ne',
-                          'name',
-                          'network',
-                          'state',
-                          'state_updated_at',
-                          'state_updated_at__lt',
-                          'state_updated_at__lte',
-                          'state_updated_at__gt',
-                          'state_updated_at__gte',
-                          'state_updated_at__ne',
-                          'type',
-                          'fields',
-                          'limit',
-                          'sort']
-
-        params = self.__parse_kwargs(kwargs, allowed_params)
-        return self.__get_json(get_url, call_type, params=params)
-
-    def get_private_cellular_sim(self, id, **kwargs):
-        """
-        Returns information about a private cellular core.
-        :param sim_id: ID of the private_cellular_sims record
-        :param kwargs: A set of zero or more allowed parameters
-          in the allowed_params list.
-        :return: An individual PCN SIM with details.
-        """
-        call_type = 'Private Cellular SIMs'
-        get_url = f'{self.base_url}/beta/private_cellular_sims/{id}'
-
-        allowed_params = ['created_at',
-                          'iccid',
-                          'id',
-                          'imsi',
-                          'last_contact_at',
-                          'name',
-                          'network',
-                          'state',
-                          'state_updated_at',
-                          'type',
-                          'fields',
-                          'limit',
-                          'sort']
-
-        params = self.__parse_kwargs(kwargs, allowed_params)
-        return self.__get_json(get_url, call_type, params=params)
-
-    def update_private_cellular_sim(self, id=None, iccid=None, imsi=None, **kwargs):
-        """
-        Updates a SIM's data.
-        :param id: ID of the private_cellular_sim record. Must specify ID, ICCID, or IMSI.
-        :type id: str
-        :param iccid: ICCID. Must specify ID, ICCID, or IMSI.
-        :type id: str
-        :param imsi: IMSI. Must specify ID, ICCID, or IMSI.
-        :type id: str
-        :param kwargs: A set of zero or more allowed parameters
-          in the allowed_params list.
-        :return: Update PCN SIM results.
-        """
-        call_type = 'Private Cellular SIM'
-
-        if id:
-            sim = self.get_private_cellular_sims(id=id)[0]
-        elif iccid:
-            sim = self.get_private_cellular_sims(iccid=iccid)[0]
-        elif imsi:
-            sim = self.get_private_cellular_sims(imsi=imsi)[0]
-        else:
-            return "ERROR: Must specify either ID, ICCID, or IMSI"
-
-        put_url = f'{self.base_url}/beta/private_cellular_sims/{sim["id"]}'
-
-        if "network" in kwargs.keys():
-            relationships = {
-                "network": {
-                    "data": {
-                        "type": "private_cellular_networks",
-                        "id": kwargs['network']
-                    }
-                }
-            }
-            kwargs.pop("network")
-
-            sim['data']['relationships'] = relationships
-
-        allowed_params = ['name',
-                          'state']
-        params = self.__parse_put_kwargs(kwargs, allowed_params)
-
-        for k, v in params.items():
-            sim['attributes'][k] = v
-
-        sim = {"data": sim}
-
-        ncm = self.session.put(put_url, data=json.dumps(sim))
-        result = self._return_handler(ncm.status_code, ncm.json(), call_type)
-        return result
-
-    def get_private_cellular_radio_statuses(self, **kwargs):
-        """
-        Returns information about a private cellular core.
-        :param kwargs: A set of zero or more allowed parameters
-          in the allowed_params list.
-        :return: Cellular radio status for all cellular radios.
-        """
-        call_type = 'Private Cellular Radio Statuses'
-        get_url = f'{self.base_url}/beta/private_cellular_radio_statuses'
-
-        allowed_params = ['admin_state',
-                          'boot_time',
-                          'cbrs_sas_status',
-                          'cell',
-                          'connected_ues',
-                          'ethernet_status',
-                          'id',
-                          'ipsec_status',
-                          'ipv4_address',
-                          'last_update_time',
-                          'online_status',
-                          'operational_status',
-                          'operating_tx_power',
-                          's1_status',
-                          'time_synchronization',
-                          'type',
-                          'fields',
-                          'limit',
-                          'sort']
-
-        params = self.__parse_kwargs(kwargs, allowed_params)
-        return self.__get_json(get_url, call_type, params=params)
-
-    def get_private_cellular_radio_status(self, status_id, **kwargs):
-        """
-        Returns information about a private cellular core.
-        :param status_id: ID of the private_cellular_radio_statuses resource
-        :param kwargs: A set of zero or more allowed parameters
-          in the allowed_params list.
-        :return: Cellular radio status for an individual radio.
-        """
-        call_type = 'Private Cellular Radio Status'
-        get_url = f'{self.base_url}/beta/private_cellular_radio_statuses/{status_id}'
-
-        allowed_params = ['admin_state',
-                          'boot_time',
-                          'cbrs_sas_status',
-                          'cell',
-                          'connected_ues',
-                          'ethernet_status',
-                          'id',
-                          'ipsec_status',
-                          'ipv4_address',
-                          'last_update_time',
-                          'online_status',
-                          'operational_status',
-                          'operating_tx_power',
-                          's1_status',
-                          'time_synchronization',
-                          'type',
-                          'fields',
-                          'limit',
-                          'sort']
-
-        params = self.__parse_kwargs(kwargs, allowed_params)
-        return self.__get_json(get_url, call_type, params=params)
-
 
     def get_public_sim_mgmt_assets(self, **kwargs):
         """
@@ -3842,15 +3396,15 @@ class NcmClientv3(BaseNcmClient):
           in the allowed_params list.
         :return: SIM asset resources.
         """
-        call_type = 'Private Cellular Radio Status'
-        get_url = f'{self.base_url}/beta/public_sim_mgmt_assets'
+        call_type = 'Public SIM Management Assets'
+        get_url = f'{self.base_url}/public_sim_mgmt_assets/'
 
         allowed_params = ['assigned_imei',
                           'carrier',
                           'detected_imei',
                           'device_status',
                           'iccid',
-                          'is_licensed'
+                          'is_licensed',
                           'type',
                           'fields',
                           'limit',
@@ -3866,8 +3420,8 @@ class NcmClientv3(BaseNcmClient):
           in the allowed_params list.
         :return: Rate plans for SIM assets.
         """
-        call_type = 'Private Cellular Radio Status'
-        get_url = f'{self.base_url}/beta/public_sim_mgmt_assets'
+        call_type = 'Public SIM Management Rate Plans'
+        get_url = f'{self.base_url}/public_sim_mgmt_rate_plans/'
 
         allowed_params = ['carrier',
                           'name',
@@ -3901,6 +3455,7 @@ class NcmClientv3(BaseNcmClient):
         :raises ValueError: If an invalid parameter or value is provided.
         """
         call_type = 'Exchange Sites'
+        self.__check_token()
         get_url = f'{self.base_url}/beta/exchange_sites'
 
         allowed_params = {
@@ -3950,11 +3505,24 @@ class NcmClientv3(BaseNcmClient):
         if site_id:
             if not isinstance(site_id, str):
                 raise TypeError("site_id must be a string")
+            # get_url is the collection path '/beta/exchange_sites' (no trailing
+            # slash), so append '/{site_id}' to yield the item path
+            # '/beta/exchange_sites/{site_id}' (no trailing slash).
             get_url += f'/{site_id}'
             response = self.__get_json(get_url, call_type)
-            
-            if response.startswith('ERROR'):
-                return [f"No site found with site_id: {site_id}"]
+
+            # __get_json returns a list of accumulated ``data`` objects on
+            # success, or an error string (starting with 'ERROR') routed through
+            # _return_handler on a non-2xx page. Guard for the string case
+            # without calling str-only methods on a list (a pre-existing
+            # fragility flagged in task 11.1): a bare string starting with
+            # 'ERROR', or an empty result, both mean "no such site".
+            if isinstance(response, str):
+                if response.startswith('ERROR'):
+                    return []
+                return response
+            if not response:
+                return []
             return response
 
         params.update(self.__parse_kwargs(kwargs, allowed_params.keys()))
@@ -3990,6 +3558,7 @@ class NcmClientv3(BaseNcmClient):
         :raises ValueError: If required parameters are missing or if an invalid parameter or value is provided.
         """
         call_type = 'Create Exchange Site'
+        self.__check_token()
 
         # Type checking for required parameters
         if not isinstance(name, str):
@@ -4053,7 +3622,7 @@ class NcmClientv3(BaseNcmClient):
             }
         }
 
-        ncm = self.session.post(post_url, data=json.dumps(data))
+        ncm = self._v3_request('post', post_url, data=json.dumps(data))
         result = self._return_handler(ncm.status_code, ncm.json(), call_type)
         if ncm.status_code == 201:
             return ncm.json()['data']
@@ -4080,6 +3649,7 @@ class NcmClientv3(BaseNcmClient):
         :raises LookupError: If no site is found when searching by id or name.
         """
         call_type = 'Update Exchange Site'
+        self.__check_token()
 
         if (site_id is None or site_id == '') and (name is None or name == ''):
             raise ValueError("Either site_id or name must be provided and cannot be blank")
@@ -4160,7 +3730,7 @@ class NcmClientv3(BaseNcmClient):
             }
         }
 
-        ncm = self.session.put(put_url, data=json.dumps(data))
+        ncm = self._v3_request('put', put_url, data=json.dumps(data))
         result = self._return_handler(ncm.status_code, ncm.json(), call_type)
         if ncm.status_code == 200:
             return ncm.json()['data']
@@ -4180,6 +3750,7 @@ class NcmClientv3(BaseNcmClient):
         :raises ValueError: If neither site_id nor site_name is provided.
         """
         call_type = 'Delete Exchange Site'
+        self.__check_token()
 
         if not site_id and not site_name:
             raise ValueError("Either site_id or site_name must be provided")
@@ -4202,7 +3773,7 @@ class NcmClientv3(BaseNcmClient):
             site_id = self.get_exchange_sites(name=site_name)[0]["id"]
             delete_url = f'{self.base_url}/beta/exchange_sites/{site_id}'
 
-        ncm = self.session.delete(delete_url)
+        ncm = self._v3_request('delete', delete_url)
         
         if ncm.status_code == 204:
             site_deletion_result = "deleted"
@@ -4238,13 +3809,14 @@ class NcmClientv3(BaseNcmClient):
         :raises LookupError: If no site is found when searching by site_name.
         """
         call_type = 'Exchange Resources'
+        self.__check_token()
 
         if resource_id:
             if not isinstance(resource_id, str):
                 raise TypeError("resource_id must be a string")
-            get_url = f"{self.base_url}/beta/exchange_resources/{resource_id}"
+            get_url = f"{self._v3_host_root()}/beta/exchange_resources/{resource_id}"
         else:
-            get_url = f"{self.base_url}/beta/exchange_resources"
+            get_url = f"{self._v3_host_root()}/beta/exchange_resources"
 
         params = {}
         if site_name:
@@ -4304,7 +3876,7 @@ class NcmClientv3(BaseNcmClient):
             else:
                 params[key] = value
 
-        response = self.session.get(get_url, params=params)
+        response = self._v3_request('get', get_url, params=params)
 
         if response.status_code == 200:
             data = response.json()['data']
@@ -4343,6 +3915,7 @@ class NcmClientv3(BaseNcmClient):
         :raises LookupError: If no site is found when searching by site_name.
         """
         call_type = 'Create Exchange Site Resource'
+        self.__check_token()
 
         # Type checking for required parameters
         if not isinstance(resource_name, str):
@@ -4368,7 +3941,7 @@ class NcmClientv3(BaseNcmClient):
         if resource_type not in valid_resource_types:
             raise ValueError(f"Invalid resource_type. Must be one of: {', '.join(valid_resource_types)}")
 
-        post_url = f'{self.base_url}/beta/exchange_resources'
+        post_url = f'{self._v3_host_root()}/beta/exchange_resources'
 
         allowed_params = {
             'protocols': (list, type(None)),
@@ -4446,7 +4019,7 @@ class NcmClientv3(BaseNcmClient):
             }
         }
 
-        ncm = self.session.post(post_url, data=json.dumps(data))
+        ncm = self._v3_request('post', post_url, data=json.dumps(data))
         result = self._return_handler(ncm.status_code, ncm.json(), call_type)
         if ncm.status_code == 201:
             return ncm.json()['data']
@@ -4480,6 +4053,7 @@ class NcmClientv3(BaseNcmClient):
         :raises LookupError: If no site is found when searching by site_name.
         """
         call_type = 'Update Exchange Resource'
+        self.__check_token()
 
         if not isinstance(resource_id, str):
             raise TypeError("resource_id must be a string")
@@ -4493,7 +4067,7 @@ class NcmClientv3(BaseNcmClient):
         resource_type = current_resource['type']
         site_id = current_resource['relationships']['exchange_site']['data']['id']
 
-        put_url = f'{self.base_url}/beta/exchange_resources/{resource_id}'
+        put_url = f'{self._v3_host_root()}/beta/exchange_resources/{resource_id}'
 
         allowed_params = {
             'name': str,
@@ -4561,7 +4135,7 @@ class NcmClientv3(BaseNcmClient):
             }
         }
 
-        ncm = self.session.put(put_url, data=json.dumps(data))
+        ncm = self._v3_request('put', put_url, data=json.dumps(data))
         result = self._return_handler(ncm.status_code, ncm.json(), call_type)
         if ncm.status_code == 200:
             return ncm.json()['data']
@@ -4584,6 +4158,7 @@ class NcmClientv3(BaseNcmClient):
         :raises LookupError: If no site is found when searching by site_name.
         """
         call_type = 'Delete Exchange Resource'
+        self.__check_token()
 
         if not resource_id and not site_name and not site_id:
             raise ValueError("Either resource_id, site_name, or site_id must be provided")
@@ -4610,8 +4185,8 @@ class NcmClientv3(BaseNcmClient):
 
         results = []
         for rid in resource_ids:
-            delete_url = f'{self.base_url}/beta/exchange_resources/{rid}'
-            ncm = self.session.delete(delete_url)
+            delete_url = f'{self._v3_host_root()}/beta/exchange_resources/{rid}'
+            ncm = self._v3_request('delete', delete_url)
             if ncm.status_code == 204:
                 results.append({'resource_id': rid, 'status': 'deleted'})
             else:
@@ -4653,9 +4228,1515 @@ class NcmClientv3(BaseNcmClient):
         Returns:
             Server response
         """
-        put_url = f'{self.base_url}/beta/account_authorizations/{authorization_id}'
         call_type = 'Account Authorization'
-        ncm = self.session.put(put_url, json=account_authorization)
+        if not authorization_id:
+            raise ValueError("authorization_id is required to update an account authorization")
+        self.__check_token()
+        put_url = f'{self.base_url}/beta/account_authorizations/{authorization_id}'
+        ncm = self._v3_request('put', put_url, json=account_authorization)
+        return self._return_handler(ncm.status_code, ncm.json(), call_type)
+
+    def get_tenant_authorizations(self, authorization_id=None, **kwargs):
+        """
+        Returns tenant authorization records from the NCM API v3
+        tenant_authorizations endpoint.
+
+        When called without ``authorization_id`` this issues a GET to
+        ``/beta/tenant_authorizations`` and returns the aggregated, paginated
+        list of tenant authorization ``data`` objects. When called with
+        ``authorization_id`` it issues a GET to
+        ``/beta/tenant_authorizations/{id}`` and returns that authorization's
+        ``data`` object.
+
+        A ``search`` parameter is supported and forwarded as a JSON:API search
+        query parameter (via the shared ``__parse_search_kwargs`` handling),
+        alongside ``sort`` and ``limit``. Any other parameter raises a
+        ``ValueError`` before a request is dispatched. A missing v3 Bearer token
+        raises before dispatch via the shared token guard. When the list
+        endpoint matches zero records an empty list is returned rather than an
+        error.
+
+        :param authorization_id: ID of a specific tenant authorization to
+          retrieve. Optional.
+        :type authorization_id: str
+        :param kwargs: A set of zero or more allowed parameters
+          in the allowed_params list.
+        :return: A list of tenant authorizations, or a single authorization's
+          data when ``authorization_id`` is provided.
+        """
+        call_type = 'Tenant Authorizations'
+
+        allowed_params = ['search', 'sort', 'limit']
+        params = self.__parse_kwargs(kwargs, allowed_params)
+
+        if authorization_id:
+            get_url = f'{self.base_url}/beta/tenant_authorizations/{authorization_id}'
+        else:
+            get_url = f'{self.base_url}/beta/tenant_authorizations'
+
+        return self.__get_json(get_url, call_type, params=params)
+
+    def update_tenant_authorization(self, authorization_id: str,
+                                    role=None, tenant_authorization: dict = None):
+        """
+        Update a tenant authorization record.
+
+        Issues a PUT to ``/beta/tenant_authorizations/{id}`` with a JSON:API
+        request body whose ``data.type`` is ``tenant_authorizations`` and
+        returns the updated authorization ``data`` object on success.
+
+        The body may be supplied one of two ways (mirroring
+        ``put_account_authorizations``):
+
+        * pass a typed ``role`` string, in which case a minimal JSON:API body is
+          constructed as ``{"data": {"type": "tenant_authorizations",
+          "id": authorization_id, "attributes": {"role": role}}}``; or
+        * pass a caller-supplied generic ``dict`` as ``tenant_authorization``,
+          which is sent verbatim (passthrough) so callers can shape the full
+          JSON:API document themselves.
+
+        :param authorization_id: ID of the authorization to update. Required;
+          a missing or blank value raises before any request is dispatched.
+        :type authorization_id: str
+        :param role: Optional role to assign, used to build a minimal body.
+        :type role: str
+        :param tenant_authorization: Optional caller-supplied JSON:API body sent
+          verbatim.
+        :type tenant_authorization: dict
+        :return: The updated tenant authorization data on success.
+        """
+        call_type = 'Tenant Authorization'
+        if not authorization_id or not str(authorization_id).strip():
+            raise ValueError(
+                "authorization_id is required to update a tenant authorization")
+
+        self.__check_token()
+
+        if tenant_authorization is not None:
+            body = tenant_authorization
+        else:
+            body = {
+                "data": {
+                    "type": "tenant_authorizations",
+                    "id": authorization_id,
+                    "attributes": {
+                        "role": role
+                    }
+                }
+            }
+
+        put_url = f'{self.base_url}/beta/tenant_authorizations/{authorization_id}'
+        ncm = self._v3_request('put', put_url, json=body)
+        return self._return_handler(ncm.status_code, ncm.json(), call_type)
+
+    def get_unmasked_wifi_passwords(self, router=None, **kwargs):
+        """
+        Returns unmasked Wi-Fi passwords for one or more routers from the NCM
+        API v3 unmasked_wifi_passwords endpoint.
+
+        Issues a GET to ``/unmasked_wifi_passwords`` (non-beta, no trailing
+        slash) with the required ``router`` query parameter and returns the
+        aggregated, paginated list of password ``data`` objects. When the
+        endpoint matches zero records an empty list is returned rather than an
+        error.
+
+        The ``router`` argument is REQUIRED: a single router id, or a list of
+        router ids which are comma-joined into the single ``router`` query
+        parameter. If ``router`` is absent or blank a ``ValueError`` is raised
+        before any request is dispatched. Only ``sort`` and ``limit`` are
+        otherwise supported; any other parameter raises a ``ValueError`` before
+        a request is dispatched. A missing v3 Bearer token raises before
+        dispatch via the shared token guard.
+
+        :param router: A single router id or a list of router ids to retrieve
+          unmasked Wi-Fi passwords for. Required.
+        :type router: str or list
+        :param kwargs: A set of zero or more allowed parameters
+          in the allowed_params list.
+        :return: A list of unmasked Wi-Fi password data objects (an empty list
+          when no record matches).
+        """
+        call_type = 'Unmasked WiFi Passwords'
+
+        # ``router`` is required and enforced before any dispatch (Req 7.2).
+        if router is None or (isinstance(router, str) and not router.strip()) \
+                or (isinstance(router, (list, tuple)) and len(router) == 0):
+            raise ValueError(
+                "router is required to retrieve unmasked Wi-Fi passwords")
+
+        get_url = f'{self.base_url}/unmasked_wifi_passwords'
+
+        # Validate remaining kwargs and guard the token via the shared helper
+        # (Req 7.4, 7.5). ``router`` is a plain query parameter here (not a
+        # JSON:API ``filter[...]``), so it is added directly rather than routed
+        # through __parse_kwargs.
+        allowed_params = ['sort', 'limit']
+        params = self.__parse_kwargs(kwargs, allowed_params)
+
+        if isinstance(router, (list, tuple)):
+            params['router'] = ",".join(str(r) for r in router)
+        else:
+            params['router'] = str(router)
+
+        return self.__get_json(get_url, call_type, params=params)
+
+    def get_migrations(self, migration_id=None, **kwargs):
+        """
+        Returns organization migration jobs from the NCM API v3
+        organizations migrations endpoint.
+
+        When called without ``migration_id`` this issues a GET to
+        ``/organizations/migrations`` (non-beta, no trailing slash) and returns
+        the aggregated, paginated list of migration ``data`` objects. When
+        called with ``migration_id`` it issues a GET to
+        ``/organizations/migrations/{id}`` and returns that migration's ``data``
+        object. When the list endpoint matches zero records an empty list is
+        returned rather than an error.
+
+        Supported query parameters are the documented list filters ``source``,
+        ``status``, ``target`` and ``type`` plus ``sort`` and ``limit``. Any
+        other parameter raises a ``ValueError`` before a request is dispatched.
+        A missing v3 Bearer token raises before dispatch via the shared token
+        guard.
+
+        :param migration_id: ID of a specific migration to retrieve. Optional.
+        :type migration_id: str
+        :param kwargs: A set of zero or more allowed parameters
+          in the allowed_params list.
+        :return: A list of migrations, or a single migration's data when
+          ``migration_id`` is provided.
+        """
+        call_type = 'Migrations'
+
+        allowed_params = ['source', 'status', 'target', 'type', 'sort', 'limit']
+        params = self.__parse_kwargs(kwargs, allowed_params)
+
+        if migration_id:
+            get_url = f'{self.base_url}/organizations/migrations/{migration_id}'
+        else:
+            get_url = f'{self.base_url}/organizations/migrations'
+
+        return self.__get_json(get_url, call_type, params=params)
+
+    def create_migration(self, migration_type: str, attributes: dict = None,
+                         relationships: dict = None, **kwargs):
+        """
+        Creates an organization migration job.
+
+        Issues a POST to ``/organizations/migrations`` with a polymorphic
+        JSON:API body whose ``data.type`` equals ``migration_type`` and returns
+        the created migration ``data`` object on success. Writes route through
+        ``_v3_request`` + ``_return_handler``; a missing v3 Bearer token raises
+        before dispatch via the shared token guard.
+
+        ``migration_type`` must be one of ``create_organizations``,
+        ``elevate_organizations`` or ``merge_organizations``; any other value
+        raises a ``ValueError`` identifying the invalid type and the accepted
+        values before any request is dispatched.
+
+        Required inputs are enforced per Swagger before dispatch:
+
+        * ``create_organizations`` and ``elevate_organizations`` require the
+          attributes ``organization_name``, ``idle_timeout``,
+          ``enhanced_login_security_enabled`` and ``mfa_required``, plus the
+          ``organization_administrator`` relationship (``elevate_organizations``
+          additionally requires the ``account`` relationship).
+        * ``merge_organizations`` requires the ``source_tenant`` relationship
+          and has no required attributes.
+
+        :param migration_type: Polymorphic migration type; one of
+          ``create_organizations``, ``elevate_organizations``,
+          ``merge_organizations``.
+        :type migration_type: str
+        :param attributes: JSON:API ``data.attributes`` for the migration.
+        :type attributes: dict
+        :param relationships: JSON:API ``data.relationships`` for the migration.
+        :type relationships: dict
+        :return: The created migration data on success.
+        """
+        call_type = 'Migration'
+
+        accepted_types = {
+            'create_organizations',
+            'elevate_organizations',
+            'merge_organizations',
+        }
+        if migration_type not in accepted_types:
+            raise ValueError(
+                "Invalid migration_type: {}. Accepted values are: {}".format(
+                    migration_type, ", ".join(sorted(accepted_types))))
+
+        attributes = attributes or {}
+        relationships = relationships or {}
+
+        # Enforce required attributes and relationships per Swagger before any
+        # request is dispatched (Req 8.7).
+        if migration_type in ('create_organizations', 'elevate_organizations'):
+            required_attrs = [
+                'organization_name',
+                'idle_timeout',
+                'enhanced_login_security_enabled',
+                'mfa_required',
+            ]
+            missing_attrs = [a for a in required_attrs if a not in attributes]
+            if missing_attrs:
+                raise ValueError(
+                    "Missing required attribute(s) for {}: {}".format(
+                        migration_type, ", ".join(missing_attrs)))
+
+            required_rels = ['organization_administrator']
+            if migration_type == 'elevate_organizations':
+                required_rels.append('account')
+            missing_rels = [r for r in required_rels if r not in relationships]
+            if missing_rels:
+                raise ValueError(
+                    "Missing required relationship(s) for {}: {}".format(
+                        migration_type, ", ".join(missing_rels)))
+        else:
+            # merge_organizations requires only the source_tenant relationship.
+            if 'source_tenant' not in relationships:
+                raise ValueError(
+                    "Missing required relationship(s) for {}: {}".format(
+                        migration_type, "source_tenant"))
+
+        self.__check_token()
+
+        data = {"type": migration_type}
+        if attributes:
+            data["attributes"] = attributes
+        if relationships:
+            data["relationships"] = relationships
+        body = {"data": data}
+
+        post_url = f'{self.base_url}/organizations/migrations'
+        ncm = self._v3_request('post', post_url, json=body)
+        return self._return_handler(ncm.status_code, ncm.json(), call_type)
+
+    def get_modem_software_versions(self, group=None, **kwargs):
+        """
+        Returns available modem software versions from the NCM API v3
+        modem_software_versions endpoint.
+
+        Issues a GET to ``/modem_software_versions`` (non-beta, no trailing
+        slash) with the required ``filter[group]`` query parameter and returns
+        the aggregated, paginated list of software version ``data`` objects.
+        When the endpoint matches zero records an empty list is returned rather
+        than an error.
+
+        The ``group`` argument is REQUIRED: if it is absent or blank a
+        ``ValueError`` is raised before any request is dispatched (Req 9.2).
+        Only ``sort`` and ``limit`` are otherwise supported; any other parameter
+        raises a ``ValueError`` before a request is dispatched (Req 9.10). A
+        missing v3 Bearer token raises before dispatch via the shared token
+        guard (Req 9.10).
+
+        :param group: The group identifier used as the required ``filter[group]``
+          query parameter. Required.
+        :type group: str
+        :param kwargs: A set of zero or more allowed parameters
+          in the allowed_params list.
+        :return: A list of modem software version data objects (an empty list
+          when no record matches).
+        """
+        call_type = 'Modem Software Versions'
+
+        # ``group`` (filter[group]) is required and enforced before any dispatch
+        # (Req 9.2).
+        if group is None or (isinstance(group, str) and not group.strip()):
+            raise ValueError(
+                "group is required to retrieve modem software versions "
+                "(filter[group])")
+
+        get_url = f'{self.base_url}/modem_software_versions'
+
+        # Validate remaining kwargs and guard the token via the shared helper
+        # (Req 9.10). The required ``group`` maps to the JSON:API
+        # ``filter[group]`` query parameter.
+        allowed_params = ['sort', 'limit']
+        params = self.__parse_kwargs(kwargs, allowed_params)
+        params['filter[group]'] = str(group)
+
+        return self.__get_json(get_url, call_type, params=params)
+
+    def get_modem_upgrades(self, modem_upgrade_id=None, group=None,
+                           upgrade_type=None, **kwargs):
+        """
+        Returns modem upgrade jobs from the NCM API v3 modem_upgrades endpoint.
+
+        When called without ``modem_upgrade_id`` this issues a GET to
+        ``/modem_upgrades`` (non-beta, no trailing slash). The list form
+        requires BOTH the ``filter[group]`` and ``filter[type]`` query
+        parameters (supplied via ``group`` and ``upgrade_type``); if either is
+        absent or blank a ``ValueError`` is raised before any request is
+        dispatched (Req 9.4). The optional ``modem_upgrade_parent`` filter is
+        included when supplied (Req 9.5). When called with ``modem_upgrade_id``
+        it issues a GET to ``/modem_upgrades/{id}`` and returns that upgrade's
+        ``data`` object. When the list endpoint matches zero records an empty
+        list is returned rather than an error (Req 9.9).
+
+        Only ``sort`` and ``limit`` are otherwise supported; any other parameter
+        raises a ``ValueError`` before a request is dispatched (Req 9.10). A
+        missing v3 Bearer token raises before dispatch via the shared token
+        guard.
+
+        :param modem_upgrade_id: ID of a specific modem upgrade to retrieve.
+          Optional.
+        :type modem_upgrade_id: str
+        :param group: The group identifier used as the required ``filter[group]``
+          query parameter for the list form. Required for the list form.
+        :type group: str
+        :param upgrade_type: The upgrade type used as the required
+          ``filter[type]`` query parameter for the list form. Required for the
+          list form.
+        :type upgrade_type: str
+        :param kwargs: A set of zero or more allowed parameters
+          in the allowed_params list (``modem_upgrade_parent``, ``sort``,
+          ``limit``).
+        :return: A list of modem upgrades, or a single modem upgrade's data when
+          ``modem_upgrade_id`` is provided (an empty list when no record
+          matches the list filters).
+        """
+        call_type = 'Modem Upgrades'
+
+        allowed_params = ['modem_upgrade_parent', 'sort', 'limit']
+
+        if modem_upgrade_id:
+            # Item read: no required filters, validate kwargs + guard token.
+            params = self.__parse_kwargs(kwargs, allowed_params)
+            get_url = f'{self.base_url}/modem_upgrades/{modem_upgrade_id}'
+            return self.__get_json(get_url, call_type, params=params)
+
+        # List form: both filter[group] and filter[type] are required and
+        # enforced before any dispatch (Req 9.4).
+        missing = []
+        if group is None or (isinstance(group, str) and not group.strip()):
+            missing.append('filter[group]')
+        if upgrade_type is None or \
+                (isinstance(upgrade_type, str) and not upgrade_type.strip()):
+            missing.append('filter[type]')
+        if missing:
+            raise ValueError(
+                "The following required filter(s) are missing for the modem "
+                "upgrades list: {}".format(", ".join(missing)))
+
+        get_url = f'{self.base_url}/modem_upgrades'
+
+        # Validate remaining kwargs and guard the token via the shared helper
+        # (Req 9.10). The required group/type map to their JSON:API
+        # ``filter[...]`` query parameters; ``modem_upgrade_parent`` is passed
+        # through as an optional filter when supplied.
+        params = self.__parse_kwargs(kwargs, allowed_params)
+        params['filter[group]'] = str(group)
+        params['filter[type]'] = str(upgrade_type)
+
+        return self.__get_json(get_url, call_type, params=params)
+
+    @staticmethod
+    def _json_media_headers():
+        """
+        Per-request header override selecting the plain ``application/json``
+        media type for both Content-Type and Accept, in place of the session
+        default ``application/vnd.api+json`` (Req 9.6, 9.7 -- see the modem
+        upgrades Swagger_Spec, which documents ``application/json`` for these
+        write operations rather than the JSON:API media type).
+
+        Used by ``create_modem_upgrade`` and ``update_modem_upgrade``. Returns a
+        fresh dict on each call so callers cannot mutate shared state -- this
+        mirrors the ``_atomic_headers``/``_multipart_headers`` static helpers.
+        """
+        return {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
+
+    def create_modem_upgrade(self, carrier, modem_type_name, operation,
+                             group_id, **kwargs):
+        """
+        Creates a modem upgrade job via the NCM API v3 modem_upgrades endpoint.
+
+        Issues a POST to ``/modem_upgrades`` (non-beta, no trailing slash) with a
+        request body whose ``data.type`` is ``modem_upgrades`` and a required
+        ``group`` relationship pointing at ``group_id``, and returns the created
+        modem upgrade ``data`` object on success (Req 9.6).
+
+        The required attributes ``carrier``, ``modem_type_name`` and
+        ``operation`` are enforced before any request is dispatched: if any is
+        absent or blank a ``ValueError`` naming the missing attribute is raised
+        and no request is sent (Req 9.8). Any additional keyword arguments are
+        merged into the request body's ``attributes`` so callers can supply the
+        optional fields documented by the Swagger_Spec (e.g. ``overwrite``,
+        ``connection_states``).
+
+        Unlike the JSON:API endpoints, this operation departs from the session
+        default ``application/vnd.api+json`` media type: the per-request
+        ``Content-Type``/``Accept`` are overridden to ``application/json`` (see
+        ``_json_media_headers``) per the modem upgrades Swagger_Spec (Req 9.6).
+        The request routes through the shared ``_v3_request`` (409
+        disambiguation and transient retry) and ``_return_handler`` (status
+        mapping). A missing v3 Bearer token raises before dispatch via the
+        shared token guard.
+
+        :param carrier: Targeted carrier (e.g. ``"att"``). Required.
+        :type carrier: str
+        :param modem_type_name: Module name (e.g. ``"LP4"``). Required.
+        :type modem_type_name: str
+        :param operation: Operation type (e.g. ``preview``/``upgrade``/
+          ``cancel``). Required.
+        :type operation: str
+        :param group_id: Identifier of the group targeted by the upgrade, used
+          for the required ``group`` relationship.
+        :param kwargs: Additional optional attributes merged into the request
+          body's ``attributes``.
+        :return: The created modem upgrade data on success.
+        """
+        call_type = 'Create Modem Upgrade'
+
+        # Enforce the required attributes before any dispatch (Req 9.8). A value
+        # is missing if it is None or a blank/whitespace-only string.
+        required = {
+            'carrier': carrier,
+            'modem_type_name': modem_type_name,
+            'operation': operation,
+        }
+        missing = [
+            name for name, value in required.items()
+            if value is None or (isinstance(value, str) and not value.strip())
+        ]
+        if missing:
+            raise ValueError(
+                "The following required attribute(s) are missing for the modem "
+                "upgrade: {}".format(", ".join(missing)))
+
+        self.__check_token()
+
+        post_url = f'{self.base_url}/modem_upgrades'
+
+        # Required attributes plus any optional attributes the caller supplied.
+        attributes = {
+            'carrier': carrier,
+            'modem_type_name': modem_type_name,
+            'operation': operation,
+        }
+        attributes.update(kwargs)
+
+        data = {
+            'data': {
+                'type': 'modem_upgrades',
+                'attributes': attributes,
+                'relationships': {
+                    'group': {
+                        'data': {
+                            'type': 'groups',
+                            'id': group_id
+                        }
+                    }
+                }
+            }
+        }
+
+        # ``application/json`` media-type override per the Swagger_Spec (Req 9.6).
+        ncm = self._v3_request(
+            'post', post_url, json=data,
+            headers=self._json_media_headers())
+        return self._return_handler(ncm.status_code, ncm.json(), call_type)
+
+    def update_modem_upgrade(self, modem_upgrade_id, **kwargs):
+        """
+        Updates a modem upgrade job via the NCM API v3 modem_upgrades endpoint.
+
+        Issues a PUT to ``/modem_upgrades/{id}`` with a request body whose
+        ``data.type`` is ``modem_upgrades`` and returns the updated modem
+        upgrade ``data`` object on success (Req 9.7). A non-blank
+        ``modem_upgrade_id`` is required: if it is absent or blank a
+        ``ValueError`` is raised and no request is dispatched.
+
+        Any keyword arguments are merged into the request body's ``attributes``
+        so callers control which fields are updated. As with
+        ``create_modem_upgrade`` the per-request ``Content-Type``/``Accept`` are
+        overridden to ``application/json`` (see ``_json_media_headers``) per the
+        modem upgrades Swagger_Spec, in place of the session default JSON:API
+        media type. The request routes through the shared ``_v3_request`` and
+        ``_return_handler``; a missing v3 Bearer token raises before dispatch via
+        the shared token guard.
+
+        :param modem_upgrade_id: Identifier of the modem upgrade to update.
+          Required (non-blank).
+        :type modem_upgrade_id: str
+        :param kwargs: Attributes merged into the request body's ``attributes``.
+        :return: The updated modem upgrade data on success.
+        """
+        call_type = 'Update Modem Upgrade'
+
+        if modem_upgrade_id is None or \
+                (isinstance(modem_upgrade_id, str)
+                 and not modem_upgrade_id.strip()):
+            raise ValueError(
+                "modem_upgrade_id is required to update a modem upgrade")
+
+        self.__check_token()
+
+        put_url = f'{self.base_url}/modem_upgrades/{modem_upgrade_id}'
+
+        data = {
+            'data': {
+                'type': 'modem_upgrades',
+                'id': str(modem_upgrade_id),
+                'attributes': dict(kwargs)
+            }
+        }
+
+        # ``application/json`` media-type override per the Swagger_Spec (Req 9.7).
+        ncm = self._v3_request(
+            'put', put_url, json=data,
+            headers=self._json_media_headers())
+        return self._return_handler(ncm.status_code, ncm.json(), call_type)
+
+    def get_esim_profiles(self, profile_id=None, **kwargs):
+        """
+        Returns eSIM profiles from the NCM API v3 esim_profiles endpoint.
+
+        When called without ``profile_id`` this issues a GET to
+        ``/beta/esim_profiles`` (no trailing slash) and returns the aggregated,
+        paginated list of eSIM profile ``data`` objects (Req 10.1). When called
+        with ``profile_id`` it issues a GET to ``/beta/esim_profiles/{id}`` and
+        returns that profile's ``data`` object (Req 10.2). When the list
+        endpoint matches zero records an empty list is returned rather than an
+        error (Req 10.9).
+
+        Supported query parameters are the documented filters ``active``,
+        ``carrier``, ``classification``, ``eid``, ``iccid``, ``net_device``,
+        ``nickname`` and ``profile_name`` plus a ``search`` parameter (Req 10.3),
+        alongside ``sort`` and ``limit``. Any other parameter raises a
+        ``ValueError`` before a request is dispatched (Req 10.10). A missing v3
+        Bearer token raises before dispatch via the shared token guard
+        (Req 10.11).
+
+        :param profile_id: ID of a specific eSIM profile to retrieve. Optional.
+        :type profile_id: str
+        :param kwargs: A set of zero or more allowed parameters
+          in the allowed_params list.
+        :return: A list of eSIM profiles, or a single profile's data when
+          ``profile_id`` is provided.
+        """
+        call_type = 'eSIM Profiles'
+
+        allowed_params = ['active', 'carrier', 'classification', 'eid', 'iccid',
+                          'net_device', 'nickname', 'profile_name', 'search',
+                          'sort', 'limit']
+        params = self.__parse_kwargs(kwargs, allowed_params)
+
+        if profile_id:
+            get_url = f'{self.base_url}/beta/esim_profiles/{profile_id}'
+        else:
+            get_url = f'{self.base_url}/beta/esim_profiles'
+
+        return self.__get_json(get_url, call_type, params=params)
+
+    def get_esim_profiles_manage(self, manage_id=None, **kwargs):
+        """
+        Returns managed eSIM profiles from the NCM API v3
+        esim_profiles/manage endpoint.
+
+        When called without ``manage_id`` this issues a GET to
+        ``/beta/esim_profiles/manage`` (no trailing slash) and returns the
+        aggregated, paginated list of managed eSIM profile ``data`` objects;
+        when called with ``manage_id`` it issues a GET to
+        ``/beta/esim_profiles/manage/{id}`` and returns that item's ``data``
+        object (Req 10.4). Note that ``manage`` is a FIXED sub-path segment of
+        the esim_profiles resource, not an identifier. When the list endpoint
+        matches zero records an empty list is returned rather than an error
+        (Req 10.9).
+
+        Only ``sort`` and ``limit`` are otherwise supported; any other parameter
+        raises a ``ValueError`` before a request is dispatched (Req 10.10). A
+        missing v3 Bearer token raises before dispatch via the shared token
+        guard (Req 10.11).
+
+        :param manage_id: ID of a specific managed eSIM profile item to
+          retrieve. Optional.
+        :type manage_id: str
+        :param kwargs: A set of zero or more allowed parameters
+          in the allowed_params list.
+        :return: A list of managed eSIM profiles, or a single item's data when
+          ``manage_id`` is provided.
+        """
+        call_type = 'eSIM Profiles Manage'
+
+        allowed_params = ['sort', 'limit']
+        params = self.__parse_kwargs(kwargs, allowed_params)
+
+        # ``manage`` is a fixed sub-path segment; the item id (when supplied) is
+        # appended after it: ``/beta/esim_profiles/manage/{id}``.
+        if manage_id:
+            get_url = f'{self.base_url}/beta/esim_profiles/manage/{manage_id}'
+        else:
+            get_url = f'{self.base_url}/beta/esim_profiles/manage'
+
+        return self.__get_json(get_url, call_type, params=params)
+
+    def create_esim_profiles_manage(self, body=None, **kwargs):
+        """
+        Creates a managed eSIM profile via the NCM API v3
+        esim_profiles/manage endpoint.
+
+        Issues a POST to ``/beta/esim_profiles/manage`` (no trailing slash) with
+        a caller-supplied JSON:API request body sent verbatim (passthrough), and
+        returns the created ``data`` object on success (Req 10.5). Because the
+        Swagger body for this operation is generic, the caller shapes the full
+        JSON:API document themselves -- mirroring the ``put_account_authorizations``
+        style -- rather than the method inventing attributes.
+
+        The request routes through the shared ``_v3_request`` (409 disambiguation
+        and transient retry) and ``_return_handler`` (status mapping). A missing
+        v3 Bearer token raises before dispatch via the shared token guard
+        (Req 10.11).
+
+        :param body: The JSON:API request body to send verbatim. Required.
+        :type body: dict
+        :return: The created managed eSIM profile data on success.
+        """
+        call_type = 'Create eSIM Profiles Manage'
+
+        if body is None:
+            raise ValueError(
+                "body is required to create a managed eSIM profile")
+
+        self.__check_token()
+
+        post_url = f'{self.base_url}/beta/esim_profiles/manage'
+        ncm = self._v3_request('post', post_url, json=body)
+        return self._return_handler(ncm.status_code, ncm.json(), call_type)
+
+    @staticmethod
+    def _multipart_headers():
+        """
+        Per-request header override for the ``multipart/form-data`` esim
+        activation POST (Req 10.7 -- see design "Media Types").
+
+        The v3 session sets a default ``Content-Type: application/vnd.api+json``
+        for every request. A multipart upload must instead let ``requests``
+        compute the ``Content-Type: multipart/form-data; boundary=...`` header
+        itself from the ``files=``/``data=`` form fields -- it cannot do that if
+        a fixed ``Content-Type`` is already present. Setting the per-request
+        ``Content-Type`` to ``None`` tells ``requests`` to drop the session
+        default so it can build the multipart body and boundary (analogous to
+        the ``_atomic_headers`` override for regrades). ``Accept`` continues to
+        request the JSON:API response media type. A fresh dict is returned on
+        each call so callers cannot mutate shared state.
+        """
+        return {
+            'Content-Type': None,
+            'Accept': V3_MEDIA_TYPE
+        }
+
+    def get_esim_profile_activations(self, activation_id=None, **kwargs):
+        """
+        Returns eSIM profile activations from the NCM API v3
+        esim_profile_activations endpoint.
+
+        When called without ``activation_id`` this issues a GET to
+        ``/beta/esim_profile_activations`` (no trailing slash) and returns the
+        aggregated, paginated list of activation ``data`` objects; when called
+        with ``activation_id`` it issues a GET to
+        ``/beta/esim_profile_activations/{id}`` and returns that activation's
+        ``data`` object (Req 10.6). When the list endpoint matches zero records
+        an empty list is returned rather than an error (Req 10.9).
+
+        Only ``sort`` and ``limit`` are otherwise supported; any other parameter
+        raises a ``ValueError`` before a request is dispatched (Req 10.10). A
+        missing v3 Bearer token raises before dispatch via the shared token
+        guard (Req 10.11).
+
+        :param activation_id: ID of a specific eSIM profile activation to
+          retrieve. Optional.
+        :type activation_id: str
+        :param kwargs: A set of zero or more allowed parameters
+          in the allowed_params list.
+        :return: A list of eSIM profile activations, or a single activation's
+          data when ``activation_id`` is provided.
+        """
+        call_type = 'eSIM Profile Activations'
+
+        allowed_params = ['sort', 'limit']
+        params = self.__parse_kwargs(kwargs, allowed_params)
+
+        if activation_id:
+            get_url = f'{self.base_url}/beta/esim_profile_activations/{activation_id}'
+        else:
+            get_url = f'{self.base_url}/beta/esim_profile_activations'
+
+        return self.__get_json(get_url, call_type, params=params)
+
+    def create_esim_profile_activation(self, operation: str, payload, **kwargs):
+        """
+        Creates an eSIM profile activation via the NCM API v3
+        esim_profile_activations endpoint using a multipart upload.
+
+        Issues a POST to ``/beta/esim_profile_activations`` (no trailing slash)
+        with a ``multipart/form-data`` body carrying the two Swagger-documented
+        form fields ``operation`` (a string) and ``payload`` (the activation
+        payload, typically binary), and returns the created ``data`` object on
+        success (Req 10.7).
+
+        Unlike the JSON:API endpoints, this operation departs from the session
+        default ``application/vnd.api+json`` media type: the form fields are
+        passed to ``requests`` via ``data=``/``files=`` and the per-request
+        ``Content-Type`` is overridden (see ``_multipart_headers``) so
+        ``requests`` builds the ``multipart/form-data`` body and computes the
+        MIME boundary itself, rather than a fixed JSON:API ``Content-Type``. The
+        request routes through the shared ``_v3_request`` (409 disambiguation
+        and transient retry) and ``_return_handler`` (status mapping). A missing
+        v3 Bearer token raises before dispatch via the shared token guard
+        (Req 10.11).
+
+        :param operation: The activation operation form field. Required.
+        :type operation: str
+        :param payload: The activation payload form field (binary or file-like).
+          Required.
+        :return: The created eSIM profile activation data on success.
+        """
+        call_type = 'Create eSIM Profile Activation'
+
+        self.__check_token()
+
+        post_url = f'{self.base_url}/beta/esim_profile_activations'
+
+        # Send ``operation`` and ``payload`` as multipart/form-data form fields.
+        # ``payload`` is routed through ``files=`` so requests treats it as a
+        # file part (binary), while ``operation`` is a plain text field; the
+        # header override drops the JSON:API Content-Type so requests sets
+        # ``multipart/form-data`` with its own boundary.
+        ncm = self._v3_request(
+            'post',
+            post_url,
+            data={'operation': operation},
+            files={'payload': payload},
+            headers=self._multipart_headers()
+        )
+        return self._return_handler(ncm.status_code, ncm.json(), call_type)
+
+    def update_esim_profile_activation(self, activation_id, **kwargs):
+        """
+        Updates an eSIM profile activation via the NCM API v3
+        esim_profile_activations endpoint.
+
+        Issues a PUT to ``/beta/esim_profile_activations/{id}`` with a
+        caller-supplied JSON:API request body sent verbatim (generic ``dict``
+        passthrough), and returns the updated ``data`` object on success
+        (Req 10.8). Because the Swagger body for this operation is generic, the
+        caller shapes the full JSON:API document themselves -- mirroring the
+        ``put_account_authorizations`` / ``create_esim_profiles_manage`` style --
+        rather than the method inventing attributes. The caller supplies the
+        body via a ``body`` keyword argument.
+
+        The request routes through the shared ``_v3_request`` (409
+        disambiguation and transient retry) and ``_return_handler`` (status
+        mapping). A missing v3 Bearer token raises before dispatch via the
+        shared token guard (Req 10.11).
+
+        :param activation_id: ID of the eSIM profile activation to update.
+          Required.
+        :type activation_id: str
+        :param kwargs: Must include ``body`` -- the JSON:API request body sent
+          verbatim.
+        :return: The updated eSIM profile activation data on success.
+        """
+        call_type = 'Update eSIM Profile Activation'
+
+        if not activation_id or not str(activation_id).strip():
+            raise ValueError(
+                "activation_id is required to update an eSIM profile activation")
+
+        body = kwargs.get('body')
+        if body is None:
+            raise ValueError(
+                "body is required to update an eSIM profile activation")
+
+        self.__check_token()
+
+        put_url = f'{self.base_url}/beta/esim_profile_activations/{activation_id}'
+        ncm = self._v3_request('put', put_url, json=body)
+        return self._return_handler(ncm.status_code, ncm.json(), call_type)
+
+    def get_starlink_interfaces(self, interface_id=None, **kwargs):
+        """
+        Returns Starlink interfaces from the NCM API v3 starlink_interfaces
+        endpoint.
+
+        When called without ``interface_id`` this issues a GET to
+        ``/starlink_interfaces`` (non-beta, no trailing slash) and returns the
+        aggregated, paginated list of interface ``data`` objects (Req 11.1).
+        When called with ``interface_id`` it issues a GET to
+        ``/starlink_interfaces/{id}`` and returns that interface's ``data``
+        object (Req 11.1). When the list endpoint matches zero records an empty
+        list is returned rather than an error (Req 11.9).
+
+        Supported query parameters are the documented filters ``carrier``,
+        ``gateway_ip``, ``net_device``, ``port``, ``software_version`` and
+        ``terminal_identifier`` plus a ``sort`` parameter (Req 11.2), alongside
+        ``limit``. Any other parameter raises a ``ValueError`` before a request
+        is dispatched (Req 11.10). A missing v3 Bearer token raises before
+        dispatch via the shared token guard (Req 11.11).
+
+        :param interface_id: ID of a specific Starlink interface to retrieve.
+          Optional.
+        :type interface_id: str
+        :param kwargs: A set of zero or more allowed parameters
+          in the allowed_params list.
+        :return: A list of Starlink interfaces, or a single interface's data
+          when ``interface_id`` is provided.
+        """
+        call_type = 'Starlink Interfaces'
+
+        allowed_params = ['carrier', 'gateway_ip', 'net_device', 'port',
+                          'software_version', 'terminal_identifier',
+                          'sort', 'limit']
+        params = self.__parse_kwargs(kwargs, allowed_params)
+
+        if interface_id:
+            get_url = f'{self.base_url}/starlink_interfaces/{interface_id}'
+        else:
+            get_url = f'{self.base_url}/starlink_interfaces'
+
+        return self.__get_json(get_url, call_type, params=params)
+
+    def get_starlink_interface_reboots(self, reboot_id=None, **kwargs):
+        """
+        Returns Starlink interface reboots from the NCM API v3
+        starlink_interfaces/reboots endpoint.
+
+        When called without ``reboot_id`` this issues a GET to
+        ``/starlink_interfaces/reboots`` (non-beta, no trailing slash) and
+        returns the aggregated, paginated list of reboot ``data`` objects; when
+        called with ``reboot_id`` it issues a GET to
+        ``/starlink_interfaces/reboots/{id}`` and returns that reboot's ``data``
+        object (Req 11.3). Note that ``reboots`` is a FIXED sub-path segment of
+        the starlink_interfaces resource, not an identifier. When the list
+        endpoint matches zero records an empty list is returned rather than an
+        error (Req 11.9).
+
+        Only ``sort`` and ``limit`` are otherwise supported; any other parameter
+        raises a ``ValueError`` before a request is dispatched (Req 11.10). A
+        missing v3 Bearer token raises before dispatch via the shared token
+        guard (Req 11.11).
+
+        :param reboot_id: ID of a specific Starlink interface reboot to
+          retrieve. Optional.
+        :type reboot_id: str
+        :param kwargs: A set of zero or more allowed parameters
+          in the allowed_params list.
+        :return: A list of Starlink interface reboots, or a single reboot's data
+          when ``reboot_id`` is provided.
+        """
+        call_type = 'Starlink Interface Reboots'
+
+        allowed_params = ['sort', 'limit']
+        params = self.__parse_kwargs(kwargs, allowed_params)
+
+        # ``reboots`` is a fixed sub-path segment; the item id (when supplied) is
+        # appended after it: ``/starlink_interfaces/reboots/{id}``.
+        if reboot_id:
+            get_url = f'{self.base_url}/starlink_interfaces/reboots/{reboot_id}'
+        else:
+            get_url = f'{self.base_url}/starlink_interfaces/reboots'
+
+        return self.__get_json(get_url, call_type, params=params)
+
+    def get_starlink_interface_stows(self, stow_id=None, **kwargs):
+        """
+        Returns Starlink interface stows from the NCM API v3
+        starlink_interfaces/stows endpoint.
+
+        When called without ``stow_id`` this issues a GET to
+        ``/starlink_interfaces/stows`` (non-beta, no trailing slash) and returns
+        the aggregated, paginated list of stow ``data`` objects; when called
+        with ``stow_id`` it issues a GET to
+        ``/starlink_interfaces/stows/{id}`` and returns that stow's ``data``
+        object (Req 11.5). Note that ``stows`` is a FIXED sub-path segment of
+        the starlink_interfaces resource, not an identifier. When the list
+        endpoint matches zero records an empty list is returned rather than an
+        error (Req 11.9).
+
+        Only ``sort`` and ``limit`` are otherwise supported; any other parameter
+        raises a ``ValueError`` before a request is dispatched (Req 11.10). A
+        missing v3 Bearer token raises before dispatch via the shared token
+        guard (Req 11.11).
+
+        :param stow_id: ID of a specific Starlink interface stow to retrieve.
+          Optional.
+        :type stow_id: str
+        :param kwargs: A set of zero or more allowed parameters
+          in the allowed_params list.
+        :return: A list of Starlink interface stows, or a single stow's data
+          when ``stow_id`` is provided.
+        """
+        call_type = 'Starlink Interface Stows'
+
+        allowed_params = ['sort', 'limit']
+        params = self.__parse_kwargs(kwargs, allowed_params)
+
+        # ``stows`` is a fixed sub-path segment; the item id (when supplied) is
+        # appended after it: ``/starlink_interfaces/stows/{id}``.
+        if stow_id:
+            get_url = f'{self.base_url}/starlink_interfaces/stows/{stow_id}'
+        else:
+            get_url = f'{self.base_url}/starlink_interfaces/stows'
+
+        return self.__get_json(get_url, call_type, params=params)
+
+    def get_starlink_diagnostics(self, diagnostics_id=None, **kwargs):
+        """
+        Returns Starlink diagnostics from the NCM API v3 starlink_diagnostics
+        endpoint.
+
+        When called without ``diagnostics_id`` this issues a GET to
+        ``/starlink_diagnostics`` (non-beta, no trailing slash) and returns the
+        aggregated, paginated list of diagnostics ``data`` objects; when called
+        with ``diagnostics_id`` it issues a GET to
+        ``/starlink_diagnostics/{id}`` and returns that diagnostics ``data``
+        object (Req 11.8). When the list endpoint matches zero records an empty
+        list is returned rather than an error (Req 11.9).
+
+        Only ``sort`` and ``limit`` are otherwise supported; any other parameter
+        raises a ``ValueError`` before a request is dispatched (Req 11.10). A
+        missing v3 Bearer token raises before dispatch via the shared token
+        guard (Req 11.11).
+
+        :param diagnostics_id: ID of a specific Starlink diagnostics record to
+          retrieve. Optional.
+        :type diagnostics_id: str
+        :param kwargs: A set of zero or more allowed parameters
+          in the allowed_params list.
+        :return: A list of Starlink diagnostics, or a single diagnostics record's
+          data when ``diagnostics_id`` is provided.
+        """
+        call_type = 'Starlink Diagnostics'
+
+        allowed_params = ['sort', 'limit']
+        params = self.__parse_kwargs(kwargs, allowed_params)
+
+        if diagnostics_id:
+            get_url = f'{self.base_url}/starlink_diagnostics/{diagnostics_id}'
+        else:
+            get_url = f'{self.base_url}/starlink_diagnostics'
+
+        return self.__get_json(get_url, call_type, params=params)
+
+    def create_starlink_interface_reboot(self, interface_id, **kwargs):
+        """
+        Requests a reboot of a Starlink interface via the NCM API v3
+        starlink_interfaces/reboots endpoint.
+
+        Issues a POST to ``/starlink_interfaces/reboots`` (non-beta, no trailing
+        slash) with a JSON:API body whose ``data.type`` is
+        ``starlink_interface_reboots`` and a required ``starlink_interface``
+        relationship pointing at the target interface, and returns the created
+        reboot ``data`` object on success (Req 11.4). The write routes through
+        ``_v3_request`` + ``_return_handler``; a missing v3 Bearer token raises
+        before dispatch via the shared token guard.
+
+        :param interface_id: ID of the Starlink interface to reboot. Required.
+        :type interface_id: str
+        :return: The created reboot job data on success, error message
+          otherwise.
+        """
+        call_type = 'Starlink Interface Reboot'
+        self.__check_token()
+
+        post_url = f'{self.base_url}/starlink_interfaces/reboots'
+
+        body = {
+            "data": {
+                "type": "starlink_interface_reboots",
+                "relationships": {
+                    "starlink_interface": {
+                        "data": {
+                            "type": "starlink_interfaces",
+                            "id": interface_id
+                        }
+                    }
+                }
+            }
+        }
+
+        ncm = self._v3_request('post', post_url, json=body)
+        return self._return_handler(ncm.status_code, ncm.json(), call_type)
+
+    def create_starlink_interface_stow(self, interface_id, action, **kwargs):
+        """
+        Requests a stow or unstow of a Starlink interface via the NCM API v3
+        starlink_interfaces/stows endpoint.
+
+        Issues a POST to ``/starlink_interfaces/stows`` (non-beta, no trailing
+        slash) with a JSON:API body whose ``data.type`` is
+        ``starlink_interface_stows``, an ``attributes.action`` of the requested
+        action, and a required ``starlink_interface`` relationship pointing at
+        the target interface, and returns the created stow ``data`` object on
+        success (Req 11.6). The write routes through ``_v3_request`` +
+        ``_return_handler``; a missing v3 Bearer token raises before dispatch
+        via the shared token guard.
+
+        ``action`` is REQUIRED and constrained to ``stow`` or ``unstow``: if it
+        is absent, blank, or any other value a ``ValueError`` is raised
+        identifying the accepted values before any request is dispatched
+        (Req 11.7).
+
+        :param interface_id: ID of the Starlink interface to stow/unstow.
+          Required.
+        :type interface_id: str
+        :param action: The stow action to perform; one of ``stow`` or
+          ``unstow``. Required.
+        :type action: str
+        :return: The created stow job data on success, error message otherwise.
+        """
+        call_type = 'Starlink Interface Stow'
+
+        accepted_actions = {'stow', 'unstow'}
+        if action not in accepted_actions:
+            raise ValueError(
+                "action is required and must be one of: {}".format(
+                    ", ".join(sorted(accepted_actions))))
+
+        self.__check_token()
+
+        post_url = f'{self.base_url}/starlink_interfaces/stows'
+
+        body = {
+            "data": {
+                "type": "starlink_interface_stows",
+                "attributes": {
+                    "action": action
+                },
+                "relationships": {
+                    "starlink_interface": {
+                        "data": {
+                            "type": "starlink_interfaces",
+                            "id": interface_id
+                        }
+                    }
+                }
+            }
+        }
+
+        ncm = self._v3_request('post', post_url, json=body)
+        return self._return_handler(ncm.status_code, ncm.json(), call_type)
+
+    def get_lan_devices(self, device_id=None, **kwargs):
+        """
+        Returns LAN devices from the NCM API v3 lan_devices endpoint.
+
+        When called without ``device_id`` this issues a GET to ``/lan_devices``
+        (non-beta, no trailing slash) and returns the aggregated, paginated list
+        of LAN device ``data`` objects; when called with ``device_id`` it issues
+        a GET to ``/lan_devices/{id}`` and returns that device's ``data`` object
+        (Req 12.1). When the list endpoint matches zero records an empty list is
+        returned rather than an error (Req 12.5).
+
+        The documented filters ``account``, ``device_status``, ``group``,
+        ``id``, ``lan_firmware_upgrade_status``, ``lan_product_info``,
+        ``mac_address``, ``name``, ``router``, ``serial_number``, ``type`` and
+        their ``__ne`` operator forms (``device_status__ne``,
+        ``lan_firmware_upgrade_status__ne``, ``name__ne``, ``type__ne``) plus
+        ``sort`` are supported and mapped to JSON:API query parameters; the
+        ``__ne`` forms route through the shared ``a__b`` -> ``filter[a][b]``
+        rule (e.g. ``type__ne=x`` -> ``filter[type][ne]=x``) (Req 12.2, 12.4).
+        Any other parameter raises a ``ValueError`` before a request is
+        dispatched (Req 12.6). A missing v3 Bearer token raises before dispatch
+        via the shared token guard (Req 12.7).
+
+        :param device_id: ID of a specific LAN device to retrieve. Optional.
+        :type device_id: str
+        :param kwargs: A set of zero or more allowed parameters
+          in the allowed_params list.
+        :return: A list of LAN devices, or a single device's data when
+          ``device_id`` is provided.
+        """
+        call_type = 'LAN Devices'
+
+        allowed_params = ['account', 'device_status', 'device_status__ne',
+                          'group', 'id', 'lan_firmware_upgrade_status',
+                          'lan_firmware_upgrade_status__ne', 'lan_product_info',
+                          'mac_address', 'name', 'name__ne', 'router',
+                          'serial_number', 'type', 'type__ne', 'sort', 'limit']
+        params = self.__parse_kwargs(kwargs, allowed_params)
+
+        if device_id:
+            get_url = f'{self.base_url}/lan_devices/{device_id}'
+        else:
+            get_url = f'{self.base_url}/lan_devices'
+
+        return self.__get_json(get_url, call_type, params=params)
+
+    def get_lan_product_infos(self, product_info_id=None, **kwargs):
+        """
+        Returns LAN product infos from the NCM API v3 lan_product_infos
+        endpoint.
+
+        When called without ``product_info_id`` this issues a GET to
+        ``/lan_product_infos`` (non-beta, no trailing slash) and returns the
+        aggregated, paginated list of product info ``data`` objects; when called
+        with ``product_info_id`` it issues a GET to
+        ``/lan_product_infos/{id}`` and returns that product info's ``data``
+        object (Req 12.3). When the list endpoint matches zero records an empty
+        list is returned rather than an error (Req 12.5).
+
+        The documented filters ``id``, ``name``, ``product_type`` and its
+        ``__ne`` operator form (``product_type__ne``) plus ``sort`` are
+        supported and mapped to JSON:API query parameters; the ``__ne`` form
+        routes through the shared ``a__b`` -> ``filter[a][b]`` rule (e.g.
+        ``product_type__ne=x`` -> ``filter[product_type][ne]=x``) (Req 12.4).
+        Any other parameter raises a ``ValueError`` before a request is
+        dispatched (Req 12.6). A missing v3 Bearer token raises before dispatch
+        via the shared token guard (Req 12.7).
+
+        :param product_info_id: ID of a specific LAN product info to retrieve.
+          Optional.
+        :type product_info_id: str
+        :param kwargs: A set of zero or more allowed parameters
+          in the allowed_params list.
+        :return: A list of LAN product infos, or a single product info's data
+          when ``product_info_id`` is provided.
+        """
+        call_type = 'LAN Product Infos'
+
+        allowed_params = ['id', 'name', 'product_type', 'product_type__ne',
+                          'sort', 'limit']
+        params = self.__parse_kwargs(kwargs, allowed_params)
+
+        if product_info_id:
+            get_url = f'{self.base_url}/lan_product_infos/{product_info_id}'
+        else:
+            get_url = f'{self.base_url}/lan_product_infos'
+
+        return self.__get_json(get_url, call_type, params=params)
+
+    def get_remote_connect_profiles(self, profile_id=None, **kwargs):
+        """
+        Returns remote connect profiles from the NCM API v3
+        remote_connect_profiles endpoint.
+
+        When called without ``profile_id`` this issues a GET to
+        ``/remote_connect_profiles`` (non-beta, no trailing slash) and returns
+        the aggregated, paginated list of profile ``data`` objects. When called
+        with ``profile_id`` it issues a GET to
+        ``/remote_connect_profiles/{id}`` and returns that profile's ``data``
+        object. When the list endpoint matches zero records an empty list is
+        returned rather than an error (Req 13.2).
+
+        The documented filters ``address``, ``name``, ``router`` and ``type``
+        plus ``sort`` are supported and mapped to JSON:API query parameters
+        (Req 13.1, 13.2). Any other parameter raises a ``ValueError`` before a
+        request is dispatched. A missing v3 Bearer token raises before dispatch
+        via the shared token guard (Req 13.12).
+
+        :param profile_id: ID of a specific remote connect profile to retrieve.
+          Optional.
+        :type profile_id: str
+        :param kwargs: A set of zero or more allowed parameters
+          in the allowed_params list.
+        :return: A list of remote connect profiles, or a single profile's data
+          when ``profile_id`` is provided.
+        """
+        call_type = 'Remote Connect Profiles'
+
+        allowed_params = ['address', 'name', 'router', 'type', 'sort', 'limit']
+        params = self.__parse_kwargs(kwargs, allowed_params)
+
+        if profile_id:
+            get_url = f'{self.base_url}/remote_connect_profiles/{profile_id}'
+        else:
+            get_url = f'{self.base_url}/remote_connect_profiles'
+
+        return self.__get_json(get_url, call_type, params=params)
+
+    def create_remote_connect_profile(self, profile_type: str,
+                                      attributes: dict = None,
+                                      relationships: dict = None, **kwargs):
+        """
+        Creates a remote connect profile.
+
+        Issues a POST to ``/remote_connect_profiles`` with a polymorphic
+        JSON:API body whose ``data.type`` equals ``profile_type`` and returns
+        the created profile ``data`` object on success. Writes route through
+        ``_v3_request`` + ``_return_handler``; a missing v3 Bearer token raises
+        before dispatch via the shared token guard (Req 13.3, 13.12).
+
+        ``profile_type`` must be one of the six documented profile types
+        (``remote_connect_ssh_profile``, ``remote_connect_http_profile``,
+        ``remote_connect_https_profile``, ``remote_connect_rdp_profile``,
+        ``remote_connect_vnc_profile``, ``remote_connect_serial_profile``); any
+        other value raises a ``ValueError`` identifying the invalid type and the
+        accepted values before any request is dispatched.
+
+        Required inputs are enforced per Swagger before dispatch (Req 13.10):
+        every type requires the attributes ``name``, ``port`` and ``address``;
+        ``remote_connect_ssh_profile`` additionally requires ``username``. A
+        ``router`` relationship is required for every type. When any required
+        attribute or the ``router`` relationship is missing a ``ValueError`` is
+        raised and no request is transmitted.
+
+        :param profile_type: Polymorphic remote connect profile type; one of the
+          six documented types.
+        :type profile_type: str
+        :param attributes: JSON:API ``data.attributes`` for the profile.
+        :type attributes: dict
+        :param relationships: JSON:API ``data.relationships`` for the profile
+          (must include the required ``router`` relationship).
+        :type relationships: dict
+        :return: The created remote connect profile data on success.
+        """
+        call_type = 'Remote Connect Profile'
+
+        accepted_types = {
+            'remote_connect_ssh_profile',
+            'remote_connect_http_profile',
+            'remote_connect_https_profile',
+            'remote_connect_rdp_profile',
+            'remote_connect_vnc_profile',
+            'remote_connect_serial_profile',
+        }
+        if profile_type not in accepted_types:
+            raise ValueError(
+                "Invalid profile_type: {}. Accepted values are: {}".format(
+                    profile_type, ", ".join(sorted(accepted_types))))
+
+        attributes = attributes or {}
+        relationships = relationships or {}
+
+        # Enforce required attributes per Swagger before any request is
+        # dispatched (Req 13.10). All types require name/port/address; SSH also
+        # requires username.
+        required_attrs = ['name', 'port', 'address']
+        if profile_type == 'remote_connect_ssh_profile':
+            required_attrs.append('username')
+        missing_attrs = [a for a in required_attrs if a not in attributes]
+        if missing_attrs:
+            raise ValueError(
+                "Missing required attribute(s) for {}: {}".format(
+                    profile_type, ", ".join(missing_attrs)))
+
+        # A router relationship is required for every profile type (Req 13.10).
+        if 'router' not in relationships:
+            raise ValueError(
+                "Missing required relationship(s) for {}: {}".format(
+                    profile_type, "router"))
+
+        self.__check_token()
+
+        data = {"type": profile_type, "attributes": attributes,
+                "relationships": relationships}
+        body = {"data": data}
+
+        post_url = f'{self.base_url}/remote_connect_profiles'
+        ncm = self._v3_request('post', post_url, json=body)
+        return self._return_handler(ncm.status_code, ncm.json(), call_type)
+
+    def update_remote_connect_profile(self, profile_id: str, **kwargs):
+        """
+        Updates a remote connect profile.
+
+        Issues a PUT to ``/remote_connect_profiles/{id}`` and returns the
+        updated profile ``data`` object on success. Writes route through
+        ``_v3_request`` + ``_return_handler``; a missing v3 Bearer token raises
+        before dispatch via the shared token guard (Req 13.4, 13.12).
+
+        ``profile_id`` is required: a missing or blank value raises before any
+        request is dispatched (Req 13.11). Updating a real-but-absent id
+        surfaces as an ``HTTPError`` via ``_return_handler`` (404) rather than a
+        silent change.
+
+        The JSON:API body is assembled from the caller-supplied keyword
+        arguments: ``attributes`` and/or ``relationships`` (both optional
+        ``dict``); ``profile_type`` (optional) sets ``data.type``.
+
+        :param profile_id: ID of the remote connect profile to update. Required.
+        :type profile_id: str
+        :param kwargs: Optional ``profile_type`` (str), ``attributes`` (dict)
+          and ``relationships`` (dict) used to build the JSON:API body.
+        :return: The updated remote connect profile data on success.
+        """
+        call_type = 'Remote Connect Profile'
+        if not profile_id or not str(profile_id).strip():
+            raise ValueError(
+                "profile_id is required to update a remote connect profile")
+
+        self.__check_token()
+
+        data = {"id": profile_id}
+        if kwargs.get('profile_type') is not None:
+            data['type'] = kwargs['profile_type']
+        if kwargs.get('attributes') is not None:
+            data['attributes'] = kwargs['attributes']
+        if kwargs.get('relationships') is not None:
+            data['relationships'] = kwargs['relationships']
+        body = {"data": data}
+
+        put_url = f'{self.base_url}/remote_connect_profiles/{profile_id}'
+        ncm = self._v3_request('put', put_url, json=body)
+        return self._return_handler(ncm.status_code, ncm.json(), call_type)
+
+    def delete_remote_connect_profile(self, profile_id: str):
+        """
+        Deletes a remote connect profile.
+
+        Issues a DELETE to ``/remote_connect_profiles/{id}`` and routes the
+        response through ``_return_handler``; a missing v3 Bearer token raises
+        before dispatch via the shared token guard (Req 13.5, 13.12).
+
+        ``profile_id`` is required: a missing or blank value raises before any
+        request is dispatched (Req 13.11). Deleting a real-but-absent id
+        surfaces as an ``HTTPError`` via ``_return_handler`` (404) rather than a
+        silent no-op.
+
+        :param profile_id: ID of the remote connect profile to delete. Required.
+        :type profile_id: str
+        :return: The response routed through ``_return_handler`` on success.
+        """
+        call_type = 'Remote Connect Profile'
+        if not profile_id or not str(profile_id).strip():
+            raise ValueError(
+                "profile_id is required to delete a remote connect profile")
+
+        self.__check_token()
+
+        delete_url = f'{self.base_url}/remote_connect_profiles/{profile_id}'
+        ncm = self._v3_request('delete', delete_url)
+        return self._return_handler(ncm.status_code, ncm.json(), call_type)
+
+    def get_lan_manager_options(self, option_id=None, **kwargs):
+        """
+        Returns LAN manager options from the NCM API v3
+        lan_manager_options endpoint.
+
+        When called without ``option_id`` this issues a GET to
+        ``/lan_manager_options`` (non-beta, no trailing slash) and returns the
+        aggregated, paginated list of option ``data`` objects. When called with
+        ``option_id`` it issues a GET to ``/lan_manager_options/{id}`` and
+        returns that option's ``data`` object. When the list endpoint matches
+        zero records an empty list is returned rather than an error (Req 13.6).
+
+        The documented filters ``enabled`` and ``router`` plus ``sort`` are
+        supported and mapped to JSON:API query parameters (Req 13.6, 13.7). Any
+        other parameter raises a ``ValueError`` before a request is dispatched.
+        A missing v3 Bearer token raises before dispatch via the shared token
+        guard (Req 13.12).
+
+        :param option_id: ID of a specific LAN manager option to retrieve.
+          Optional.
+        :type option_id: str
+        :param kwargs: A set of zero or more allowed parameters
+          in the allowed_params list.
+        :return: A list of LAN manager options, or a single option's data when
+          ``option_id`` is provided.
+        """
+        call_type = 'LAN Manager Options'
+
+        allowed_params = ['enabled', 'router', 'sort', 'limit']
+        params = self.__parse_kwargs(kwargs, allowed_params)
+
+        if option_id:
+            get_url = f'{self.base_url}/lan_manager_options/{option_id}'
+        else:
+            get_url = f'{self.base_url}/lan_manager_options'
+
+        return self.__get_json(get_url, call_type, params=params)
+
+    def create_lan_manager_option(self, enabled: bool, router_id: str,
+                                  account_id: str = None, **kwargs):
+        """
+        Creates a LAN manager option.
+
+        Issues a POST to ``/lan_manager_options`` with a JSON:API body whose
+        ``data.type`` equals ``"lan_manager_options"`` and returns the created
+        option ``data`` object on success. Writes route through ``_v3_request``
+        + ``_return_handler``; a missing v3 Bearer token raises before dispatch
+        via the shared token guard (Req 13.8, 13.12).
+
+        Required inputs are enforced per Swagger before dispatch (Req 13.10):
+        the ``enabled`` attribute is required and a ``router`` relationship
+        (built from ``router_id``) is required. When either is missing a
+        ``ValueError`` is raised and no request is transmitted. An optional
+        ``account`` relationship is included when ``account_id`` is supplied.
+
+        :param enabled: Value for the required ``attributes.enabled`` flag.
+        :type enabled: bool
+        :param router_id: ID of the router for the required ``router``
+          relationship.
+        :type router_id: str
+        :param account_id: Optional ID for an ``account`` relationship.
+        :type account_id: str
+        :return: The created LAN manager option data on success.
+        """
+        call_type = 'LAN Manager Option'
+
+        # Enforce required attribute/relationship inputs before any request is
+        # dispatched (Req 13.10).
+        if enabled is None:
+            raise ValueError(
+                "Missing required attribute for lan_manager_options: enabled")
+        if not router_id or not str(router_id).strip():
+            raise ValueError(
+                "Missing required relationship for lan_manager_options: router")
+
+        self.__check_token()
+
+        relationships = {
+            "router": {"data": {"type": "routers", "id": router_id}}
+        }
+        if account_id is not None:
+            relationships["account"] = {
+                "data": {"type": "accounts", "id": account_id}
+            }
+
+        data = {"type": "lan_manager_options",
+                "attributes": {"enabled": enabled},
+                "relationships": relationships}
+        body = {"data": data}
+
+        post_url = f'{self.base_url}/lan_manager_options'
+        ncm = self._v3_request('post', post_url, json=body)
+        return self._return_handler(ncm.status_code, ncm.json(), call_type)
+
+    def update_lan_manager_option(self, option_id: str, **kwargs):
+        """
+        Updates a LAN manager option.
+
+        Issues a PUT to ``/lan_manager_options/{id}`` and returns the updated
+        option ``data`` object on success. Writes route through ``_v3_request``
+        + ``_return_handler``; a missing v3 Bearer token raises before dispatch
+        via the shared token guard (Req 13.9, 13.12).
+
+        ``option_id`` is required: a missing or blank value raises before any
+        request is dispatched (Req 13.11). Updating a real-but-absent id
+        surfaces as an ``HTTPError`` via ``_return_handler`` (404) rather than a
+        silent change.
+
+        The JSON:API body is assembled from the caller-supplied keyword
+        arguments: ``attributes`` and/or ``relationships`` (both optional
+        ``dict``). ``data.type`` is set to ``"lan_manager_options"``.
+
+        :param option_id: ID of the LAN manager option to update. Required.
+        :type option_id: str
+        :param kwargs: Optional ``attributes`` (dict) and ``relationships``
+          (dict) used to build the JSON:API body.
+        :return: The updated LAN manager option data on success.
+        """
+        call_type = 'LAN Manager Option'
+        if not option_id or not str(option_id).strip():
+            raise ValueError(
+                "option_id is required to update a LAN manager option")
+
+        self.__check_token()
+
+        data = {"type": "lan_manager_options", "id": option_id}
+        if kwargs.get('attributes') is not None:
+            data['attributes'] = kwargs['attributes']
+        if kwargs.get('relationships') is not None:
+            data['relationships'] = kwargs['relationships']
+        body = {"data": data}
+
+        put_url = f'{self.base_url}/lan_manager_options/{option_id}'
+        ncm = self._v3_request('put', put_url, json=body)
         return self._return_handler(ncm.status_code, ncm.json(), call_type)
 
     def update_user_role(self, email: str, new_role: str) -> dict:
