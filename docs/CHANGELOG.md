@@ -258,3 +258,56 @@ Mostly bookkeeping: fixes from earlier in the day landed, which left several ent
   minting a new one — otherwise every run regenerates every identity's UUID, which
   breaks anything elsewhere in the config that references the old UUID. Discovered
   while building Consolidate Mode for `host_identity_copier`.
+
+## 2026-08-28 — `locations` endpoint missing `router`/`router__in` in the generated reference
+
+Found while answering a question about retrieving router lat/long. No code was written
+and no API call was made; this is a doc-vs-shipped-code discrepancy only.
+
+- Added `router` and `router__in` rows to the `locations` query-parameter table in
+  `api-v2-full-reference.md`, which listed only `id`, `id__in`, `limit` and `offset`.
+  Evidence is in-repo: `get_locations()` in `ncm/ncm/ncm.py` declares both in
+  `allowed_params`, and `scripts/export_locations.py` plus
+  `web_apps/script_manager/scripts/Export Locations.py` both batch on
+  `router__in`. Every other router-scoped endpoint in that reference already
+  documented `router__in`, so `locations` was the outlier.
+- Marked the addition **UNVERIFIED against a live account** in the doc itself — the
+  evidence is shipped code, not an observed response. The `in: int / out: url` type
+  notation is inferred from the sibling endpoints' rows, and whether `router__in` has
+  its own page-size ceiling on this endpoint is unknown.
+- Added a `known-issues.md` entry generalizing the lesson: the generated query-param
+  tables are a floor, not a ceiling. Before concluding a filter does not exist, grep
+  the method's `allowed_params` in `ncm/ncm/ncm.py` and grep `scripts/` and
+  `web_apps/` for existing callers. Recorded explicitly that only this one endpoint
+  was found incomplete and the other 29 were not audited.
+
+## 2026-08-27 — Parallelized chunked cellular health fetches; fixed online/offline to use connection_state
+
+- Added known issue: `net_device_health` has no timestamp filter at all (confirmed against `docs/api-v2-full-reference.md` and the SDK's `allowed_params`), so it always requires a full `limit='all'` pull — incremental refresh is only possible for `net_device_metrics`, which does support `update_ts__gt/lt`.
+- Added known issue: `net_devices.connection_state` (per-interface) and `routers.state` (per-router) are frequently conflated. A router can be `online` while a specific modem interface is `disconnected`, `connecting`, or `standby`. Documented observed `connection_state` values and a sampled account where 50 of 472 interfaces were miscounted as online under the old logic.
+- Added common pattern: "Parallelizing Chunked `__in` Requests" — fan chunked `net_device_metrics`/`net_devices`/`asset_endpoints` calls out over a `ThreadPoolExecutor` instead of a sequential loop, since each 100-ID chunk is an independent request. Generalizes the pattern already used ad hoc in `assign_sdk/serve.py`.
+- Fixed `web_apps/cellular_health_dashboard/serve.py`: `_get_cellular_health()` now fetches `net_device_metrics` and `net_devices` chunks concurrently (both across chunks within each call, and between the two calls) via `_fetch_chunks_parallel()`, cutting the ~600 sequential API calls needed for a 27k-device account down to a handful of concurrent batches. Also changed `router_state` derivation to be based on `net_devices.connection_state` (`connected` → online, `unplugged` → unplugged, everything else → offline) instead of the parent router's `state`, fixing devices being shown as online when their actual cellular interface was disconnected/connecting/standby.
+
+## 2026-08-27 — Correction: per-interface online/offline is binary, not three-state
+
+Supersedes part of the 2026-08-27 entry above, which had `unplugged` as a third state.
+
+- Corrected `known-issues.md` ("`net_devices.connection_state` vs `routers.state`"): the guidance to keep `unplugged` as its own distinct badge was wrong in practice. A third bucket means the summary counts no longer sum to the total (7 unplugged interfaces on the sampled account were neither online nor offline), which reads as a bug in the dashboard. Treat `connection_state` as binary: `connected` is online, everything else — `disconnected`, `connecting`, `standby`, `standby_connecting`, `unplugged` — is offline.
+- Updated `web_apps/cellular_health_dashboard/serve.py` accordingly: `iface_state = 'online' if connection_state == 'connected' else 'offline'`. Verified against the live account — 60 online / 410 offline / 470 total, sums correctly, and zero rows where the online flag disagrees with `connection_state == 'connected'`.
+
+## 2026-08-27 — Cellular health data granularity is per-modem, not per-router
+
+- Added known issue: `net_device_health`, `net_device_metrics` and `net_devices` are keyed by net_device (one record per network interface), not by router, so a router with two modems yields two records and `expand=router` duplicates the router name across them. Documented three consequences: router name/ID is not a unique row key (`(router_name, interface_name)` is the display key, net_device ID the real one); record counts are interface counts rather than device counts, so labeling such a total "Devices" in a UI overstates how many routers exist; and per-router rollups require explicit grouping by router ID plus a decision on how to combine multiple modems' scores. Also noted that `net_devices.model` is the modem model, not the router model.
+- Surfaced while relabeling the cellular health dashboard UI: the ambiguity of "device" between the router level and the modem-interface level is what made the original labels misleading, and it is a data-modeling property of these endpoints rather than anything specific to that app.
+
+## 2026-08-27 — Favicon pattern for web apps
+
+- Added a "Favicon" subsection to the Web UI Template section of `common-patterns.md`. Any app that mounts the shared `script_manager/static` folder can declare a favicon by pointing `rel="icon"` and `rel="apple-touch-icon"` at the existing `/static/logo.png` — no new binary asset and no server change. Recorded that `logo.png` is 92x80 RGBA (near-square, so it scales acceptably to 16/32px), that apps serving their own `static/` need the path adjusted, and that browsers cache favicons harder than HTML, so verify by requesting the icon URL directly before assuming the markup is wrong.
+- Context worth keeping: prior to this, **no** web app in the repo declared a favicon (checked all twelve), so this is an additive convention rather than a fix to an existing one. `cellular_health_dashboard` is currently the only app with one. Deliberately documented as an available pattern rather than added to `web-ui-standards.md` as a requirement, since mandating it implies touching the other eleven apps — that is a scope call for the maintainer, not something to assume.
+- Applied to `web_apps/cellular_health_dashboard/index.html`. Verified the tags render and `/static/logo.png` returns HTTP 200 as `image/png`.
+
+## 2026-08-27 — Two-stage filtering for dashboard stat cards that double as filters
+
+- Added common pattern: "Dashboard Stat Cards That Double as Filters — Two-Stage Filtering". The dashboard standard requires stat cards to act as filters *and* requires display-option toggles plus a search box, and those requirements conflict unless filtering is split in two. Counting cards from the full dataset leaves them frozen when options change; counting from the fully-filtered dataset makes clicking one card zero out all the others. Documented the `getBaseRows()` (display options + search, excluding the card filter) / `applyFilters()` (card filter, table only) split, plus the invariants worth asserting — mutually exclusive cards summing to the total, category buckets never exceeding the total, and default total equalling raw dataset length.
+- Fixed `web_apps/cellular_health_dashboard/index.html`: `updateStats()` counted from `healthData` and ran only once per fetch, so no Display Option or search ever moved the cards. Now computed from the base set on every `applyFilters()` call. Verified by extracting the real `getBaseRows`/`updateStats`/`getSignalQuality` from the page and executing them under node against live API data (471 rows) across five option combinations; all invariants held.
+- **Recorded two latent instances not fixed:** `inventory_dashboard` (`updateStats()` counts from `inventoryData`) and `alert_dashboard` (counts from `alertsData`) have the same defect — their stat cards ignore search and display options. Left alone because they were outside the requested change, but noted in `common-patterns.md` so the next person touching either one sees it rather than rediscovering it.

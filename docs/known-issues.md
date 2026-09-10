@@ -347,6 +347,67 @@ The typical pattern for a cellular health dashboard is:
 3. `GET /net_devices/?id__in=id1,id2,...` → carrier, model, router ref
 4. `GET /routers/?expand=group` → device names, groups, state
 
+### `net_device_health` Has No Timestamp Filter — Always a Full Pull (discovered 2026-08-27)
+Confirmed against `docs/api-v2-full-reference.md` and the SDK's `allowed_params`
+in `ncm/ncm/ncm.py`: `/net_device_health/` supports only `net_device`,
+`net_device__in`, `id__gt/gte/lt/lte`, `limit`, `offset`. There is no
+`update_ts__gt/lt`, `created_at__gt/lt`, or any other timestamp-based filter —
+unlike `/net_device_metrics/`, which does support `update_ts__gt/lt`.
+
+This means an incremental/delta refresh (only fetch health records that changed
+since the last poll) is impossible for this endpoint; every refresh must fully
+re-paginate all records with `limit='all'`. If you want incremental refreshing
+for a cellular health dashboard, it can only apply to `/net_device_metrics/`
+(and only if you also accept that health scores/categories stay on a full-pull
+cadence, since there's no way to ask "what health records changed").
+
+### `net_devices.connection_state` vs `routers.state` — Different Things (discovered 2026-08-27)
+These are easy to conflate when building an "online/offline" indicator for a
+cellular interface, but they answer different questions:
+- `routers.state` — whether the parent router/device is online, offline, or
+  initialized with NCM overall.
+- `net_devices.connection_state` — whether THIS specific network interface
+  (e.g. one modem) is actually connected. Observed values on a live account:
+  `connected`, `disconnected`, `connecting`, `standby`,
+  `standby_connecting`, `unplugged`.
+
+A router can be `online` while one of its modem interfaces is
+`disconnected`, `connecting`, or in `standby` — the router itself has
+connectivity (e.g. via another WAN) even though a given cellular interface does
+not. Using `router.state` (or falling back to it) to decide whether a *modem
+interface* is "online" overcounts: on one sampled account, 40 of 472
+interfaces were `router.state=online` while `connection_state=disconnected`,
+and another 10 were `online` while `connecting`/`standby`/`standby_connecting`.
+
+For a per-interface online/offline indicator, use only
+`net_devices.connection_state` and treat it as binary: `connected` is online,
+every other value is offline. Resist the temptation to promote `unplugged` (or
+`connecting`/`standby`) to a third badge — a device in any of those states is not
+passing traffic, and a third bucket means summary counts no longer sum to the
+total, which reads as a bug.
+
+### Cellular Health Data Is Per-Modem, Not Per-Router — Router Name Is Not a Key (discovered 2026-08-27)
+`net_device_health`, `net_device_metrics` and `net_devices` are all keyed by
+net_device (one record per network interface), not by router. A router with two
+modems yields two records, and joining them to routers via `expand=router`
+duplicates the router name across those rows.
+
+Consequences when building per-modem views or reports:
+- **Do not treat the router name (or router ID) as a unique row key.** Sorting or
+  grouping by it alone produces what look like duplicate entries. The unique key
+  is the net_device ID; `(router_name, interface_name)` is the useful display key.
+- **Counts are interface counts, not device counts.** "472 records" on an account
+  is 472 modem interfaces across fewer physical routers. Labeling such a total
+  "Devices" in a UI misleads users into thinking they have more routers than they
+  do — name it modems/interfaces.
+- **Per-router rollups need explicit aggregation.** Any "how many routers are
+  unhealthy" question requires grouping by router ID first and deciding how to
+  combine multiple modems' scores; the raw records cannot answer it directly.
+
+The interface name (`net_devices.name`) looks like `mdm-211c287d`, and
+`net_devices.model` is the modem model (e.g. `Internal 5GE-AM (SIM1)`), not the
+router model — another place where "device" is ambiguous between the two levels.
+
 ### `net_devices` Do Not Contain Signal Fields (discovered 2026-06-06)
 The `/net_devices/` endpoint does NOT return signal strength fields (rssi,
 rsrp, rsrq, sinr, signal_percent). These fields only exist on the
@@ -898,3 +959,37 @@ usage line now uses the activate form rather than `.venv/bin/python`, since a
 long-running server launched the bare way boots fine and then fails every API call.
 The other eleven entry points were swept the same day — docstring path and port now
 match source in all twelve, so treat a mismatch as a regression rather than the norm.
+
+### `api-v2-full-reference.md` Query-Param Tables Can Be Incomplete — Cross-Check `ncm.py` (discovered 2026-08-28)
+The generated tables in `docs/api-v2-full-reference.md` are not guaranteed to list
+every filter an endpoint accepts. Read them as a floor, not a ceiling.
+
+**Confirmed instance: `locations`.** Its table listed only `id`, `id__in`, `limit`
+and `offset` — no `router` or `router__in`. Meanwhile the shipped client and two
+shipped scripts depend on a router filter:
+
+- `ncm/ncm/ncm.py` → `get_locations()` declares
+  `allowed_params = ['id', 'id__in', 'router', 'router__in', 'limit', 'offset']`
+- `scripts/export_locations.py` and
+  `web_apps/script_manager/scripts/Export Locations.py` both batch with
+  `n2.get_locations(router__in=batch)`
+
+Every other router-scoped endpoint in the same reference (`configuration_managers`,
+`device_app_states`, `net_devices`, `router_alerts`, `router_state_samples`,
+`router_stream_usage_samples`) does document `router__in`, so `locations` was the
+outlier rather than the rule. The two rows have been added to the reference with a
+note.
+
+Why it costs you: a reader who trusts the table concludes there is no server-side
+router filter for locations, and fetches the whole collection to filter client-side.
+On a large account that is many paginated requests instead of a batched query.
+
+**Verification status.** The discrepancy between the doc and the shipped code is
+directly observed. Whether `router__in` behaves as expected against a live account is
+**UNVERIFIED** — no request was made to `/api/v2/locations/` when this was written.
+Also UNVERIFIED: whether any endpoint *other* than `locations` has an incomplete
+table. One instance was found; the rest were not audited.
+
+Practical check before concluding a filter does not exist: grep the matching method's
+`allowed_params` in `ncm/ncm/ncm.py`, and grep `scripts/` and `web_apps/` for existing
+callers. Working code that predates the generated doc is the stronger evidence.
