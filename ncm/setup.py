@@ -5,9 +5,9 @@ with open("README.md", "r") as fh:
 
 setup(
     name="ncm",
-    version="0.0.71",
-    author="Nathan Wiens - Cradlepoint",
-    author_email="nathan.wiens@cradlepoint.com",
+    version="0.0.72",
+    author="Jon Gaudu - Ericsson",
+    author_email="jon.gaudu@ericsson.com.com",
     description="Python client library for Cradlepoint NCM API",
     long_description=long_description,
     long_description_content_type="text/markdown",
