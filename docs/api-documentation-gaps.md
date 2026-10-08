@@ -31,9 +31,36 @@ error requiring a filter. These endpoints use TimeUUID-based pagination
 
 ## Response Schema Gaps
 
-The Swagger specs at `developer.cradlepoint.com/swagger/spec/{endpoint}.json`
-do NOT include response models/schemas — only query parameters and headers.
-Response field documentation must be obtained empirically via sample GET requests.
+**Corrected 2026-09-28. This section previously claimed the Swagger specs contain
+no response models. That is not true of all of them — check before assuming.**
+
+The specs live at `developer.cradlepoint.com/swagger/spec/{Endpoint_Name}.json`,
+which is the JSON the Swagger UI page
+(`developer.cradlepoint.com/Swagger_UI?ep={Endpoint_Name}`) fetches. It is plain
+JSON and directly retrievable — if you are unsure of the exact filename, load the
+UI page and read the spec URL out of its network requests.
+
+Coverage varies by endpoint family:
+
+- **Some specs are complete.** `Modem_Software_Upgrades.json` carries full
+  `components.schemas` — request *and* response models with field-level types,
+  descriptions, `enum` value lists, `required` markers, defaults, nullability, and
+  worked response examples. It documents things that are very hard to discover
+  empirically, such as the exact `status` enum and the `page[size]` maximum.
+- **Others really do omit response models,** which is what this section originally
+  described. For those, response fields still have to be captured from sample
+  requests.
+
+So: **read the spec first, and only fall back to empirical discovery for the parts
+it genuinely omits.** Guessing field names when a spec was available is how
+`package_version` got mistaken for `available_version` (see `known-issues.md`) — a
+mistake that fails silently, producing blank columns rather than an error.
+
+The specs also beat the repo's own artifacts when they disagree. The Postman
+collection and some scripts under `scripts/` have drifted from the live API (wrong
+path prefixes, parameter names that no longer exist). Treat the spec as
+authoritative, the SDK as good evidence, and the Postman collection as a historical
+snapshot.
 
 ## Endpoints With Empty Data in This Account
 

@@ -282,6 +282,27 @@ response, eliminating the separate fetch entirely. The same applies to
 `expand=account`. Always prefer `expand` over a separate lookup fetch when you
 only need the related resource's name or ID.
 
+**When the group list *is* the product (measured 2026-09-28).** `expand=group` does
+not help if you need a group picker rather than group names hung off routers. On a
+test account with **5,889 groups, `get_groups(limit='all')` took 66 seconds** —
+sequential pages of 500. Per-group calls afterwards were fast by comparison
+(`net_devices` for one group 0.5s, v3 `modem_software_versions` 1.4s), so the group
+enumeration is the whole cost.
+
+A UI that blocks on this looks hung for over a minute on first load. Options, none
+of which the API solves for you:
+
+- Cache the list to disk and serve it instantly on later loads, refreshing in the
+  background (`web_apps/cellular_health_dashboard` does this for its dataset via a
+  `snapshot_cache.json`).
+- Narrow with `fields='id,name'` to cut payload size — this does **not** reduce the
+  page count, so expect a modest gain at best.
+- Avoid enumerating at all where possible: if the user already knows the group, take
+  an ID directly, or reach groups via the routers you are already fetching.
+
+Do not assume a group list is cheap because it was fast on a small account; the cost
+scales with the tenant, not with your code.
+
 ### v3 Subscriptions Have No `status` Field (discovered 2026-04-01)
 The v3 `/subscriptions/` endpoint returns `attributes.start_time` and
 `attributes.end_time` but no explicit `status` field. To determine if a
@@ -303,12 +324,19 @@ bare uppercase hex (e.g. `0030441A2B3C`). When joining data across v2 and v3,
 you must normalize both to the same format (e.g. strip colons/dashes and
 upper-case) before matching.
 
-### v3 Beta Endpoints Use /beta/ Prefix (discovered 2026-04-01, updated 2026-04-02)
+### v3 Beta Endpoints Use /beta/ Prefix (discovered 2026-04-01, updated 2026-04-02, corrected 2026-09-28)
 Several v3 endpoints are served under `/api/v3/beta/` rather than `/api/v3/`.
 Requests without the `/beta/` prefix may 404. Known beta endpoints include
-`exchange_sites`, `modem_software_versions`, and `modem_upgrades`. Because
-these are beta endpoints, their contracts may change without notice. Always
-check the OpenAPI spec or release notes for the correct path prefix.
+`exchange_sites`. Because these are beta endpoints, their contracts may change
+without notice. Always check the OpenAPI spec or release notes for the correct
+path prefix.
+
+**Correction (2026-09-28):** this entry previously also listed
+`modem_software_versions` and `modem_upgrades`. Those two are **not** beta — the
+official Swagger spec documents them at `/api/v3/modem_software_versions` and
+`/api/v3/modem_upgrades`. See "Modem Upgrade Endpoints Are NOT Beta" below. The
+broader lesson holds: verify the prefix per endpoint against the spec instead of
+generalizing from a sibling.
 
 ### net_devices `is_asset` Filter (discovered 2026-04-01)
 The v2 `/net_devices/` endpoint supports an `is_asset` boolean
@@ -993,3 +1021,815 @@ table. One instance was found; the rest were not audited.
 Practical check before concluding a filter does not exist: grep the matching method's
 `allowed_params` in `ncm/ncm/ncm.py`, and grep `scripts/` and `web_apps/` for existing
 callers. Working code that predates the generated doc is the stronger evidence.
+
+### v2 List Endpoints Return Duplicate Records — `/firmwares/`, `/products/` (discovered 2026-09-25)
+Paginating the full `/api/v2/firmwares/` collection yields substantially more rows
+than there are distinct firmware records. Measured against a live account with
+`limit=500`: **20,000+ rows returned for 17,677 unique `id` values**. Duplicates also
+show up inside a single small page — `?limit=3&version=7.24.40` returned firmware id
+`9395` twice in three rows.
+
+Always dedupe by `id` when accumulating pages:
+
+```python
+records = {}
+for page in pages:
+    for item in page:
+        records[str(item["id"])] = item   # last write wins; records are identical
+firmwares = list(records.values())
+```
+
+Why it costs you: a naive `count = len(all_rows)` overstates the catalog by ~15%, and
+any per-record work (HEAD requests, hashing, table rows) is done several times over.
+A UI that renders the raw rows shows visibly duplicated entries.
+
+**It is not only `/firmwares/`, and not only across pages.** `/products/` does the same
+thing *within a single response*: one `?limit=500` request returned **154 rows for 102
+unique ids** on one page. So "duplicates come from pagination" is the wrong mental model
+— treat any v2 list response as a multiset and dedupe by `id` as a habit, not just on
+large collections.
+
+**Verification status.** Directly observed against a live account on 2026-09-25 for
+`/firmwares/` (full pagination and a single filtered page) and `/products/` (single
+page). Whether the duplication is stable (same ids duplicated on every pull) is
+**UNVERIFIED** — dedupe unconditionally rather than relying on a fixed pattern. Only
+these two endpoints were checked; others may or may not behave the same way.
+
+### The Same Model + NCOS Version Has Many Distinct Firmware Builds (discovered 2026-09-25)
+`model + version` does **not** identify a firmware image. NCM publishes multiple
+distinct builds under one version string, each with its own `id`, `built_at`, and
+`hash`. Measured on a live account: **3,426 of 5,389 model/version pairs — about two
+thirds — had more than one distinct `hash`**, some with six builds.
+
+```
+IBR600C  7.26.100  built 2026-09-16T00:34:43Z  hash d53a0427…
+IBR600C  7.26.100  built 2026-09-21T17:37:17Z  hash 85b622ca…
+```
+
+Why it costs you: any code that keys firmware by `f"{model}-{version}"` — cache keys,
+download filenames, dedupe sets, "do I already have this?" checks — silently collapses
+several different images into one. Downloading "all builds of 7.26.100" to
+`IBR600C-7.26.100.bin` writes one file and silently drops the rest.
+
+**`built_at` does not break the tie either.** Distinct images regularly share an
+identical build timestamp, so `model + version + built_at` is *still* not unique:
+**2,166 of 15,505 (model, version, built_at) triples mapped to more than one `hash`**
+— 14% — with up to four images on a single triple.
+
+```
+AER2200  7.1.20  built 2019-08-27T15:05:37Z  id 1654  hash c1a467895797…
+AER2200  7.1.20  built 2019-08-27T15:05:37Z  id 1661  hash befd3dafac2b…
+```
+
+The practical consequence: "take the newest build" is not always a decision. For
+**681 of 5,389** model/version pairs, the newest `built_at` still maps to several
+different images, so a `max(built_at)` pick silently chooses arbitrarily between them.
+`hash` (or `id`) is the only field that reliably separates them.
+
+Use `id` as the identity, and where a human-readable name is needed, disambiguate with
+`built_at` **and** a short `hash` prefix — the hash is the part doing the real work:
+
+```python
+groups = {}
+for fw in firmwares:
+    groups.setdefault((fw["model"], fw["version"]), set()).add(fw["hash"])
+
+def filename(fw):
+    base = f"{fw['model']}-{fw['version']}"
+    if len(groups[(fw["model"], fw["version"])]) > 1:
+        return f"{base}-{fw['built_at'][:10].replace('-', '')}-{fw['hash'][:6]}.bin"
+    return f"{base}.bin"
+```
+
+Also note `built_at` is UTC. If you bake the build date into a filename, render the
+date in UTC in any accompanying UI too, or a user in a negative offset sees "Sep 15"
+next to a file named `…20260916…`.
+
+If a UI shows these rows, show the `hash` (first 7 chars is enough). Otherwise rows with
+the same model, version, and build date look like duplicated data and users reasonably
+report it as a bug.
+
+**What the pairs actually are: `multiimage` builds.** The distinguishing information is
+in the `url` filename, not in any metadata field. NCM publishes most builds twice — a
+standard image and a `multiimage` one — sharing the model, version, and build timestamp:
+
+```
+/E3000-multiimage-2026-09-16T00%3A39%3A53.bin    hash 83e64d1b…
+/E3000-2026-09-16T00%3A39%3A53.bin               hash 31e827b0…
+```
+
+Both point at product 56 (`E3000`), same `version`, same `built_at`. This accounts for
+the collisions exactly: **1,963 of 17,677 records carry the `multiimage` tag, and 2,166
+(model, version, built_at) triples have both a standard and a multiimage image**.
+
+So parse the variant out of `url` and treat it as part of the identity:
+
+```python
+def image_variant(url):
+    return "multiimage" if "-multiimage-" in urllib.parse.unquote(url).lower() else ""
+```
+
+Two consequences:
+- Surface the variant in any UI. Without it the rows look like duplicated data.
+- If you parse the model from `url` as a fallback, **strip the variant tag first**, or
+  you invent a phantom model named `E3000-MULTIIMAGE`.
+
+**Verification status.** Directly measured across a full 17,677-record catalog on
+2026-09-25, including the triple collision counts and the multiimage correspondence.
+What `multiimage` *means* functionally (dual-boot slots, combined hardware variants,
+something else) is **UNVERIFIED** — the API exposes no field describing it, and it was
+not tested against a device. Check NCM release notes before assuming which variant a
+deployment needs; don't automate that choice on the strength of the API alone.
+
+### Firmware `url` Is Not Always a Path, and Not Always `.bin` (discovered 2026-09-25)
+Code that does `CDN_BASE + firmware["url"]` and names the result `.bin` is wrong for a
+minority of records. Across a 17,677-record catalog:
+
+| `url` shape | Count | Example |
+|---|---|---|
+| Path, standard image | 15,231 | `/170900-022-2025-08-21T14:26:57.bin` |
+| Path, multiimage variant | 1,955 | `/AER2200-multiimage-2019-08-27T15:05:37.bin` |
+| Path, **not** `.bin` | 450 | `/cr4250-core-image-cr4250-upgrade-1.0-20190827161513.vmp` |
+| **Fully-qualified URL** | 41 | `https://d251cfg5d9gyuq.cloudfront.net/CBA250-2012-04-16T11%3A00%3A57.bin` |
+
+Three separate traps:
+
+1. **41 records are absolute URLs.** Prepending the CDN base produces
+   `https://…cloudfront.nethttps://…`, which fails. Worse, a guard like
+   `if not url.startswith("/"): continue` skips them *silently*. Normalize instead:
+
+   ```python
+   def image_url(url):
+       if url.lower().startswith(("http://", "https://")):
+           return url
+       return FIRMWARE_CDN + url
+   ```
+
+2. **A second CDN host appears, and it is dead.** Of those 41, 22 point at
+   `d30wehszhs5ixg.cloudfront.net`, which **does not resolve** (DNS
+   `NameResolutionError`, tested 2026-09-25) — so those images are unobtainable
+   regardless of client code. The other 19 use the usual host and download fine. Report
+   such failures rather than hiding them; a user needs to know the image is gone, not
+   watch a download silently not happen.
+
+3. **450 records are `.vmp`, not `.bin`** (CR4250). Derive the extension from the URL
+   rather than hardcoding it, or files land on disk misnamed.
+
+Also worth knowing: individual CDN objects can return **403** even when sibling objects
+for the same model and version return 200 (observed on one CR4250 `.vmp`). Treat a
+per-image HTTP failure as normal and surface it per row.
+
+**Verification status.** Counts measured directly against a live catalog on 2026-09-25.
+The dead host, the working absolute-URL downloads (SHA-1 verified), and the 403 were all
+confirmed with live requests. Whether the dead host affects other accounts, and whether
+`d30wehszhs5ixg` was ever reachable, is **UNVERIFIED**.
+
+### `/firmwares/` Has No Product or Model Filter (discovered 2026-09-25)
+`allowed_params` for `/firmwares/` is `id`, `id__in`, `version`, `version__in`,
+`limit`, `offset` — there is no `product` or `product__in`. Listing the firmware
+available for one model therefore requires pulling the whole collection and filtering
+client-side; filtering by `version` server-side is the only narrowing available.
+
+The `model` name is also not on the firmware record. `product` is a URL
+(`.../api/v2/products/63/`), so resolving names means a separate `/products/` pull (one
+page, fast) and a join on the extracted id. That join is authoritative **when it
+resolves** — but you need both a fallback and a dedupe step:
+
+- **`/products/` repeats records too**, and not as a pagination artifact: a single
+  `?limit=500` response returned **154 rows for 102 unique ids**. Key your lookup dict
+  by `id` (idempotent) rather than appending to a list and trusting the length. Unique
+  ids and unique names both came to 102, so no two distinct products shared a name.
+- **Not every referenced product exists in `/products/`.** Across a full catalog, **12
+  of the 113 product ids referenced by firmware records were absent**, covering 274
+  records (1.6%) — ids `103`, `99`, `78`, `77`, `55` and others, presumably retired
+  products. Those firmwares get no name from the join, so a fallback is genuinely
+  required; just don't reach for it first.
+
+Parsing the model out of `url` looks like an equivalent shortcut, since most paths are
+shaped `/{MODEL}-{built_at}.bin` (e.g. `/IBR600C-2026-09-16T00%3A34%3A43.bin`). It is
+not. Measured against a 17,677-record catalog, a regex anchored on the ISO build
+timestamp:
+
+- **fails entirely for 491 records (2.8%)** — the 450 CR4250 `.vmp` paths use a compact
+  timestamp (`…-20190827161513.vmp`) and the 41 absolute URLs don't match the leading
+  `/{MODEL}-` shape at all;
+- **returns a different, legacy name for 9 records** — `/NCSG-KVM-…` and `/NCSG-…` for
+  products actually named `NCXSG-KVM` and `NCXSG-Azure`. The URL keeps the old `NCSG`
+  branding, so a URL-derived catalog splits one model across two names;
+- **needs the variant stripped first**, or `multiimage` builds produce a phantom
+  `MODEL-MULTIIMAGE` model (see the multiimage entry above).
+
+So: join on `product` first, fall back to URL parsing only for the ~1.6% of records
+whose product id is missing, and strip the variant tag when you do.
+
+**Verification status.** Parameter list confirmed against
+`docs/api-v2-full-reference.md`, `get_firmwares()` in `ncm/ncm/ncm.py`, and a live
+account on 2026-09-25. The parse-failure and name-mismatch counts were measured directly
+against the same catalog. Whether an undocumented `product` filter is silently accepted
+was **not** tested.
+
+### Modem Upgrade Endpoints Are NOT Beta — Correcting This File (corrected 2026-09-28)
+**The `/beta/` prefix entry above is wrong for these two endpoints.** The official
+OpenAPI spec at
+`https://developer.cradlepoint.com/swagger/spec/Modem_Software_Upgrades.json`
+documents them without the beta segment:
+
+```
+GET  /api/v3/modem_software_versions
+GET  /api/v3/modem_upgrades
+POST /api/v3/modem_upgrades
+PUT  /api/v3/modem_upgrades/{id}
+```
+
+Three sources in this repo say otherwise and should not be trusted on this point:
+the Postman collection (whose folder is even titled "Modem Software Upgrades
+(BETA)"), `scripts/test_modem_management_api.py`, and the `/beta/` prefix entry
+earlier in this file. The `ncm` SDK's live methods (`ncm/ncm/ncm.py` L4515-4790)
+use the non-beta path and are **correct**; its commented-out older methods
+(L5787+) use the beta path and are stale.
+
+The likely history: the endpoints were beta when the Postman collection and the
+test script were written, and were promoted without those artifacts being updated.
+Treat the Swagger spec as authoritative and the `/beta/` prefix as a fallback for
+older deployments. `web_apps/modem_upgrades` requests the non-beta path first and
+falls back to beta on a `404`.
+
+### modem_upgrades Uses JSON:API `filter[...]`, Not Postman's `group`/`job_type` (corrected 2026-09-28)
+The Postman collection documents the list parameters as plain `group` and
+`job_type`. The Swagger spec documents them as JSON:API filters, and marks the
+first two **required**:
+
+| Parameter | Required | Notes |
+|---|---|---|
+| `filter[group]` | Yes | integer group ID |
+| `filter[type]` | Yes | `modem_upgrade_parent` \| `modem_upgrade_child` |
+| `filter[modem_upgrade_parent]` | Only when `filter[type]=modem_upgrade_child` | parent job ID |
+
+`scripts/test_modem_management_api.py` gets this right. Postman's `job_type`
+spelling appears nowhere in the spec — do not use it.
+
+Note that `filter[type]` being *required* means there is no "just list everything
+for this group" call; you must decide up front whether you want jobs or per-modem
+activities.
+
+### modem_upgrades Paging Is Cursor-Based and `page[size]` Caps at 50 (discovered 2026-09-28)
+Both modem endpoints page with `page[size]` (default 20, **maximum 50**) plus
+`page[after]` / `page[before]` cursors, and return `links.first/last/next/prev`.
+Asking for more than 50 is a `400 Bad Request`, which is easy to trip if you carry
+over the v2 habit of `limit=500`. Follow `links.next` until it is null rather than
+computing offsets.
+
+Both endpoints also return **`204 No Content`** — not an empty `200` — when nothing
+matches ("Could not find available modem packages" / "No jobs or activities
+found"). Code that assumes a JSON body on any 2xx will throw on the empty
+response; treat 204 as an empty result set.
+
+### modem_software_versions Field Is `package_version`, Not `version` (discovered 2026-09-28)
+The available-firmware field is `package_version`. The SDK's disabled older code
+and several plausible guesses use `available_version` or `version`, which are not
+in the spec. A reader looking for the wrong key silently gets a blank version
+column rather than an error.
+
+Full attribute set for `modem_software_versions`:
+
+| Attribute | Meaning |
+|---|---|
+| `carrier` | carrier name, e.g. `verizon`, `att`, `sprint` |
+| `modem_type_name` | modem module type, e.g. `LP4` |
+| `package_version` | the modem firmware package version |
+| `min_router_version` | **minimum NCOS version the router must run** to accept it |
+
+`min_router_version` is worth surfacing in any upgrade UI: a modem package can be
+available to a group while some routers in that group are on too old an NCOS build
+to take it.
+
+`carrier` + `modem_type_name` from a record here are exactly the two required
+attributes for `POST /modem_upgrades`, so the versions endpoint is the intended way
+to populate an upgrade request.
+
+### Modem Upgrade Jobs Cannot Target Individual Routers (discovered 2026-09-28)
+Confirmed against the Swagger spec: `POST /modem_upgrades` requires
+`data.relationships.group` and accepts no other target. There is no `router`,
+`net_device`, or ID-list attribute anywhere in `ModemUpgradeRequest`, so a job
+necessarily applies to **every matching modem in the group**.
+
+This is easy to get wrong when building tooling: a UI that lets an operator select
+specific routers and then submits a group-scoped job will upgrade far more devices
+than the operator chose. Either scope the UI to groups, or say plainly that a
+device-level selection is a display filter only. To genuinely narrow the blast
+radius, the devices have to be moved into their own group in NCM first.
+
+The only in-request narrowing levers are `connection_states` (e.g. restrict to
+`["connected"]`) and `overwrite` (whether to re-push to modems already on the
+target version).
+
+### Modem Upgrade Progress Lives in Child Records, Not the Parent Job (discovered 2026-09-28)
+`modem_upgrades` is a parent/child collection. `filter[type]=modem_upgrade_parent`
+returns jobs; `filter[type]=modem_upgrade_child` (optionally narrowed with
+`filter[modem_upgrade_parent]={id}`) returns one record per modem, and those
+children are where per-device status lives.
+
+Worse, **there is no documented `GET /modem_upgrades/{id}`.** The spec defines only
+the filtered list and `PUT /modem_upgrades/{id}`; the SDK's `get_modem_upgrades(
+modem_upgrade_id=...)` builds an item-read path that appears nowhere in the spec.
+To read one job's current state portably, list the group's parents and match on ID,
+or attempt the item read and fall back to the list on a `404`.
+
+Consequences for a monitor:
+
+1. Fetch children on every poll, not just the parent.
+2. Do not rely solely on the parent's `status`. Parent counters (`modem_count`,
+   `success_count`, `failed_count`) are documented but not always populated.
+   Treating "every child is terminal" as an additional completion signal covers
+   the gap — and a wall-clock timeout is still required, since a job can stall
+   indefinitely on a modem that never reports back.
+
+The `status` enum **is** documented, and none of the values are the ones you would
+guess:
+
+| Status | Terminal? | Meaning |
+|---|---|---|
+| `created` | no | job accepted |
+| `queued` | no | waiting to start |
+| `initializing` | no | starting up |
+| `running` | no | in flight |
+| `finished` | **yes** | completed |
+| `error` | **yes** | failed |
+| `canceled` | **yes** | cancelled (one `l`) |
+
+Note `finished` rather than `complete`/`completed`, `error` rather than `failed`,
+and the single-`l` American `canceled`. Code that matches on `completed` or
+`cancelled` will never fire. Since this is a young endpoint family, matching the
+documented values exactly *and* falling back to substring classification for
+anything unrecognized is the durable approach.
+
+### Modem Upgrade Child Records Are Under-Documented — Expect Only net_device IDs (discovered 2026-09-28)
+The Swagger spec reuses a single schema (`ModemUpgradeResource`) for both parent
+jobs and child activities, and that schema documents only a `group` relationship
+and job-level attributes. So the spec does **not** describe how a child identifies
+the modem it belongs to, even though that is the whole point of a child record.
+
+In practice children reference a modem by `net_device` ID, and the SDK's disabled
+older `get_group_modem_upgrade_device_summary` lists `router_name`,
+`net_device_name` and `current_version` as available fields — suggesting the API
+returns more than the spec admits. Because the shape is not pinned down, extract
+these fields defensively (probe `relationships.net_device`, then
+`attributes.net_device_id`, then `attributes.net_device`) rather than assuming one
+location, and keep the raw `attributes` dict so unexpected fields are still visible.
+
+A bare `net_device` ID tells an operator nothing, so an upgrade report built from v3
+data alone reads as a list of opaque integers.
+
+Resolve them through v2: `GET /net_devices/?id__in=<ids>&expand=router` returns the
+inline router object (name, state, model) plus the modem's `version`/`ver_pkg`,
+which is the "firmware before the upgrade" column a report needs. Chunk the IDs at
+100 per call and cache the results — the mapping does not change during a job.
+
+Note the two APIs must both be authorized for this: v3 Bearer token for the upgrade
+records, v2 header keys for the name lookup. An app that resolves names needs both
+credential sets, which is unusual — most tools in this repo need only one.
+
+### A modem_upgrades Preview Returns a COUNT, Not a Modem List (discovered 2026-09-28, verified live)
+This is the most consequential thing to know before building anything on
+`operation: "preview"`, and it is not in the spec.
+
+A preview job **never creates child activity records.** Verified against a live
+account: after `POST /modem_upgrades` with `operation: "preview"`, the child query
+
+```
+GET /api/v3/modem_upgrades?filter[group]=636741
+    &filter[type]=modem_upgrade_child&filter[modem_upgrade_parent]=67683780
+```
+
+answers `200` with `{"links":{...},"data":[],"meta":{...}}` — an empty array, and it
+stays empty indefinitely (polled well past 100 seconds on a job NCM had already
+finished evaluating). The entire result of a dry run is the parent's
+`modem_count`.
+
+Sequence observed:
+
+1. `POST` returns immediately: `status: "created"`, `modem_count: null`.
+2. Within about a second NCM evaluates the group, sets `modem_count`, and settles
+   `status` at `"preview"`.
+3. No children, ever.
+
+So a UI that promises "here are the modems this would touch" cannot get that from
+the API. Options: show the count as authoritative and derive a candidate list
+locally from v2 `net_devices` (clearly labelled as derived — see below), or show
+only the count.
+
+**Do not build a long poll waiting for preview children.** It will spin until its
+timeout on every run. Poll only until `modem_count` stops being null.
+
+### A Preview's modem_count Will Not Match a Naive Local Match (discovered 2026-09-28)
+If you do derive a candidate list locally, expect it to disagree with NCM. On a
+group of 4 online E320s with 8 `5GB` modems, all on older TMO firmware and none on
+the target `generic` package, NCM reported **3** eligible while matching on modem
+type + "version differs" yielded **8**.
+
+The eligibility rule is not documented and clearly involves more than type and
+version — plausibly `min_router_version` against each router's NCOS build, SIM or
+carrier state, or per-router constraints. Do not present a locally derived list as
+the scope of the job. Treat `modem_count` as authoritative and label anything you
+compute yourself as indicative.
+
+Related: a group whose router is **offline** reported `modem_count: 0` even with
+`overwrite: true`, so offline devices appear to be excluded outright.
+
+### `status: "preview"` Is Missing From the Documented Enum (discovered 2026-09-28)
+The spec's `status` enum is `created`, `queued`, `initializing`, `running`,
+`error`, `finished`, `canceled`. A live preview job settles at **`status:
+"preview"`**, which is not in that list.
+
+Two lessons: the enum is incomplete, so match the documented values but always
+have a fallback branch for unrecognized ones; and `"preview"` is a *settled* state
+rather than an in-flight one, even though nothing about the string says so. Code
+that waits for a terminal status on a preview job will wait forever.
+
+### `GET /modem_upgrades/{id}` Returns 403, Not 404 (discovered 2026-09-28)
+The spec defines no item-read endpoint, and the live API **refuses it with `403
+Forbidden`** rather than `404 Not Found`. The `ncm` SDK's
+`get_modem_upgrades(modem_upgrade_id=...)` builds exactly this URL, so that call
+path cannot work.
+
+Two traps follow:
+
+- **Do not treat 403 as "bad token" on v3.** The obvious handler — map 401/403 to
+  "check your credentials" — produces a completely misleading error here, since the
+  same token succeeds on the list and on `POST`. On these endpoints 403 means "this
+  operation is not available", and the spec lists `403 Forbidden - Request
+  forbidden` as a normal response for every documented operation.
+- **A fallback keyed on 404 will not fire.** Anything falling back from the item
+  read to the filtered list must trigger on 403 as well.
+
+Read a single job with `filter[group]` + `filter[type]=modem_upgrade_parent` and
+match the ID client-side.
+
+### `filter[modem_upgrade_parent]` Is Enforced, With a Good Error (discovered 2026-09-28)
+Requesting children without a parent gives a genuinely helpful `400`:
+
+```json
+{"errors":[{"detail":"filter[modem_upgrade_parent] is required when filter[type]=modem_upgrade_child",
+            "status":"400","source":{"pointer":"/data"},"code":"invalid"}]}
+```
+
+Worth knowing because it is easy to destroy this message. If your client retries a
+`400` using a different parameter spelling — e.g. falling back from `filter[type]`
+to Postman's `job_type` — the retry replaces the clear message above with a
+baffling one about a field you never sent:
+
+```
+HTTP 400: This field may not be null. (/data/attributes/job_type)
+```
+
+Keep parameter-style fallbacks narrow: only retry when the error actually names an
+unknown or invalid *parameter*, and never when it names a missing required one.
+A broad "any 400 means try the other spelling" rule turns good diagnostics into
+bad ones. (The `job_type` pointer does reveal that the server's internal serializer
+field is named `job_type`, which is presumably where Postman's spelling came from —
+but it is not accepted as a query parameter.)
+
+**When implementing that rule, do not use `"filter"` as the discriminator.** It is
+the obvious choice and it is worthless: the word appears in both the error you want
+to retry (`invalid filter: group`) and the one you must not (`filter[...] is
+required`), so matching on it reintroduces the exact bug. Two things that do work:
+match only unambiguous unknown-parameter wording (`unknown`, `unrecognized`,
+`unsupported`, `not a valid`), and explicitly bail out when the message contains
+`required`. Also only consider a fallback at all while the correct spelling is still
+undetermined — once a working form is known, a 400 is real and should surface as-is.
+
+### Empty v3 Collections Come Back as `200` With `data: []`, Not Always `204` (discovered 2026-09-28)
+The spec documents `204 No Content` for "no jobs or activities found" on
+`modem_upgrades`. In practice an empty child query returned `200` with
+`"data": []` plus a populated `links`/`meta` envelope. Handle both: check for a
+2xx, then treat a missing or empty `data` as an empty result rather than keying off
+the status code. Responses also carry
+`meta.pagination.before`/`after` alongside `links`, which the spec does not mention.
+
+### `connection_states` Accepts Fewer States Than Modems Actually Report (discovered 2026-09-28)
+The `connection_states` filter on `POST /modem_upgrades` restricts which modems a
+job targets, by each modem's own cellular connection state. Its enum has **three**
+values:
+
+```
+connected | disconnected | standby
+```
+
+But the v2 `net_devices.connection_state` field those modems report has **six**
+observed values (see the `net_devices.connection_state` vs `routers.state` entry
+above): `connected`, `disconnected`, `connecting`, `standby`,
+`standby_connecting`, `unplugged`.
+
+So `connecting`, `standby_connecting` and `unplugged` cannot be expressed in the
+filter, and **how NCM treats modems in those states is unknown** — whether they are
+excluded outright, folded into `disconnected`, or ignored by the filter entirely.
+This was not tested: every preview run during this work sent
+`connection_states: null`. Also untested is whether the filter is evaluated once at
+job creation or re-checked per modem as the job progresses, which matters because a
+modem's state can change mid-job.
+
+Two practical consequences:
+
+- A UI offering exactly the three enum values is correct per the spec but cannot
+  express "target the modems that are currently `connecting`". Don't silently map a
+  sixth-value state onto one of the three — you would be guessing at NCM's rule.
+- Leaving the filter null (the default) is the safer choice when you want NCM's own
+  eligibility rules to decide, which is also the only behavior verified here.
+
+Beware the related trap: a router can be `online` while every one of its modems is
+`disconnected`. On a live group of 4 `online` E320s, all 8 modems reported
+`disconnected`, so a `["connected"]` filter there would plausibly have targeted
+nothing despite the routers looking healthy. Filter on modem state only when you
+actually mean modem state.
+
+### v3 Endpoint Reference Had Drifted From the Verified Path Conventions (discovered 2026-09-28)
+The `docs/api-v3-endpoints.md` reference had fallen out of sync with what the rest
+of this repo already knew (the "v3 Beta Endpoints" and regrades entries above, and
+the official Swagger specs at `developer.cradlepoint.com/swagger/spec/{name}.json`).
+Cross-checking the specs surfaced four errors in that reference, now corrected:
+
+- **`users` was listed as a v3 CRUD endpoint.** It is a **v2** endpoint
+  (`swagger/spec/users.json` → `basePath https://www.cradlepointecm.com/api/v2`,
+  four `X-` header keys, GET only, filters `id`/`username`/`email`). Moved to
+  `api-v2-endpoints.md`.
+- **`regrades` was listed at `/api/v3/regrades/`.** The real path is
+  `/api/v3/asset_endpoints/regrades` (and `/{id}`). GET requires `filter[action]`
+  (`UPGRADE`/`DOWNGRADE`/`LICENSE`/`UNLICENSE`) and `filter[status]`
+  (`RUNNING`/`COMPLETED`/`FAILED`); POST is JSON:API atomic, required fields
+  `action` + `mac_address`. (The regrades path was already correct in the SDK-gotcha
+  entries above — only the reference doc was wrong.)
+- **PCN and NCX endpoints were listed at bare `/api/v3/...` with trailing slashes.**
+  Both families are under `/api/v3/beta/...` with **no** trailing slash, per their
+  specs (`private_cellular_networks`, `private_cellular_radios`, `exchange_sites`,
+  `exchange_resources`). This matches the "v3 Beta Endpoints Must NOT Have Trailing
+  Slashes" entry above.
+- **`subscriptions` was listed with a trailing slash and an item-read `/{id}`
+  path.** The spec defines only `GET /api/v3/subscriptions` (no trailing slash, no
+  `/{id}`, GET only), `page[size]` max 50, `filter[start_time]`/`filter[end_time]`.
+
+Lesson: the Swagger spec JSON is directly fetchable and authoritative. When the
+endpoint reference and the discovered-issues log disagree, the log (and the spec)
+won — the reference was the stale artifact.
+
+### The Removals List Means Different Things at Group and Device Scope (discovered 2026-10-05)
+
+The second element of a config diff (`[updates, removals]`) is described in
+`api-configuration.md` as "paths to remove from defaults". That phrasing hides an
+asymmetry that reverses the correct approach depending on which endpoint you are
+writing to.
+
+The config diff is not a command that gets executed and discarded; it is **persisted
+state** that NCM layers on top of what the device would otherwise inherit
+(`Target = Group config + Individual config`). So a removals entry is a standing
+instruction to suppress a path, not a one-time delete.
+
+At **group scope** (`/groups/{id}/`), a removals path prunes something the group
+would otherwise contribute — the intuitive reading, and why
+`common-patterns.md` correctly recommends "prefer PATCH with removals over PUT" for
+mirroring collections between groups.
+
+At **device scope** (`/configuration_managers/{id}/`), the stored diff *is* the
+device's override layer. A removals path there suppresses the path from what the
+**group** supplies. Consequences:
+
+- To make a device stop overriding the group and start inheriting it, delete the key
+  from `updates` (element 0). Adding it to `removals` does the opposite: it persists
+  a new device-level override that blocks the group's value entirely.
+- A `security`-rooted path sitting in a device's removals list is itself blocking
+  inheritance of the group's firewall config, so restoring inheritance means
+  clearing those entries too — not just the `updates` branch.
+- **PATCH cannot do this.** PATCH merges `updates`, so no PATCH body removes a key
+  from it. The operation is read-modify-write with PUT, sending the device's complete
+  diff minus the one branch. PUT's "resets unmentioned fields to defaults" hazard
+  does not apply, because you are sending the whole document, not a fragment — and
+  the documented device-config reset is itself a PUT of `[{}, []]`
+  (`api-configuration.md`).
+
+The "PATCH CAN Remove Config Items" entry above remains accurate: PATCH does accept
+removals, and that is the right tool for pruning a group's own config. It is the
+wrong tool for restoring group inheritance on a device.
+
+Verified end-to-end against 400 live devices while building
+`web_apps/revert_device_firewall/` (74 carried device-level `security` config). The
+read, diff and payload-construction paths were exercised against production data;
+the PUT itself was verified against a stubbed session rather than live devices.
+
+Related trap: root-level `firewall` and root-level `security` are different things.
+Zone firewall config (zones, filter policies, forwardings), IPS and app sets live
+under `security`; `firewall` holds port forwarding and similar. Many devices carry
+both. Removing "the firewall config" by name alone will take out the wrong branch.
+
+### Not Every Router Has a `configuration_managers` Record (discovered 2026-10-05)
+
+A batched `get_configuration_managers(router__in=…)` can return **fewer records than
+router IDs you asked for**. Observed against a live account while scanning 400
+routers for `web_apps/revert_device_firewall/`: one device (a CR4250) had no
+configuration manager record at all, while the other 399 did.
+
+Complements the "Configuration Manager ID ≠ Router ID" entry above: that one says
+don't assume the IDs match, this one says don't assume a record exists.
+
+Why it bites: the natural way to consume a batched read is to zip the response
+against the request list, or to index into it positionally. Both silently misalign
+when a device is missing — every device after the gap gets attributed to the wrong
+router, which in a config-writing script means pushing one device's config onto
+another's. A length check does not save you either, since the response is also
+capped by pagination.
+
+Map explicitly on the `router` field of each returned record and treat absence as a
+skip, not an error:
+
+```python
+records = client.get_configuration_managers(
+    router__in=','.join(router_ids),
+    fields='id,router,configuration,suspended,synched',
+    limit='all',
+)
+by_router = {}
+for rec in records or []:
+    rid = str(rec.get('router', '')).rstrip('/').split('/')[-1]   # it is a URL
+    if rid:
+        by_router[rid] = rec
+
+missing = [r for r in router_ids if r not in by_router]   # report, do not crash
+for rid in router_ids:
+    rec = by_router.get(rid)
+    if rec is None:
+        continue        # nothing to write for this device
+```
+
+Note that the `router` field comes back as a resource URL
+(`https://.../api/v2/routers/123456/`), not a bare ID, so it needs parsing before it
+can be used as a dict key. The root cause of the missing record was not
+investigated — the practical point is that the gap exists in real accounts and must
+be handled.
+
+### Web apps must not mount a sibling app's static folder (fixed 2026-10-06)
+Seven apps used to serve their logo and favicon from a *sibling* directory,
+`web_apps/script_manager/static`, via `.parent.parent / "script_manager" / "static"`.
+Copy any one of those app folders on its own and the path no longer resolves, so
+`/static/logo.png` returns 404 and the header renders a broken-image icon.
+
+The failure is quiet in the worst way: most of those apps guarded the mount with
+`if STATIC_DIR.is_dir()`, so the server starts normally and every API route works.
+Nothing in the logs indicates a problem.
+
+**The rule is that each app is self-contained — no app reads files from another at
+runtime.** Each app owns its `static/` folder:
+```python
+STATIC_DIR = Path(__file__).resolve().parent / "static"      # own folder
+if STATIC_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+```
+Duplicating a 6 KB logo per app is the right trade. Resist the urge to "fix" a
+missing shared asset with `onerror="this.style.display='none'"` on the `<img>` —
+that hides the symptom and leaves the app unbrandable when shipped.
+
+All seven were converted on 2026-10-06 (`alert_dashboard`,
+`cellular_health_dashboard`, `geo_ip_blocker`, `host_identity_copier`,
+`inventory_dashboard`, `ncos_downloader`, `revert_device_firewall`), each with its
+own `static/logo.png` and `logo_dark.png`. `config_builder` and
+`netcloud_router_lookup` already had their own.
+
+Still outstanding: `geo_ip_blocker` and `host_identity_copier` also reach to the repo
+root with `sys.path.insert(0, str(PROJECT_ROOT / 'ncm'))` to import the vendored SDK,
+and load `.env` from `PROJECT_ROOT`. That is a repo dependency rather than a
+cross-app one, but it breaks the same way in a standalone copy. Every other app just
+does `import ncm` against the pip-installed package.
+
+Two related points for standalone distribution:
+
+* **Per-app `requirements.txt`.** The root `requirements.txt` is the union across all
+  apps, so it installs packages a single app does not need. A per-app file listing
+  only what that app imports keeps a shipped copy small. Derive it from the actual
+  imports rather than copying the root file.
+* **Python floor is 3.10, not 3.9.** The repo standard says 3.9+, but current
+  `fastapi`, `uvicorn`, `starlette`, `python-dotenv` and `urllib3` all publish
+  `Requires-Python >=3.10`. Any FastAPI app in this repo therefore needs 3.10+ on a
+  fresh install; pip will refuse on 3.9. Verify with
+  `python -c "import importlib.metadata as m; print(m.metadata('fastapi')['Requires-Python'])"`.
+
+### Backgrounding a web app silently loses its stdout startup banner (discovered 2026-10-06)
+Every `web_apps/` entry point prints its URL with plain `print()` before calling
+`uvicorn.run()`. Start one in the background with output redirected — which is the
+prescribed way to launch these — and that banner never reaches the log:
+
+```
+$ .venv/bin/python serve.py > run.log 2>&1 &
+$ cat run.log
+INFO:     Started server process [34287]
+INFO:     Uvicorn running on http://127.0.0.1:8090 (Press CTRL+C to quit)
+```
+
+The "Open http://localhost:8090 in your browser" line is missing. Cause: when stdout
+is not a tty it is block-buffered (4 KB), so a ~150 byte banner sits in the buffer
+indefinitely. Uvicorn's lines appear because they go through `logging` to stderr,
+which is not block-buffered. Kill the process and the buffered stdout is discarded
+entirely, so the banner is never written at all.
+
+Measured on `revert_device_firewall`: `grep -c "Open http"` gives 0 under default
+buffering and 1 with `-u`. Both forms fix it:
+
+```bash
+.venv/bin/python -u serve.py > run.log 2>&1 &      # or
+PYTHONUNBUFFERED=1 .venv/bin/python serve.py > run.log 2>&1 &
+```
+
+The trap is the inference, not the missing text: **absence of the banner is not
+evidence the app failed to start.** The server in the example above was serving
+fine. Confirm startup from uvicorn's own stderr line, or by hitting the port
+(`curl -s -o /dev/null -w '%{http_code}' http://localhost:<port>/`), rather than by
+grepping for the app's own print output. Note also that a `print()` diagnostic added
+while debugging a backgrounded app may never appear for the same reason — use
+`flush=True`, stderr, or `-u`.
+
+### Unquoted `--include=*.py` makes a zsh grep report a false clean result (discovered 2026-10-06)
+zsh (the default macOS shell) applies filename globbing to `--include=*.py`. Nothing
+in the working directory matches that literal pattern, so with zsh's default
+`nomatch` option the entire command aborts before grep runs:
+
+```
+$ grep -rn "pattern" --include=*.py . || echo "NONE - clean"
+zsh: no matches found: --include=*.py
+NONE - clean          # <-- grep never ran; this "clean" is meaningless
+```
+
+The `|| echo` fallback converts a shell error into what reads like a verified
+negative result. This happened during a real cross-app dependency audit in this repo
+and briefly produced a false all-clear.
+
+Quote the pattern, or prefer the dedicated grep tool:
+```bash
+grep -rn "pattern" --include='*.py' .
+```
+More generally, when a command's *absence of output* is the evidence for a claim,
+confirm the command actually executed — check the exit code or run it once in a form
+you know produces hits.
+
+### A cached NodeList goes stale on every selection click, so loops select one row (discovered 2026-10-07)
+
+The picker tables in these apps redraw with `container.innerHTML = …` inside `render()`,
+and `render()` runs on each selection click. Every existing element reference is
+discarded, so a loop over a NodeList captured beforehand clicks detached nodes after
+the first iteration:
+
+```javascript
+const rows = document.querySelectorAll('#listContainer tr[data-id]');
+for (let i = 0; i < 12; i++) rows[i].click();      // selects exactly 1
+```
+
+The clicks land on orphaned nodes and are swallowed by the document-level delegation,
+with no error. The UI reported "1 router selected" after twelve clicks, which reads as
+a broken selection handler rather than a stale-reference problem in the harness.
+
+Re-query inside the loop, and make the step idempotent so a re-run does not toggle
+selections back off:
+
+```javascript
+for (let i = 0; i < 12; i++) {
+  const rows = document.querySelectorAll('#listContainer tr[data-id]');
+  if (!rows[i].classList.contains('selected')) rows[i].click();
+}
+```
+
+Applies to any browser-driven check of an app that re-renders a list on interaction —
+so all of the pickers and dashboards here. The same trap makes a verification step
+*pass* when the count happens not to be asserted, so assert the resulting count
+(`#selectionSummary`, the action button's label) rather than assuming the clicks took.
+
+**Related: verify the frontend against a stub backend when the live fetch is the
+bottleneck.** On a ~10.8k-router tenant, `/api/inventory` had not returned after
+several minutes, which blocks any UI check that needs populated rows. A throwaway
+`http.server` that serves the app's real `index.html` with synthetic `/api/*` JSON
+exercises the actual frontend code paths in seconds, with no risk of touching fleet
+config — useful for destructive apps specifically, since a stub cannot write. The
+app's own internals are typically wrapped in an IIFE and unreachable from
+`page.evaluate`, so driving the real buttons against a stub is the only way to test
+the logic rather than re-implementing it. Keep the stub outside the app directory and
+delete it afterward; apps must stay self-contained. (The inventory stall itself is
+unexplained and not confirmed to be a bug.)
+
+### A root `AGENTS.md` is loaded into every Kiro request, duplicating `inclusion: always` steering (discovered 2026-10-08)
+
+Kiro auto-loads a repo-root `AGENTS.md` as a workspace rule, injected in full on every
+request — the same standing cost as a steering file with `inclusion: always`, but with
+no front matter to scope it. Confirmed directly: creating `AGENTS.md` caused it to
+appear as `## Included Rules (AGENTS.md) [Workspace]` on the very next turn, alongside
+`project-setup.md`. A root `claude.md` was *not* injected in the same session.
+
+So `AGENTS.md` is the wrong place for anything already covered by always-on steering.
+This repo's copy had mirrored all six steering files in full, which both doubled the
+always-on budget and drifted — it still described `users` as a v3 CRUD endpoint after
+`docs/api-v3-endpoints.md` had been corrected to v2 GET-only, and listed 12 web apps
+against 16 on disk. Prior entries in this file record four earlier rounds of the same
+drift (stale CSV path, `serve.py` assumption, `fileMatchPattern`, untracked `ncm2/`).
+
+The file has been deleted. `.kiro/steering/*.md` is the single source of truth; the
+cross-agent entry point is `claude.md`, which holds the always-applicable essentials
+plus an index of which steering file to read when. If you need to serve agents that
+read neither, add a pointer file — do not re-mirror the rules.
+
+Generalizes to two things worth separating when auditing agent instructions: *where a
+file is loaded* (always-on versus on demand) and *whether its content is a copy*. A
+full mirror is a maintenance liability on its own, and an always-on mirror is also a
+per-request tax. A pointer costs one read only on the turns that need it.

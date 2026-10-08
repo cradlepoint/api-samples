@@ -36,6 +36,18 @@ DELETE /api/v2/accounts/{id}/
 
 Key fields: `id`, `name`, `account`, `resource_url`
 
+## users
+
+```
+GET /api/v2/users/
+```
+
+**GET only.** This is a v2 endpoint (four `X-` header keys), despite `users` also
+existing in NCM's UI as an account-management feature. It was previously
+mis-documented as a v3 CRUD endpoint — it is not.
+
+Filters: `id`, `username`, `email`, plus `limit` / `offset`.
+
 ## routers
 
 ```
@@ -109,6 +121,7 @@ Filters: `id`, `id__in`, `router`, `router__in`, `synched`, `suspended`, `versio
 GET /api/v2/locations/
 GET /api/v2/locations/{id}/
 POST /api/v2/locations/
+PUT /api/v2/locations/{id}/
 DELETE /api/v2/locations/{id}/
 ```
 
@@ -132,6 +145,12 @@ GET /api/v2/net_devices/{id}/
 Key fields: `id`, `router`, `name`, `mode` (wan/lan/mdm), `carrier`, `type`, `is_connected`
 
 Filters: `router`, `router__in`, `mode`, `mode__in`, `id`, `id__in`, `account`, `account__in`, `connection_state`, `connection_state__in`, `is_asset`, `ipv4_address`, `ipv4_address__in`
+
+`connection_state` enum (per the official spec): `connected`, `connecting`,
+`disconnecting`, `disconnected`, `error`, `ready`, `configuring`, `unplugged`.
+Note: live accounts have also returned `standby` and `standby_connecting`, which
+the spec omits — treat only `connected` as online and everything else as offline
+(see `known-issues.md`).
 
 Expand: `router`, `account`
 
@@ -238,12 +257,58 @@ GET /api/v2/firmwares/
 GET /api/v2/firmwares/{id}/
 ```
 
+Parameters: `id`, `id__in`, `version`, `version__in`, `limit`, `offset`.
+**There is no `product` filter** — narrowing to one model means pulling the collection
+and filtering client-side. `version` is the only useful server-side filter.
+
+Key fields:
+
+| Field | Notes |
+|---|---|
+| `id` | The firmware identity. `model`+`version` is **not** unique — see below |
+| `version` | NCOS version string, e.g. `7.26.100` |
+| `url` | CDN **path** to the image, e.g. `/IBR600C-2026-09-16T00%3A34%3A43.bin` |
+| `hash` | SHA-1 of the image — use it to verify downloads |
+| `product` | URL to `/products/{id}/`; the model **name** is not on this record |
+| `built_at` | UTC build timestamp |
+| `released_at`, `expires_at` | UTC; `expires_at` is typically `built_at` + 2 years |
+| `is_deprecated` | Boolean |
+| `default_configuration` | URL to the firmware's default config |
+
+Resolving the model name: extract the id from `product` and join against `/products/`
+(single page). Prefer this join. Parsing the model out of `url` instead looks equivalent
+but fails for ~2.8% of records and returns stale legacy names (`NCSG-KVM` for the product
+`NCXSG-KVM`), so keep it as a fallback only — which you do need, since ~1.6% of firmware
+records reference a product id absent from `/products/`. See known-issues.
+
+Downloading an image: prepend the CDN base
+(`https://d251cfg5d9gyuq.cloudfront.net`) to `url`. See
+`common-patterns.md` → "Downloading Firmware Images".
+
+Two behaviors that will bite you, both documented in `known-issues.md`:
+
+- **Records repeat across pages.** A full pull returns roughly 20,000 rows for 17,677
+  distinct `id` values. Dedupe by `id`.
+- **The same model + version has many distinct builds.** About two thirds of
+  model/version pairs have more than one `hash`. Never use `model`+`version` as a
+  filename, cache key, or identity.
+
 ## products
 
 ```
 GET /api/v2/products/
 GET /api/v2/products/{id}/
 ```
+
+Fields: `id`, `name` (e.g. `IBR600C`), `series`, `device_type`, `resource_url`.
+Small collection, so a single `limit=500` request covers it — handy as a lookup table for
+the `product` URLs on routers and firmwares.
+
+**Dedupe by `id`.** Like `/firmwares/`, this endpoint repeats records — a single
+`?limit=500` response returned **154 rows for 102 unique ids**, so the duplication is
+within one response, not a pagination artifact. Build `{id: record}` rather than counting
+rows. Also note the collection is not exhaustive: ~1.6% of firmware records reference a
+product id that is absent here, so joins need a fallback.
 
 ## failovers
 
@@ -257,7 +322,12 @@ GET /api/v2/failovers/
 POST /api/v2/reboot_activity/
 ```
 
-Body: `{"router": "<router_url>"}`
+Body: a **router** URI or a **group** URI (choose one, not both):
+- `{"router": "<router_url>"}` — reboot a single router
+- `{"group": "<group_url>"}` — reboot every router in a group
+
+Returns `201 Created` when the request is accepted (not a guarantee the device
+started rebooting). An invalid target ID typically returns `403 Forbidden`.
 
 ## speed_test
 

@@ -17,10 +17,12 @@ There are two active API versions:
 - Covers: routers, groups, configs, alerts, locations, net_devices, firmware, etc.
 
 ### API v3
-- Base URL: `https://api.cradlepointecm.com/api/v3/`
+- Base URL: `https://api.cradlepointecm.com/api/v3` (paths have **no** trailing slash)
 - Authentication: Bearer token
 - Content-Type: `application/vnd.api+json` (JSON:API spec)
-- Covers: subscriptions, users, private cellular, NCX sites/resources
+- Covers: subscriptions, regrades, private cellular (`/api/v3/beta/...`), NCX
+  sites/resources (`/api/v3/beta/...`)
+- Note: `users` is a **v2** endpoint, not v3.
 
 ## Authentication
 
@@ -60,10 +62,15 @@ Not all endpoints support all methods. Some are read-only (GET only).
 
 ## Critical Rules
 
-1. **Trailing slash required**: All endpoint URLs MUST end with `/`. Missing trailing slash
-   causes a redirect, resulting in two calls counted against your account.
+1. **Trailing slash — v2 only**: All **v2** endpoint URLs MUST end with `/`. A
+   missing trailing slash causes a redirect, resulting in two calls counted against
+   your account.
    - Correct: `https://www.cradlepointecm.com/api/v2/routers/`
    - Wrong: `https://www.cradlepointecm.com/api/v2/routers`
+
+   This is a v2 rule. The **v3** API is the opposite: every v3 Swagger spec defines
+   its paths **without** a trailing slash (e.g. `/api/v3/subscriptions`). Do not add
+   one to v3 URLs. See `api-v3-endpoints.md`.
 
 2. **TLS 1.2+ required**: SSL and earlier TLS versions are not supported (PCI 3.2 compliance).
 

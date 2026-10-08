@@ -27,6 +27,15 @@ The second element lists paths to remove from defaults:
 [{}, [["lan", "00000001-0d93-319d-8220-4a1fb0372b51"]]]
 ```
 
+**This list is persisted state, not a one-time delete, so it means different things
+at group and device scope.** At group scope it prunes what the group contributes. At
+device scope the stored diff *is* the override layer, so a removals path there
+suppresses the path from what the **group** supplies. To make a device stop
+overriding the group and inherit it instead, delete the key from the updates dict —
+adding it to the removals list persists a new override that blocks the group's value.
+See "The Removals List Means Different Things at Group and Device Scope" in
+`known-issues.md`.
+
 **Works with PATCH as well as PUT.** NCM's own UI removes config via PATCH with an
 empty updates dict and a populated removals list, so you do not need PUT (and its
 reset-unmentioned-fields behavior) just to delete something.

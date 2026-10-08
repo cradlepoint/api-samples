@@ -6,9 +6,32 @@ description: Web UI standards — template references, dark mode, dashboard requ
 
 # Web UI Standards
 
+## Apps are self-contained (required)
+
+**No app may read files from another app at runtime.** Every app serves only from its
+own directory. An app folder must be copyable on its own — zip it, send it, and it
+runs with nothing but `requirements.txt` installed.
+
+This means each app owns its own `static/` directory with its own `logo.png` and
+`logo_dark.png`:
+
+```python
+STATIC_DIR = Path(__file__).resolve().parent / "static"      # own folder, never a sibling's
+if STATIC_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+```
+
+Never write `.parent.parent / "<other_app>" / "static"`. Duplicating a 6 KB logo into
+each app is the correct trade; a shared folder silently breaks every standalone copy.
+
+Each app also needs its own `requirements.txt` listing only what that app imports —
+not a copy of the root file, which is the union across all apps.
+
 ## Style Foundation
 
-All web UIs must use the project template as the style base:
+Use the project template as the style base. These are **copy-from** references, read
+at authoring time and copied into the new app — not paths to depend on at runtime:
+
 - HTML: `web_apps/web_app_template/index.html`
 - CSS: `web_apps/script_manager/static/css/style.css`
 - JS: `web_apps/script_manager/static/js/app.js`
@@ -61,10 +84,16 @@ GET|POST|DELETE /api/profiles → profile CRUD
 POST /api/profiles/load → load profile into env
 GET /api/profiles/current → current env credentials
 POST /api/credentials/apply → apply without saving
-/static         → mount for shared logos
+/static         → mount the app's OWN static folder (logos)
 ```
 
 **All @app routes must be defined BEFORE `uvicorn.run()` (which blocks forever).**
+
+These dashboards bind a local port with **no authentication**. That is fine for
+localhost use, but say so if a user asks about exposing one on a network — the
+credentials in the Settings panel would be reachable by anyone who can hit the port.
+Apps that can push firmware or config changes to a fleet should bind `127.0.0.1`
+rather than `0.0.0.0`.
 
 ### Frontend CDN Libraries
 

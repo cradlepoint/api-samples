@@ -11,6 +11,7 @@ description: NCM API development — endpoint routing, SDK usage, critical rules
 Before writing code, consult `docs/`:
 - `api-overview.md` — auth, base URLs, pagination, filtering
 - `api-v2-endpoints.md` / `api-v3-endpoints.md` — endpoint details
+- `api-v2-full-reference.md` — full v2 reference
 - `api-configuration.md` — device/group config push
 - `api-webhooks.md` — webhook setup
 - `ncm-sdk-reference.md` — Python SDK methods
@@ -43,12 +44,16 @@ Before writing code, consult `docs/`:
 | Firmware | v2 → firmwares | `get_firmwares()` |
 | Reboot | v2 → reboot_activity | `reboot_device()`, `reboot_group()` |
 | Speed tests | v2 → speed_test | `create_speed_test()` |
-| Users | v3 → users | `get_users()`, `create_user()` |
-| Subscriptions | v3 → subscriptions | `get_subscriptions()`, `regrade()` |
-| Private cellular | v3 → private_cellular_* | `get_private_cellular_networks()` |
-| NCX sites/resources | v3 → exchange_* | `get_exchange_sites()`, `create_exchange_site()` |
+| Users | **v2** → users (GET only) | `get_users()` |
+| Subscriptions | v3 → subscriptions (`/api/v3/subscriptions`, GET only) | `get_subscriptions()` |
+| Regrades | v3 → `/api/v3/asset_endpoints/regrades` | `regrade()` |
+| Private cellular | v3 → `/api/v3/beta/private_cellular_*` | `get_private_cellular_networks()` |
+| NCX sites/resources | v3 → `/api/v3/beta/exchange_*` | `get_exchange_sites()`, `create_exchange_site()` |
 | CSV export | common-patterns | `export_to_csv()` pattern |
 | Batch ops | common-patterns | `batch_operation()` pattern |
+
+v3 endpoints require `NCM_API_TOKEN`. If it is absent, say so rather than letting the
+call fail opaquely.
 
 ## Critical Rules
 
@@ -72,12 +77,10 @@ Before considering an NCM app complete:
 
 ## After Completion — Reflexion
 
-Evaluate whether you discovered anything new:
-- New API behavior → update relevant `docs/*.md`
-- Bug/gotcha → append to `docs/known-issues.md`
-- Reusable pattern → add to `docs/common-patterns.md`
-- Doc was wrong → fix it, log in `docs/CHANGELOG.md`
-- App-specific only → do NOT update docs
+Evaluate whether you discovered anything generally applicable: new API behavior, a
+gotcha, a reusable pattern, or a doc error. If so, update the relevant `docs/` file and
+log it in `docs/CHANGELOG.md`. Skip it when the discovery is app-specific, a
+user-specific config issue, or already documented.
 
-Format for `known-issues.md`: `### [Title] (discovered YYYY-MM-DD)`
-Format for `CHANGELOG.md`: `## YYYY-MM-DD — [Description]`
+Target files, entry formats and the full loop: `#reflexion-workflow`. The
+`reflexion-update-docs` Stop hook also prompts this automatically.
