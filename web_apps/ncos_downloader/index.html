@@ -1,0 +1,1470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NCOS Downloader</title>
+<link rel="icon" type="image/png" href="/static/logo.png">
+<link rel="apple-touch-icon" href="/static/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root{
+  --primary-color:#4f46e5; --primary-dark:#3730a3; --secondary-color:#6b7280;
+  --success-color:#059669; --warning-color:#d97706; --danger-color:#dc2626; --info-color:#0284c7;
+  --light-bg:#f9fafb; --light-surface:#ffffff;
+  --text-primary:#111827; --text-secondary:#6b7280; --text-light:#9ca3af;
+  --border-color:#d1d5db;
+  --shadow-sm:0 1px 2px 0 rgb(0 0 0 / .05);
+  --shadow-md:0 4px 6px -1px rgb(0 0 0 / .1), 0 2px 4px -2px rgb(0 0 0 / .1);
+  --shadow-lg:0 10px 15px -3px rgb(0 0 0 / .1), 0 4px 6px -4px rgb(0 0 0 / .1);
+  --shadow-xl:0 20px 25px -5px rgb(0 0 0 / .1), 0 8px 10px -6px rgb(0 0 0 / .1);
+  --radius-sm:.375rem; --radius-md:.5rem; --radius-lg:.75rem; --radius-xl:1rem;
+  --transition:all .2s cubic-bezier(.4,0,.2,1);
+  --surface-2:#f3f4f6;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+/* Author `display` rules outrank the UA style for [hidden], so enforce it. */
+[hidden]{display:none !important}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);height:100vh;
+  color:var(--text-primary);line-height:1.6;overflow:hidden}
+.app-container{height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* Header */
+.app-header{background:var(--light-bg);border-bottom:1px solid var(--border-color);box-shadow:var(--shadow-md);z-index:100}
+.header-content{padding:.875rem 2rem;display:flex;align-items:center;justify-content:space-between;gap:2rem}
+.logo-section{display:flex;align-items:center;gap:1rem;min-width:0}
+.app-logo{height:36px;width:auto}
+body.dark-mode .app-logo{content:url('/static/logo_dark.png')}
+#app-title{font-size:1.5rem;font-weight:700;white-space:nowrap;
+  background:linear-gradient(135deg,var(--primary-color),var(--info-color));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.catalog-badge{font-size:.8125rem;color:var(--text-secondary);white-space:nowrap;
+  padding:.25rem .625rem;background:var(--surface-2);border:1px solid var(--border-color);
+  border-radius:9999px}
+.header-actions{display:flex;align-items:center;gap:.625rem}
+.icon-btn{background:var(--light-surface);border:1px solid var(--border-color);border-radius:var(--radius-md);
+  padding:.625rem;cursor:pointer;transition:var(--transition);color:var(--text-primary);
+  box-shadow:var(--shadow-sm);display:flex;align-items:center;justify-content:center}
+.icon-btn:hover{background:var(--light-bg);transform:translateY(-1px);box-shadow:var(--shadow-md)}
+
+/* Tabs */
+.tab-bar{display:flex;gap:0;padding:0 2rem;background:var(--light-bg);border-bottom:1px solid var(--border-color)}
+.tab{padding:.75rem 1.25rem;font-size:.9375rem;font-weight:500;cursor:pointer;border:none;
+  background:none;color:var(--text-secondary);border-bottom:2px solid transparent;
+  margin-bottom:-1px;transition:var(--transition);font-family:inherit;display:flex;align-items:center;gap:.5rem}
+.tab.active{color:var(--primary-color);border-bottom-color:var(--primary-color)}
+.tab:hover:not(.active){color:var(--text-primary)}
+.tab-count{font-size:.75rem;font-weight:600;background:var(--primary-color);color:#fff;
+  border-radius:9999px;padding:.0625rem .4375rem;min-width:1.25rem;text-align:center}
+.tab-count.idle{background:var(--secondary-color)}
+
+/* Content */
+.content-area{flex:1;padding:1.25rem 2rem;max-width:1700px;margin:0 auto;width:100%;
+  overflow:hidden;display:flex;flex-direction:column;min-height:0}
+.tab-panel{flex:1;display:flex;flex-direction:column;min-height:0}
+.tab-panel[hidden]{display:none}
+
+/* Banner */
+.banner{display:none;align-items:center;gap:.75rem;padding:.75rem 1rem;border-radius:var(--radius-md);
+  margin-bottom:1rem;font-size:.875rem;border:1px solid transparent}
+.banner.show{display:flex}
+.banner.warn{background:rgba(217,119,6,.1);border-color:var(--warning-color);color:#92400e}
+.banner.error{background:rgba(220,38,38,.1);border-color:var(--danger-color);color:#991b1b}
+.banner .banner-spacer{flex:1}
+body.dark-mode .banner.warn{color:#fcd34d}
+body.dark-mode .banner.error{color:#fca5a5}
+
+/* Stat cards */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:.875rem;margin-bottom:1.125rem}
+.stat-card{background:var(--light-surface);border:2px solid var(--border-color);border-radius:var(--radius-lg);
+  padding:.875rem 1rem;box-shadow:var(--shadow-sm);transition:var(--transition);cursor:pointer;user-select:none}
+.stat-card:hover{box-shadow:var(--shadow-md);transform:translateY(-2px)}
+.stat-card.active{border-color:var(--primary-color);box-shadow:0 0 0 3px rgba(79,70,229,.2)}
+.stat-label{font-size:.75rem;color:var(--text-secondary);font-weight:500;margin-bottom:.125rem}
+.stat-value{font-size:1.5rem;font-weight:700;color:var(--text-primary);line-height:1.2}
+.stat-value.ok{color:var(--success-color)}
+.stat-value.warn{color:var(--warning-color)}
+.stat-value.bad{color:var(--danger-color)}
+.stat-value.accent{color:var(--primary-color)}
+
+/* Filters */
+.filter-bar{display:flex;align-items:flex-end;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap}
+.field{display:flex;flex-direction:column;gap:.25rem}
+.field label{font-size:.75rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.03em}
+.input,.select{padding:.5rem .75rem;border:1px solid var(--border-color);border-radius:var(--radius-md);
+  font-size:.875rem;font-family:inherit;background:var(--light-surface);color:var(--text-primary);transition:var(--transition)}
+.input:focus,.select:focus{outline:none;border-color:var(--primary-color);box-shadow:0 0 0 3px rgba(79,70,229,.1)}
+.search-wrap{position:relative}
+.search-wrap .input{width:300px;padding-right:2rem}
+#clearSearchBtn{position:absolute;right:.375rem;top:50%;transform:translateY(-50%);background:none;
+  border:none;cursor:pointer;color:var(--text-light);font-size:1rem;display:none;padding:.25rem}
+.filter-spacer{flex:1}
+.filter-actions{display:flex;gap:.5rem;padding-bottom:.0625rem}
+.check{display:flex;align-items:center;gap:.4375rem;font-size:.8125rem;cursor:pointer;white-space:nowrap;padding-bottom:.5rem}
+.check input{width:.9375rem;height:.9375rem;cursor:pointer;accent-color:var(--primary-color)}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:.5rem;padding:.5rem 1rem;border:none;
+  border-radius:var(--radius-md);font-size:.875rem;font-weight:500;cursor:pointer;
+  transition:var(--transition);box-shadow:var(--shadow-sm);font-family:inherit;white-space:nowrap}
+.btn-primary{background:linear-gradient(135deg,var(--primary-color),var(--primary-dark));color:#fff}
+.btn-primary:hover:not(:disabled){transform:translateY(-1px);box-shadow:var(--shadow-lg)}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.btn-secondary{background:var(--light-surface);color:var(--text-primary);border:1px solid var(--border-color)}
+.btn-secondary:hover:not(:disabled){background:var(--light-bg)}
+.btn-danger{background:var(--danger-color);color:#fff}
+.btn-danger:hover:not(:disabled){filter:brightness(1.08)}
+.btn-sm{padding:.3125rem .625rem;font-size:.75rem}
+.btn-link{background:none;border:none;color:var(--primary-color);cursor:pointer;font-size:.8125rem;
+  font-family:inherit;text-decoration:underline;padding:0}
+
+/* Selection bar */
+.selection-bar{display:none;align-items:center;gap:1rem;padding:.75rem 1.25rem;margin-bottom:1rem;
+  background:linear-gradient(135deg,rgba(79,70,229,.09),rgba(2,132,199,.09));
+  border:1px solid var(--primary-color);border-radius:var(--radius-lg)}
+.selection-bar.show{display:flex}
+.selection-bar .sel-text{font-size:.875rem;font-weight:500}
+.selection-bar .sel-spacer{flex:1}
+
+/* Panel + table */
+.panel{background:var(--light-surface);border:1px solid var(--border-color);border-radius:var(--radius-xl);
+  box-shadow:var(--shadow-lg);overflow:hidden;flex:1;display:flex;flex-direction:column;min-height:0}
+.panel-header{padding:.875rem 1.25rem;border-bottom:1px solid var(--border-color);background:var(--light-bg);
+  display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap}
+.panel-header h2{font-size:1rem;font-weight:600}
+.panel-header .meta{font-size:.8125rem;color:var(--text-secondary)}
+.table-container{overflow:auto;flex:1;min-height:0}
+table.data{width:100%;border-collapse:collapse;min-width:960px}
+table.data th,table.data td{padding:.5625rem .875rem;text-align:left;border-bottom:1px solid var(--border-color);
+  font-size:.8125rem;white-space:nowrap}
+table.data th{background:var(--light-bg);font-weight:600;position:sticky;top:0;z-index:10;
+  color:var(--text-secondary);text-transform:uppercase;font-size:.6875rem;letter-spacing:.05em;
+  cursor:pointer;user-select:none}
+table.data th.nosort{cursor:default}
+table.data th:hover:not(.nosort){background:var(--border-color)}
+table.data th .sort-arrow{margin-left:3px;opacity:.35}
+table.data th.sorted .sort-arrow{opacity:1;color:var(--primary-color)}
+table.data tbody tr:hover{background:var(--light-bg)}
+table.data tbody tr.group-even{background:rgba(79,70,229,.03)}
+table.data tbody tr.group-even:hover{background:rgba(79,70,229,.08)}
+table.data tbody tr.selected{background:rgba(79,70,229,.1)}
+table.data tbody tr.selected:hover{background:rgba(79,70,229,.15)}
+td.clickable:hover{text-decoration:underline;color:var(--primary-color);cursor:pointer}
+td.mono,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.model-cell{font-weight:600}
+.row-check{width:1rem;height:1rem;cursor:pointer;accent-color:var(--primary-color)}
+
+.badge{display:inline-flex;align-items:center;gap:.25rem;padding:.125rem .5rem;border-radius:9999px;
+  font-size:.6875rem;font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+.badge.current{background:rgba(5,150,105,.12);color:var(--success-color)}
+.badge.expired{background:rgba(217,119,6,.12);color:var(--warning-color)}
+.badge.deprecated{background:rgba(220,38,38,.12);color:var(--danger-color)}
+.badge.ondisk{background:rgba(2,132,199,.12);color:var(--info-color)}
+.badge.variant{background:rgba(79,70,229,.12);color:var(--primary-color);text-transform:none}
+
+/* Empty / loading */
+.center-state{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:3.5rem 2rem;color:var(--text-secondary);text-align:center;gap:.75rem;flex:1}
+.center-state h3{font-size:1.125rem;font-weight:600;color:var(--text-primary)}
+.center-state p{max-width:460px;font-size:.875rem}
+.spinner{width:30px;height:30px;border:3px solid var(--border-color);border-top-color:var(--primary-color);
+  border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.progress{width:100%;max-width:420px;height:8px;background:var(--surface-2);border-radius:9999px;overflow:hidden}
+.progress .fill{height:100%;background:linear-gradient(90deg,var(--primary-color),var(--info-color));
+  width:0%;transition:width .3s ease}
+.progress.indet .fill{width:35%;animation:slide 1.2s ease-in-out infinite}
+@keyframes slide{0%{margin-left:-35%}100%{margin-left:100%}}
+
+/* Jobs */
+.job-list{display:flex;flex-direction:column;gap:.625rem;padding:1rem 1.25rem;overflow-y:auto}
+.job{display:grid;grid-template-columns:1fr auto;gap:.375rem .875rem;padding:.75rem .875rem;
+  border:1px solid var(--border-color);border-radius:var(--radius-md);background:var(--light-bg)}
+.job .job-title{font-size:.875rem;font-weight:600}
+.job .job-sub{font-size:.75rem;color:var(--text-secondary)}
+.job .job-right{display:flex;align-items:center;gap:.625rem;justify-self:end}
+.job .progress{grid-column:1/-1;max-width:none;height:6px}
+.job.state-error{border-color:var(--danger-color);background:rgba(220,38,38,.06)}
+.job.state-done{border-color:var(--success-color)}
+.job.state-canceled{opacity:.65}
+.job-state{font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+.job-state.downloading{color:var(--primary-color)}
+.job-state.queued{color:var(--text-secondary)}
+.job-state.done{color:var(--success-color)}
+.job-state.error{color:var(--danger-color)}
+.job-state.canceled{color:var(--secondary-color)}
+
+/* Modals */
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);
+  z-index:1000;align-items:center;justify-content:center;padding:1rem}
+.modal.show{display:flex}
+.modal-content{background:var(--light-surface);border-radius:var(--radius-xl);box-shadow:var(--shadow-xl);
+  width:100%;max-width:580px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden}
+.modal-content.wide{max-width:760px}
+.modal-header{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.25rem;
+  border-bottom:1px solid var(--border-color);background:var(--light-bg)}
+.modal-header h2{font-size:1.0625rem;font-weight:600}
+.modal-close{background:none;border:none;font-size:1.5rem;cursor:pointer;color:var(--text-secondary);
+  width:2rem;height:2rem;display:flex;align-items:center;justify-content:center;border-radius:var(--radius-sm)}
+.modal-close:hover{background:var(--surface-2)}
+.modal-body{padding:1.25rem;overflow-y:auto;flex:1}
+.modal-footer{padding:1rem 1.25rem;border-top:1px solid var(--border-color);display:flex;gap:.5rem;
+  flex-wrap:wrap;background:var(--light-bg)}
+.section{margin-top:1.25rem;padding-top:1.125rem;border-top:1px solid var(--border-color)}
+.section:first-child{margin-top:0;padding-top:0;border-top:none}
+.section h3{font-size:.875rem;font-weight:600;margin-bottom:.75rem}
+.form-grid{display:flex;flex-direction:column;gap:.875rem}
+.form-grid label.flabel{display:block;font-size:.8125rem;font-weight:500;margin-bottom:.25rem}
+.form-grid .input{width:100%}
+.pw-wrap{position:relative}
+.pw-wrap .input{padding-right:2.5rem;font-family:ui-monospace,monospace}
+.eye-toggle{position:absolute;right:.5rem;top:50%;transform:translateY(-50%);background:none;border:none;
+  cursor:pointer;color:var(--text-secondary);padding:.25rem}
+.help-body h3{margin-top:1.125rem;font-size:.9375rem}
+.help-body h3:first-child{margin-top:0}
+.help-body p,.help-body li{font-size:.875rem;color:var(--text-secondary);margin-top:.375rem}
+.help-body ol,.help-body ul{padding-left:1.25rem}
+.help-body code{background:var(--surface-2);padding:.0625rem .3125rem;border-radius:3px;font-size:.8125rem;
+  font-family:ui-monospace,monospace;color:var(--text-primary)}
+
+/* Toast */
+.toast{position:fixed;bottom:1.5rem;right:1.5rem;padding:.875rem 1.25rem;background:var(--light-surface);
+  border:1px solid var(--border-color);border-radius:var(--radius-md);box-shadow:var(--shadow-xl);
+  display:none;z-index:2000;max-width:420px;font-size:.875rem;animation:slideIn .3s ease-out}
+.toast.show{display:block}
+.toast.success{border-left:4px solid var(--success-color)}
+.toast.error{border-left:4px solid var(--danger-color)}
+.toast.info{border-left:4px solid var(--info-color)}
+@keyframes slideIn{from{transform:translateX(110%);opacity:0}to{transform:translateX(0);opacity:1}}
+
+/* Dark mode */
+body.dark-mode{background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);color:#f9fafb;
+  --light-bg:#1e293b; --light-surface:#111a2b; --surface-2:#374151;
+  --text-primary:#f9fafb; --text-secondary:#9ca3af; --text-light:#6b7280; --border-color:#4b5563}
+body.dark-mode #app-title{-webkit-text-fill-color:initial;background:none;color:#f9fafb}
+body.dark-mode .panel-header,body.dark-mode table.data th,body.dark-mode .modal-header,
+body.dark-mode .modal-footer,body.dark-mode .job{background:#1e293b}
+body.dark-mode table.data th{background:#374151;color:#d1d5db}
+body.dark-mode table.data th:hover:not(.nosort){background:#4b5563}
+body.dark-mode table.data tbody tr:hover{background:#243044}
+body.dark-mode .btn-secondary,body.dark-mode .icon-btn,body.dark-mode .input,body.dark-mode .select{
+  background:#374151;border-color:#4b5563;color:#f9fafb}
+body.dark-mode .btn-secondary:hover:not(:disabled),body.dark-mode .icon-btn:hover{background:#4b5563}
+body.dark-mode .catalog-badge{background:#374151}
+body.dark-mode .app-header,body.dark-mode .tab-bar{background:#1e293b;border-color:#4b5563}
+
+/* Responsive */
+@media (max-width:1024px){
+  .content-area{padding:1rem}.header-content{padding:.875rem 1rem}.tab-bar{padding:0 1rem}
+  .search-wrap .input{width:220px}
+}
+@media (max-width:768px){
+  #app-title{font-size:1.125rem}.catalog-badge{display:none}
+  .stats-row{grid-template-columns:repeat(2,1fr)}
+  .filter-bar{flex-direction:column;align-items:stretch}
+  .field,.search-wrap,.search-wrap .input{width:100%}
+  .selection-bar{flex-wrap:wrap}
+}
+</style>
+</head>
+<body>
+<div class="app-container">
+  <header class="app-header">
+    <div class="header-content">
+      <div class="logo-section">
+        <img src="/static/logo.png" alt="" class="app-logo" onerror="this.style.display='none'">
+        <h1 id="app-title">NCOS Downloader</h1>
+        <span class="catalog-badge" id="catalogBadge">Loading…</span>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-secondary" id="refreshCatalogBtn" title="Re-fetch the firmware catalog from NCM">↻ Refresh Catalog</button>
+        <button class="icon-btn" id="helpBtn" aria-label="Help" title="Help" style="font-size:1.125rem;font-weight:700;width:2.5rem;height:2.5rem;">?</button>
+        <button class="icon-btn" id="settingsBtn" aria-label="Settings" title="Settings">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+        </button>
+        <button class="icon-btn" id="darkModeToggle" aria-label="Toggle dark mode" title="Toggle dark mode">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        </button>
+      </div>
+    </div>
+    <nav class="tab-bar">
+      <button class="tab active" data-tab="browse">Browse Firmware</button>
+      <button class="tab" data-tab="downloads">Downloads <span class="tab-count idle" id="tabCount">0</span></button>
+    </nav>
+  </header>
+
+  <main class="content-area">
+    <div class="banner" id="banner"><span id="bannerText"></span><span class="banner-spacer"></span><button class="btn btn-sm btn-secondary" id="bannerAction" style="display:none;"></button></div>
+
+    <!-- ===================== BROWSE ===================== -->
+    <section class="tab-panel" id="panel-browse">
+      <div class="stats-row">
+        <div class="stat-card" data-filter="all" title="Show everything"><div class="stat-label">Matching Images</div><div class="stat-value accent" id="statMatching">—</div></div>
+        <div class="stat-card" data-filter="latest" title="Newest version per model"><div class="stat-label">Latest per Model</div><div class="stat-value" id="statLatest">—</div></div>
+        <div class="stat-card" data-filter="current" title="Not expired, not deprecated"><div class="stat-label">Current</div><div class="stat-value ok" id="statCurrent">—</div></div>
+        <div class="stat-card" data-filter="expired" title="Past expiry date"><div class="stat-label">Expired</div><div class="stat-value warn" id="statExpired">—</div></div>
+        <div class="stat-card" data-filter="deprecated" title="Marked deprecated by NCM"><div class="stat-label">Deprecated</div><div class="stat-value bad" id="statDeprecated">—</div></div>
+        <div class="stat-card" data-filter="ondisk" title="Already downloaded"><div class="stat-label">On Disk</div><div class="stat-value" id="statOnDisk">—</div></div>
+      </div>
+
+      <div class="filter-bar">
+        <div class="field">
+          <label for="modelFilter">Model</label>
+          <input class="input" id="modelFilter" list="modelList" placeholder="All models" autocomplete="off" style="width:200px;">
+          <datalist id="modelList"></datalist>
+        </div>
+        <div class="field">
+          <label for="versionFilter">NCOS Version</label>
+          <select class="select" id="versionFilter" style="width:160px;"><option value="">All versions</option></select>
+        </div>
+        <div class="field">
+          <label for="searchInput">Search</label>
+          <div class="search-wrap">
+            <input type="text" class="input" id="searchInput" placeholder="Model, version, filename…">
+            <button id="clearSearchBtn" aria-label="Clear search">✕</button>
+          </div>
+        </div>
+        <label class="check" title="Hide images NCM has marked deprecated"><input type="checkbox" id="hideDeprecated" checked> Hide deprecated</label>
+        <label class="check" title="Hide images past their expiry date"><input type="checkbox" id="hideExpired"> Hide expired</label>
+        <label class="check" title="Most versions are published twice — a standard image and a multiimage build. Tick this to show only the standard image."><input type="checkbox" id="hideMultiimage"> Hide multiimage</label>
+        <div class="filter-spacer"></div>
+        <div class="filter-actions">
+          <button class="btn btn-secondary btn-sm" id="resetFiltersBtn">Reset filters</button>
+          <button class="btn btn-secondary btn-sm" id="exportCsvBtn">⬇ CSV</button>
+          <button class="btn btn-secondary btn-sm" id="exportPdfBtn">⬇ PDF</button>
+        </div>
+      </div>
+
+      <div class="selection-bar" id="selectionBar">
+        <span class="sel-text" id="selectionText">0 selected</span>
+        <span class="sel-spacer"></span>
+        <button class="btn btn-secondary btn-sm" id="clearSelectionBtn">Clear selection</button>
+        <button class="btn btn-primary" id="downloadSelectedBtn">⬇ Download Selected</button>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Firmware Images</h2>
+          <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
+            <span class="meta" id="pageInfo"></span>
+            <button class="btn btn-secondary btn-sm" id="prevPageBtn" disabled>← Prev</button>
+            <button class="btn btn-secondary btn-sm" id="nextPageBtn" disabled>Next →</button>
+          </div>
+        </div>
+        <div class="table-container" id="browseContainer">
+          <div class="center-state" id="browseLoading">
+            <div class="spinner"></div>
+            <h3 id="loadingTitle">Loading catalog…</h3>
+            <p id="loadingText">Fetching the firmware list from NetCloud Manager.</p>
+            <div class="progress indet" id="catalogProgress"><div class="fill"></div></div>
+          </div>
+          <div class="center-state" id="browseEmptyState" hidden>
+            <h3>No firmware catalog yet</h3>
+            <p>Build the catalog to browse every NCOS image available to your account. It takes about 10 seconds.</p>
+            <button class="btn btn-primary" id="buildCatalogBtn">Build Catalog</button>
+          </div>
+          <div class="center-state" id="browseNoResults" hidden>
+            <h3>No matches</h3>
+            <p>No firmware images match the current filters.</p>
+            <button class="btn btn-secondary" id="noResultsResetBtn">Reset filters</button>
+          </div>
+          <table class="data" id="browseTable" hidden>
+            <thead><tr>
+              <th class="nosort" style="width:2.25rem;"><input type="checkbox" class="row-check" id="selectAllCheck" title="Select all on this page"></th>
+              <th data-key="model">Model <span class="sort-arrow">↕</span></th>
+              <th data-key="version">Version <span class="sort-arrow">↕</span></th>
+              <th data-key="variant" title="Image variant from the firmware URL. 'multiimage' builds are published alongside the standard image for the same version and build time.">Image <span class="sort-arrow">↕</span></th>
+              <th data-key="built_at">Built <span class="sort-arrow">↕</span></th>
+              <th data-key="released_at">Released <span class="sort-arrow">↕</span></th>
+              <th data-key="expires_at">Expires <span class="sort-arrow">↕</span></th>
+              <th data-key="statusRank">Status <span class="sort-arrow">↕</span></th>
+              <th data-key="filename">Filename <span class="sort-arrow">↕</span></th>
+              <th data-key="hash" title="First 7 characters of the image SHA-1 — the only field that separates same-version builds">SHA-1 <span class="sort-arrow">↕</span></th>
+              <th class="nosort" style="width:7rem;">Action</th>
+            </tr></thead>
+            <tbody id="browseBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== DOWNLOADS ===================== -->
+    <section class="tab-panel" id="panel-downloads" hidden>
+      <div class="stats-row">
+        <div class="stat-card" style="cursor:default;"><div class="stat-label">Active</div><div class="stat-value accent" id="statActive">0</div></div>
+        <div class="stat-card" style="cursor:default;"><div class="stat-label">Completed</div><div class="stat-value ok" id="statDone">0</div></div>
+        <div class="stat-card" style="cursor:default;"><div class="stat-label">Failed</div><div class="stat-value bad" id="statFailed">0</div></div>
+        <div class="stat-card" style="cursor:default;"><div class="stat-label">Files on Disk</div><div class="stat-value" id="statFiles">0</div></div>
+        <div class="stat-card" style="cursor:default;"><div class="stat-label">Disk Used</div><div class="stat-value" id="statBytes">—</div></div>
+        <div class="stat-card" style="cursor:default;"><div class="stat-label">Disk Free</div><div class="stat-value" id="statFree">—</div></div>
+      </div>
+
+      <div class="panel" style="margin-bottom:1rem;flex:0 0 auto;max-height:40vh;">
+        <div class="panel-header">
+          <h2>Transfers</h2>
+          <div style="display:flex;gap:.5rem;">
+            <button class="btn btn-secondary btn-sm" id="cancelAllBtn" disabled>Cancel active</button>
+            <button class="btn btn-secondary btn-sm" id="clearJobsBtn">Clear finished</button>
+          </div>
+        </div>
+        <div class="job-list" id="jobList">
+          <div class="center-state" id="noJobs" style="padding:2rem;">
+            <p>No transfers yet. Select firmware on the Browse tab and click Download.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Downloaded Files</h2>
+          <span class="meta mono" id="downloadDirLabel"></span>
+        </div>
+        <div class="table-container">
+          <table class="data" id="filesTable" style="min-width:640px;">
+            <thead><tr>
+              <th data-key="name">Filename <span class="sort-arrow">↕</span></th>
+              <th data-key="size">Size <span class="sort-arrow">↕</span></th>
+              <th data-key="modified">Downloaded <span class="sort-arrow">↕</span></th>
+              <th class="nosort" style="width:14rem;">Actions</th>
+            </tr></thead>
+            <tbody id="filesBody"></tbody>
+          </table>
+          <div class="center-state" id="noFiles" hidden style="padding:2rem;">
+            <p>No firmware images downloaded yet.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Settings Modal -->
+<div class="modal" id="settingsModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Settings</h2>
+      <button class="modal-close" id="closeSettingsBtn" aria-label="Close">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="section">
+        <h3>API Credentials</h3>
+        <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:1rem;">
+          <select class="select" id="profileSelect" style="flex:1;"><option value="">— Select profile —</option></select>
+          <button class="btn btn-secondary btn-sm" id="loadProfileBtn">Load</button>
+          <button class="btn btn-secondary btn-sm" id="deleteProfileBtn" style="color:var(--danger-color);">Delete</button>
+        </div>
+        <div class="form-grid">
+          <div><label class="flabel" for="credCpApiId">X_CP_API_ID</label><input class="input mono" type="text" id="credCpApiId" autocomplete="off"></div>
+          <div><label class="flabel" for="credCpApiKey">X_CP_API_KEY</label><div class="pw-wrap"><input class="input" type="password" id="credCpApiKey" autocomplete="off"><button type="button" class="eye-toggle" data-target="credCpApiKey" aria-label="Show value">👁</button></div></div>
+          <div><label class="flabel" for="credEcmApiId">X_ECM_API_ID</label><input class="input mono" type="text" id="credEcmApiId" autocomplete="off"></div>
+          <div><label class="flabel" for="credEcmApiKey">X_ECM_API_KEY</label><div class="pw-wrap"><input class="input" type="password" id="credEcmApiKey" autocomplete="off"><button type="button" class="eye-toggle" data-target="credEcmApiKey" aria-label="Show value">👁</button></div></div>
+        </div>
+        <div style="display:flex;gap:.5rem;margin-top:1rem;flex-wrap:wrap;">
+          <button class="btn btn-primary" id="applyCredsBtn">Apply &amp; Refresh</button>
+          <button class="btn btn-secondary" id="saveProfileBtn">Save Profile…</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>Downloads</h3>
+        <div class="form-grid">
+          <div>
+            <label class="flabel" for="downloadDirInput">Download folder</label>
+            <input class="input mono" type="text" id="downloadDirInput" spellcheck="false">
+          </div>
+          <div>
+            <label class="flabel" for="concurrencyInput">Simultaneous downloads (1–8)</label>
+            <input class="input" type="number" id="concurrencyInput" min="1" max="8" style="width:6rem;">
+          </div>
+          <label class="check"><input type="checkbox" id="verifySha1Input"> Verify SHA-1 hash after each download</label>
+        </div>
+        <button class="btn btn-primary" id="saveSettingsBtn" style="margin-top:1rem;">Save Download Settings</button>
+      </div>
+
+      <div class="section">
+        <h3>Display Options</h3>
+        <label class="check"><input type="checkbox" id="groupByModelToggle"> Shade alternating model groups</label>
+        <label class="check" style="margin-top:.5rem;"><input type="checkbox" id="showSizesToggle"> Look up image sizes for the current page</label>
+        <div class="field" style="margin-top:.75rem;">
+          <label for="rowsPerPageSelect">Rows per page</label>
+          <select class="select" id="rowsPerPageSelect" style="width:7rem;">
+            <option>25</option><option selected>50</option><option>100</option><option>250</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Help Modal -->
+<div class="modal" id="helpModal">
+  <div class="modal-content wide">
+    <div class="modal-header">
+      <h2>How to use NCOS Downloader</h2>
+      <button class="modal-close" id="closeHelpBtn" aria-label="Close">×</button>
+    </div>
+    <div class="modal-body help-body">
+      <h3>1. Credentials</h3>
+      <p>Enter your four NCM v2 API keys — <code>X_CP_API_ID</code>, <code>X_CP_API_KEY</code>,
+        <code>X_ECM_API_ID</code>, <code>X_ECM_API_KEY</code> — in <strong>Settings</strong> (gear icon).
+        Save them as a named profile to switch between accounts. The app also picks them up from the
+        environment if they are already set there.</p>
+
+      <h3>2. Build the catalog</h3>
+      <p>NCM's <code>/firmwares/</code> endpoint has no "list by model" filter, so the app pulls the whole
+        catalog once (about 10 seconds) and joins it against <code>/products/</code> to resolve model names.
+        The result is cached on disk, so later visits load instantly. Use <strong>Refresh Catalog</strong>
+        after a new NCOS release.</p>
+
+      <h3>3. Find your image</h3>
+      <ul>
+        <li>Filter by <strong>Model</strong>, <strong>Version</strong>, or free-text <strong>Search</strong>.</li>
+        <li>Click a stat card to filter — <em>Latest per Model</em> is the quickest way to find current firmware.</li>
+        <li>Click any column header to sort. Click a Model or Version cell to search for it.</li>
+        <li><strong>Deprecated</strong> images are hidden by default; <strong>Expired</strong> ones are still
+          downloadable but past their NCM expiry date.</li>
+      </ul>
+
+      <h3>Why does each version appear twice?</h3>
+      <p>Because NCM usually publishes two images per build: a <strong>standard</strong> one and a
+        <strong>multiimage</strong> one. They share the same model, version, and build timestamp, and differ
+        only by the <code>multiimage</code> tag in the firmware URL — and by their SHA-1. The
+        <strong>Image</strong> column shows which is which, and <strong>Hide multiimage</strong> in the
+        filter bar collapses the list to one row per build.</p>
+      <p>The API gives no field describing what the difference means, so if you are unsure which your
+        deployment expects, check with the NCM release notes rather than guessing. Roughly 2,000 of the
+        17,700 images in a full catalog are multiimage builds.</p>
+
+      <h3>4. Download</h3>
+      <p>Tick rows and use <strong>Download Selected</strong>, or use the per-row button. Transfers run in the
+        background on the <strong>Downloads</strong> tab, several at a time, and each file's SHA-1 is checked
+        against the hash NCM publishes. A failed check deletes the partial file rather than leaving a corrupt
+        image on disk. Files land in the download folder set in Settings and can be saved to your browser or
+        deleted from the Downloads tab.</p>
+
+      <h3>Notes</h3>
+      <ul>
+        <li>Images are named <code>MODEL-VERSION.bin</code>. NCM often publishes several distinct builds
+          of the same model and version, so where that happens the build date and a short hash are added
+          — <code>IBR600C-7.26.100-20260916-d53a04.bin</code> — to keep the builds apart. A name already
+          on disk is skipped, so re-downloading is safe.</li>
+        <li>The <code>.bin</code> files come from Cradlepoint's CDN, referenced by each firmware record.</li>
+        <li>This app serves on localhost with no authentication. Don't expose the port on a shared network —
+          anyone who reaches it could read the credentials in Settings.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Save Profile Modal -->
+<div class="modal" id="saveProfileModal">
+  <div class="modal-content" style="max-width:420px;">
+    <div class="modal-header"><h2>Save Profile</h2><button class="modal-close" id="closeSaveProfileBtn" aria-label="Close">×</button></div>
+    <div class="modal-body">
+      <label class="flabel" for="profileNameInput">Profile name</label>
+      <input class="input" type="text" id="profileNameInput" placeholder="e.g. Production account" style="width:100%;">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" id="confirmSaveProfileBtn">Save</button>
+      <button class="btn btn-secondary" id="cancelSaveProfileBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================= State ============================= */
+const state = {
+  firmwares: [], models: [], versions: [], builtAt: null,
+  filtered: [], selected: new Set(), onDisk: new Set(),
+  sort: {key:'model', dir:'asc'}, page: 1,
+  // No card filter by default: hiding all but the newest version per model made
+  // it look like only one version existed. Sorting puts newest first instead.
+  cardFilter: 'all', sizes: {}, jobs: [], files: [],
+  filesSort: {key:'modified', dir:'desc'},
+  pollTimer: null, catalogTimer: null,
+};
+const prefs = {
+  get group(){ return localStorage.getItem('ncos.group') !== 'false'; },
+  set group(v){ localStorage.setItem('ncos.group', v); },
+  get sizes(){ return localStorage.getItem('ncos.sizes') === 'true'; },
+  set sizes(v){ localStorage.setItem('ncos.sizes', v); },
+  get rows(){ return parseInt(localStorage.getItem('ncos.rows') || '50', 10); },
+  set rows(v){ localStorage.setItem('ncos.rows', v); },
+  get dark(){ return localStorage.getItem('ncos.dark') === 'true'; },
+  set dark(v){ localStorage.setItem('ncos.dark', v); },
+};
+const $ = id => document.getElementById(id);
+
+/* ============================= Helpers ============================= */
+function fmtBytes(n){
+  if(n === null || n === undefined || n === '') return '—';
+  if(n === 0) return '0 B';
+  const u = ['B','KB','MB','GB','TB']; let i = 0; let v = Number(n);
+  while(v >= 1024 && i < u.length - 1){ v /= 1024; i++; }
+  return v.toFixed(v < 10 && i > 0 ? 1 : 0) + ' ' + u[i];
+}
+function fmtDate(iso){
+  if(!iso) return '—';
+  const d = new Date(iso);
+  if(isNaN(d)) return '—';
+  // Firmware timestamps are UTC, and the build date is baked into filenames.
+  // Render in UTC so the column and the filename can't disagree.
+  return d.toLocaleDateString(undefined, {year:'numeric', month:'short', day:'2-digit', timeZone:'UTC'});
+}
+function fmtDateTime(iso){
+  if(!iso) return '—';
+  const d = new Date(iso);
+  return isNaN(d) ? '—' : d.toLocaleString(undefined, {dateStyle:'medium', timeStyle:'short'});
+}
+function relTime(iso){
+  if(!iso) return 'never';
+  const secs = (Date.now() - new Date(iso).getTime()) / 1000;
+  if(isNaN(secs)) return 'never';
+  if(secs < 60) return 'just now';
+  if(secs < 3600) return Math.floor(secs/60) + 'm ago';
+  if(secs < 86400) return Math.floor(secs/3600) + 'h ago';
+  return Math.floor(secs/86400) + 'd ago';
+}
+function versionKey(v){
+  return String(v || '').split(/[.\-_]/).map(p => {
+    const m = /^(\d*)(.*)$/.exec(p);
+    return [m[1] ? parseInt(m[1],10) : 0, m[2].toLowerCase()];
+  });
+}
+function cmpVersion(a, b){
+  const ka = versionKey(a), kb = versionKey(b);
+  for(let i = 0; i < Math.max(ka.length, kb.length); i++){
+    const x = ka[i] || [0,''], y = kb[i] || [0,''];
+    if(x[0] !== y[0]) return x[0] - y[0];
+    if(x[1] !== y[1]) return x[1] < y[1] ? -1 : 1;
+  }
+  return 0;
+}
+function escapeHtml(s){
+  return String(s ?? '').replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function toast(msg, kind='info', ms=3800){
+  const el = $('toast');
+  el.textContent = msg;
+  el.className = 'toast show ' + kind;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.className = 'toast'; }, ms);
+}
+async function api(path, opts={}){
+  const res = await fetch(path, {
+    headers: opts.body ? {'Content-Type':'application/json'} : {},
+    ...opts,
+  });
+  let data = null;
+  try { data = await res.json(); } catch(e) { /* non-JSON (file download) */ }
+  if(!res.ok){
+    const msg = (data && (data.message || data.error)) || res.statusText;
+    const err = new Error(msg);
+    err.data = data; err.status = res.status;
+    throw err;
+  }
+  return data;
+}
+// The server assigns filenames, since it alone knows whether a model+version
+// has several distinct builds that need disambiguating.
+function filenameFor(fw){ return fw.filename || `${fw.model}-${fw.version}.bin`; }
+function isExpired(fw){ return !!fw.expires_at && new Date(fw.expires_at) < new Date(); }
+function statusOf(fw){
+  if(fw.deprecated) return 'deprecated';
+  if(isExpired(fw)) return 'expired';
+  return 'current';
+}
+
+/* ============================= Catalog load ============================= */
+async function loadStatus(){
+  try {
+    const s = await api('/api/status');
+    renderBanner(s);
+    applyServerSettings(s.settings);
+    return s;
+  } catch(e){
+    toast('Could not reach the server: ' + e.message, 'error');
+    return null;
+  }
+}
+function renderBanner(s){
+  const banner = $('banner'), text = $('bannerText'), action = $('bannerAction');
+  if(!s.credentials){
+    banner.className = 'banner warn show';
+    text.textContent = 'API credentials are not configured. Firmware cannot be listed or downloaded until they are set.';
+    action.style.display = '';
+    action.textContent = 'Open Settings';
+    action.onclick = () => openSettings();
+  } else if(s.catalog && s.catalog.state === 'error' && s.catalog.error){
+    banner.className = 'banner error show';
+    text.textContent = 'Catalog error: ' + s.catalog.error;
+    action.style.display = '';
+    action.textContent = 'Retry';
+    action.onclick = () => buildCatalog();
+  } else {
+    banner.className = 'banner';
+    action.style.display = 'none';
+  }
+}
+async function loadCatalog(){
+  const data = await api('/api/catalog');
+  if(data.status !== 'ok'){
+    state.firmwares = [];
+    showBrowseState(data.state === 'running' ? 'loading' : 'empty');
+    if(data.state === 'running') pollCatalog();
+    return false;
+  }
+  state.firmwares = data.firmwares.map(fw => ({
+    ...fw,
+    filename: filenameFor(fw),
+    status: statusOf(fw),
+    statusRank: ({current:0, expired:1, deprecated:2})[statusOf(fw)],
+  }));
+  state.models = data.models;
+  state.versions = data.versions;
+  state.builtAt = data.built_at;
+  populateFilterOptions();
+  updateCatalogBadge();
+  applyFilters();
+  return true;
+}
+function updateCatalogBadge(){
+  const badge = $('catalogBadge');
+  if(!state.firmwares.length){ badge.textContent = 'No catalog'; return; }
+  badge.textContent = `${state.firmwares.length.toLocaleString()} images · ${state.models.length} models · updated ${relTime(state.builtAt)}`;
+}
+function populateFilterOptions(){
+  $('modelList').innerHTML = state.models.map(m => `<option value="${escapeHtml(m)}">`).join('');
+  const sel = $('versionFilter'), keep = sel.value;
+  sel.innerHTML = '<option value="">All versions</option>' +
+    state.versions.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+  if(keep && state.versions.includes(keep)) sel.value = keep;
+}
+async function buildCatalog(){
+  try {
+    await api('/api/catalog/refresh', {method:'POST'});
+    showBrowseState('loading');
+    $('loadingTitle').textContent = 'Building catalog…';
+    pollCatalog();
+  } catch(e){
+    toast(e.message, 'error');
+    if(e.data && e.data.error_type === 'no_credentials') openSettings();
+  }
+}
+function pollCatalog(){
+  clearInterval(state.catalogTimer);
+  state.catalogTimer = setInterval(async () => {
+    let st;
+    try { st = await api('/api/catalog/status'); } catch(e){ return; }
+    if(st.state === 'running'){
+      $('loadingTitle').textContent = st.phase || 'Building catalog…';
+      $('loadingText').textContent = st.rows
+        ? `${st.rows.toLocaleString()} firmware records so far…`
+        : 'Contacting NetCloud Manager…';
+    } else {
+      clearInterval(state.catalogTimer);
+      if(st.state === 'ready'){
+        await loadCatalog();
+        toast(`Catalog ready — ${state.firmwares.length.toLocaleString()} firmware images.`, 'success');
+      } else if(st.state === 'error'){
+        showBrowseState('empty');
+        toast('Catalog build failed: ' + (st.error || 'unknown error'), 'error', 7000);
+      }
+      loadStatus();
+    }
+  }, 700);
+}
+function showBrowseState(which){
+  const map = {loading:'browseLoading', empty:'browseEmptyState', none:'browseNoResults', table:'browseTable'};
+  Object.entries(map).forEach(([k, id]) => { $(id).hidden = (k !== which); });
+}
+
+/* ============================= Filtering ============================= */
+function latestPerModel(rows){
+  // Newest version per model, and within that version the newest build —
+  // the same model+version often has several distinct builds.
+  const best = new Map();
+  rows.forEach(fw => {
+    const cur = best.get(fw.model);
+    if(!cur){ best.set(fw.model, fw); return; }
+    const vcmp = cmpVersion(fw.version, cur.version);
+    if(vcmp > 0 || (vcmp === 0 && (fw.built_at || '') > (cur.built_at || ''))){
+      best.set(fw.model, fw);
+    }
+  });
+  return new Set([...best.values()].map(fw => fw.id));
+}
+function applyFilters(){
+  const model = $('modelFilter').value.trim().toUpperCase();
+  const version = $('versionFilter').value;
+  const query = $('searchInput').value.trim().toLowerCase();
+  const hideDep = $('hideDeprecated').checked;
+  const hideExp = $('hideExpired').checked;
+  const hideMulti = $('hideMultiimage').checked;
+
+  let rows = state.firmwares;
+  if(hideDep) rows = rows.filter(fw => !fw.deprecated);
+  if(hideExp) rows = rows.filter(fw => fw.status !== 'expired');
+  if(hideMulti) rows = rows.filter(fw => !fw.variant);
+  if(model) rows = rows.filter(fw => fw.model.toUpperCase().includes(model));
+  if(version) rows = rows.filter(fw => fw.version === version);
+  if(query) rows = rows.filter(fw =>
+    fw.model.toLowerCase().includes(query) ||
+    fw.version.toLowerCase().includes(query) ||
+    (fw.variant || '').toLowerCase().includes(query) ||
+    fw.filename.toLowerCase().includes(query));
+
+  const card = state.cardFilter;
+  if(card === 'latest'){
+    const keep = latestPerModel(rows);
+    rows = rows.filter(fw => keep.has(fw.id));
+  } else if(card === 'current'){
+    rows = rows.filter(fw => fw.status === 'current');
+  } else if(card === 'expired'){
+    rows = rows.filter(fw => fw.status === 'expired');
+  } else if(card === 'deprecated'){
+    rows = rows.filter(fw => fw.deprecated);
+  } else if(card === 'ondisk'){
+    rows = rows.filter(fw => state.onDisk.has(fw.filename));
+  }
+
+  state.filtered = sortRows(rows);
+  if((state.page - 1) * prefs.rows >= state.filtered.length) state.page = 1;
+  renderStats();
+  renderBrowse();
+}
+function sortRows(rows){
+  const {key, dir} = state.sort;
+  const mul = dir === 'asc' ? 1 : -1;
+  // Ties always break newest-first: within one model you want the latest
+  // version at the top, and within one version the latest build.
+  const newestFirst = (a, b) =>
+    -cmpVersion(a.version, b.version) ||
+    String(b.built_at || '').localeCompare(String(a.built_at || ''));
+  return [...rows].sort((a, b) => {
+    if(key === 'version'){
+      return cmpVersion(a.version, b.version) * mul ||
+             a.model.localeCompare(b.model) ||
+             String(b.built_at || '').localeCompare(String(a.built_at || ''));
+    }
+    let x = a[key], y = b[key];
+    if(typeof x === 'number' || typeof y === 'number'){
+      return ((x ?? 0) - (y ?? 0)) * mul || a.model.localeCompare(b.model) || newestFirst(a, b);
+    }
+    x = String(x ?? ''); y = String(y ?? '');
+    const cmp = x.localeCompare(y, undefined, {numeric:true, sensitivity:'base'});
+    if(cmp) return cmp * mul;
+    return a.model.localeCompare(b.model) || newestFirst(a, b);
+  });
+}
+function renderStats(){
+  const visible = state.firmwares.filter(fw =>
+    (!$('hideDeprecated').checked || !fw.deprecated) &&
+    (!$('hideExpired').checked || fw.status !== 'expired'));
+  $('statMatching').textContent = state.filtered.length.toLocaleString();
+  $('statLatest').textContent = latestPerModel(visible).size.toLocaleString();
+  $('statCurrent').textContent = state.firmwares.filter(f => f.status === 'current').length.toLocaleString();
+  $('statExpired').textContent = state.firmwares.filter(f => f.status === 'expired').length.toLocaleString();
+  $('statDeprecated').textContent = state.firmwares.filter(f => f.deprecated).length.toLocaleString();
+  $('statOnDisk').textContent = state.onDisk.size.toLocaleString();
+  document.querySelectorAll('.stat-card[data-filter]').forEach(card => {
+    card.classList.toggle('active', card.dataset.filter === state.cardFilter && state.cardFilter !== 'all');
+  });
+}
+
+/* ============================= Browse table ============================= */
+function renderBrowse(){
+  if(!state.firmwares.length){ showBrowseState('empty'); return; }
+  if(!state.filtered.length){ showBrowseState('none'); updateSelectionBar(); return; }
+  showBrowseState('table');
+
+  const per = prefs.rows;
+  const pages = Math.max(1, Math.ceil(state.filtered.length / per));
+  state.page = Math.min(state.page, pages);
+  const start = (state.page - 1) * per;
+  const rows = state.filtered.slice(start, start + per);
+
+  let groupIdx = -1, lastModel = null;
+  $('browseBody').innerHTML = rows.map(fw => {
+    if(fw.model !== lastModel){ groupIdx++; lastModel = fw.model; }
+    const shade = prefs.group && groupIdx % 2 === 1 ? ' group-even' : '';
+    const sel = state.selected.has(fw.id) ? ' selected' : '';
+    const disk = state.onDisk.has(fw.filename);
+    const size = state.sizes[fw.url];
+    return `<tr class="${shade}${sel}" data-id="${fw.id}">
+      <td><input type="checkbox" class="row-check" data-id="${fw.id}"${state.selected.has(fw.id) ? ' checked' : ''}></td>
+      <td class="model-cell clickable" data-search="${escapeHtml(fw.model)}">${escapeHtml(fw.model)}</td>
+      <td class="mono clickable" data-search="${escapeHtml(fw.version)}">${escapeHtml(fw.version)}</td>
+      <td>${fw.variant
+            ? `<span class="badge variant">${escapeHtml(fw.variant)}</span>`
+            : '<span style="color:var(--text-light);">standard</span>'}</td>
+      <td>${fmtDate(fw.built_at)}</td>
+      <td>${fmtDate(fw.released_at)}</td>
+      <td>${fmtDate(fw.expires_at)}</td>
+      <td><span class="badge ${fw.status}">${fw.status}</span>${disk ? ' <span class="badge ondisk">on disk</span>' : ''}</td>
+      <td class="mono" style="color:var(--text-secondary);">${escapeHtml(fw.filename)}${size ? ` <span style="opacity:.7;">(${fmtBytes(size)})</span>` : ''}</td>
+      <td class="mono" style="color:var(--text-light);" title="${escapeHtml(fw.hash)}">${escapeHtml((fw.hash || '').slice(0, 7)) || '—'}</td>
+      <td><button class="btn btn-secondary btn-sm dl-one" data-id="${fw.id}">⬇ ${disk ? 'Again' : 'Download'}</button></td>
+    </tr>`;
+  }).join('');
+
+  $('pageInfo').textContent =
+    `${(start + 1).toLocaleString()}–${Math.min(start + per, state.filtered.length).toLocaleString()} of ${state.filtered.length.toLocaleString()}`;
+  $('prevPageBtn').disabled = state.page <= 1;
+  $('nextPageBtn').disabled = state.page >= pages;
+  const pageIds = rows.map(r => r.id);
+  $('selectAllCheck').checked = pageIds.length > 0 && pageIds.every(id => state.selected.has(id));
+  updateSelectionBar();
+  if(prefs.sizes) fetchSizes(rows);
+}
+function updateSortIndicators(table, sort){
+  table.querySelectorAll('th[data-key]').forEach(th => {
+    const on = th.dataset.key === sort.key;
+    th.classList.toggle('sorted', on);
+    const arrow = th.querySelector('.sort-arrow');
+    if(arrow) arrow.textContent = on ? (sort.dir === 'asc' ? '↑' : '↓') : '↕';
+  });
+}
+function updateSelectionBar(){
+  const n = state.selected.size;
+  $('selectionBar').classList.toggle('show', n > 0);
+  if(!n) return;
+  const chosen = state.firmwares.filter(fw => state.selected.has(fw.id));
+  const known = chosen.map(fw => state.sizes[fw.url]).filter(Boolean);
+  let text = `${n} image${n === 1 ? '' : 's'} selected`;
+  if(known.length === chosen.length && known.length){
+    text += ` · ${fmtBytes(known.reduce((a, b) => a + b, 0))}`;
+  }
+  $('selectionText').textContent = text;
+}
+async function fetchSizes(rows){
+  const missing = rows.map(r => r.url).filter(u => state.sizes[u] === undefined);
+  if(!missing.length) return;
+  missing.forEach(u => { state.sizes[u] = null; });
+  try {
+    const res = await api('/api/sizes', {method:'POST', body: JSON.stringify({urls: missing})});
+    Object.assign(state.sizes, res.sizes || {});
+    renderBrowse();
+  } catch(e){ /* sizes are a nicety; ignore failures */ }
+}
+
+/* ============================= Downloads ============================= */
+async function startDownloads(items, overwrite=false){
+  if(!items.length) return;
+  try {
+    const res = await api('/api/downloads', {
+      method:'POST',
+      body: JSON.stringify({overwrite, items: items.map(fw => ({
+        url: fw.url, model: fw.model, version: fw.version,
+        hash: fw.hash, filename: fw.filename,
+      }))}),
+    });
+    const parts = [];
+    if(res.queued) parts.push(`${res.queued} queued`);
+    if(res.skipped && res.skipped.length) parts.push(`${res.skipped.length} already on disk`);
+    if(res.rejected && res.rejected.length){
+      parts.push(`${res.rejected.length} unusable (${res.rejected.slice(0,2).join(', ')})`);
+    }
+    const kind = res.rejected && res.rejected.length ? 'error' : (res.queued ? 'success' : 'info');
+    toast(parts.join(' · ') || 'Nothing to do', kind, 5000);
+    if(res.queued){
+      switchTab('downloads');
+      startJobPolling();
+    }
+  } catch(e){
+    toast('Download failed: ' + e.message, 'error');
+    if(e.data && e.data.error_type === 'no_credentials') openSettings();
+  }
+}
+function startJobPolling(){
+  if(state.pollTimer) return;
+  state.pollTimer = setInterval(refreshJobs, 900);
+  refreshJobs();
+}
+function stopJobPollingIfIdle(active){
+  const onTab = !$('panel-downloads').hidden;
+  if(!active && !onTab && state.pollTimer){
+    clearInterval(state.pollTimer);
+    state.pollTimer = null;
+  }
+}
+async function refreshJobs(){
+  let data;
+  try { data = await api('/api/downloads'); } catch(e){ return; }
+  const finishedBefore = state.jobs.filter(j => j.state === 'done').length;
+  state.jobs = data.jobs;
+  renderJobs();
+  const count = $('tabCount');
+  count.textContent = data.active || state.jobs.filter(j => j.state === 'done').length;
+  count.classList.toggle('idle', !data.active);
+  $('cancelAllBtn').disabled = !data.active;
+  const doneNow = state.jobs.filter(j => j.state === 'done').length;
+  if(doneNow !== finishedBefore) await refreshFiles();
+  stopJobPollingIfIdle(data.active);
+}
+function renderJobs(){
+  const list = $('jobList');
+  const active = state.jobs.filter(j => j.state === 'queued' || j.state === 'downloading').length;
+  $('statActive').textContent = active;
+  $('statDone').textContent = state.jobs.filter(j => j.state === 'done').length;
+  $('statFailed').textContent = state.jobs.filter(j => j.state === 'error').length;
+
+  if(!state.jobs.length){
+    list.innerHTML = '<div class="center-state" style="padding:2rem;"><p>No transfers yet. Select firmware on the Browse tab and click Download.</p></div>';
+    return;
+  }
+  list.innerHTML = state.jobs.map(j => {
+    const pct = j.state === 'done' ? 100 : j.pct;
+    let sub;
+    if(j.state === 'downloading'){
+      sub = `${fmtBytes(j.received)}${j.total ? ' of ' + fmtBytes(j.total) : ''}`
+          + (j.speed ? ` · ${fmtBytes(j.speed)}/s` : '');
+    } else if(j.state === 'done'){
+      sub = `${fmtBytes(j.total)} · ${j.verified ? 'SHA-1 verified' : 'downloaded'}`;
+    } else if(j.state === 'error'){
+      sub = j.error || 'Failed';
+    } else if(j.state === 'canceled'){
+      sub = 'Canceled';
+    } else {
+      sub = 'Waiting for a free slot…';
+    }
+    const canCancel = j.state === 'queued' || j.state === 'downloading';
+    return `<div class="job state-${j.state}">
+      <div>
+        <div class="job-title">${escapeHtml(j.model)} <span class="mono" style="font-weight:400;">${escapeHtml(j.version)}</span></div>
+        <div class="job-sub">${escapeHtml(sub)}</div>
+      </div>
+      <div class="job-right">
+        <span class="job-state ${j.state}">${j.state === 'done' && j.verified ? '✓ verified' : j.state}</span>
+        ${canCancel ? `<button class="btn btn-secondary btn-sm cancel-job" data-id="${j.id}">Cancel</button>` : ''}
+      </div>
+      <div class="progress"><div class="fill" style="width:${pct}%;"></div></div>
+    </div>`;
+  }).join('');
+}
+async function refreshFiles(){
+  let data;
+  try { data = await api('/api/files'); } catch(e){ return; }
+  state.files = data.files;
+  state.onDisk = new Set(data.files.map(f => f.name));
+  $('statFiles').textContent = data.count;
+  $('statBytes').textContent = fmtBytes(data.bytes);
+  $('statFree').textContent = fmtBytes(data.free);
+  $('downloadDirLabel').textContent = data.dir;
+  renderFiles();
+  if(state.firmwares.length) applyFilters();
+}
+function renderFiles(){
+  const {key, dir} = state.filesSort;
+  const mul = dir === 'asc' ? 1 : -1;
+  const rows = [...state.files].sort((a, b) => {
+    const x = a[key], y = b[key];
+    if(typeof x === 'number') return (x - y) * mul;
+    return String(x).localeCompare(String(y), undefined, {numeric:true}) * mul;
+  });
+  $('noFiles').hidden = rows.length > 0;
+  $('filesTable').hidden = rows.length === 0;
+  $('filesBody').innerHTML = rows.map(f => `<tr>
+    <td class="mono">${escapeHtml(f.name)}</td>
+    <td>${fmtBytes(f.size)}</td>
+    <td>${fmtDateTime(f.modified)}</td>
+    <td>
+      <a class="btn btn-secondary btn-sm" href="/api/files/${encodeURIComponent(f.name)}" download>⬇ Save</a>
+      <button class="btn btn-secondary btn-sm verify-file" data-name="${escapeHtml(f.name)}">Verify</button>
+      <button class="btn btn-secondary btn-sm delete-file" data-name="${escapeHtml(f.name)}" style="color:var(--danger-color);">Delete</button>
+    </td>
+  </tr>`).join('');
+  updateSortIndicators($('filesTable'), state.filesSort);
+}
+
+/* ============================= Exports ============================= */
+function exportCsv(){
+  if(!state.filtered.length){ toast('Nothing to export', 'info'); return; }
+  const head = ['Model','Version','Image','Built','Released','Expires','Status','Filename','CDN Path','SHA-1'];
+  const lines = [head.join(',')].concat(state.filtered.map(fw => [
+    fw.model, fw.version, fw.variant || 'standard', fw.built_at, fw.released_at,
+    fw.expires_at, fw.status, fw.filename, fw.url, fw.hash,
+  ].map(v => `"${String(v ?? '').replace(/"/g,'""')}"`).join(',')));
+  const blob = new Blob([lines.join('\n')], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `ncos_firmware_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast(`Exported ${state.filtered.length} rows to CSV`, 'success');
+}
+function exportPdf(){
+  if(!state.filtered.length){ toast('Nothing to export', 'info'); return; }
+  const {jsPDF} = window.jspdf || {};
+  if(!jsPDF){ toast('PDF library did not load', 'error'); return; }
+  const doc = new jsPDF({orientation:'landscape'});
+  doc.setFontSize(16); doc.setTextColor(79,70,229);
+  doc.text('NCOS Firmware Catalog', 14, 15);
+  doc.setFontSize(9); doc.setTextColor(107,114,128);
+  doc.text(`Generated ${new Date().toLocaleString()}`, 14, 21);
+  const counts = state.filtered.reduce((acc, fw) => (acc[fw.status]++, acc), {current:0, expired:0, deprecated:0});
+  doc.text(`${state.filtered.length} images · ${counts.current} current · ${counts.expired} expired · ${counts.deprecated} deprecated`, 14, 26);
+  doc.autoTable({
+    startY: 30,
+    head: [['Model','Version','Image','Built','Released','Expires','Status','Filename']],
+    body: state.filtered.slice(0, 2000).map(fw => [
+      fw.model, fw.version, fw.variant || 'standard', fmtDate(fw.built_at),
+      fmtDate(fw.released_at), fmtDate(fw.expires_at), fw.status, fw.filename,
+    ]),
+    styles: {fontSize:7, cellPadding:1.5},
+    headStyles: {fillColor:[79,70,229], textColor:255, fontStyle:'bold'},
+    alternateRowStyles: {fillColor:[247,247,251]},
+    didParseCell: d => {
+      if(d.section === 'body' && d.column.index === 6){   // Status column
+        const v = d.cell.raw;
+        if(v === 'current') d.cell.styles.textColor = [5,150,105];
+        else if(v === 'expired') d.cell.styles.textColor = [217,119,6];
+        else if(v === 'deprecated') d.cell.styles.textColor = [220,38,38];
+      }
+    },
+    didDrawPage: () => {
+      doc.setFontSize(8); doc.setTextColor(150);
+      doc.text(`Page ${doc.internal.getNumberOfPages()}`,
+        doc.internal.pageSize.getWidth() - 25,
+        doc.internal.pageSize.getHeight() - 8);
+    },
+  });
+  doc.save(`ncos_firmware_${new Date().toISOString().slice(0,10)}.pdf`);
+  toast('PDF exported', 'success');
+}
+
+/* ============================= Settings ============================= */
+function applyServerSettings(s){
+  if(!s) return;
+  $('downloadDirInput').value = s.download_dir || '';
+  $('concurrencyInput').value = s.concurrency ?? 3;
+  $('verifySha1Input').checked = s.verify_sha1 !== false;
+}
+async function openSettings(){
+  $('settingsModal').classList.add('show');
+  try {
+    const cur = await api('/api/profiles/current');
+    $('credCpApiId').value = cur.X_CP_API_ID.value || '';
+    $('credCpApiKey').value = cur.X_CP_API_KEY.value || '';
+    $('credEcmApiId').value = cur.X_ECM_API_ID.value || '';
+    $('credEcmApiKey').value = cur.X_ECM_API_KEY.value || '';
+  } catch(e){ /* leave fields as-is */ }
+  await loadProfileList();
+}
+async function loadProfileList(){
+  try {
+    const profiles = await api('/api/profiles');
+    const sel = $('profileSelect'), keep = sel.value;
+    sel.innerHTML = '<option value="">— Select profile —</option>' +
+      Object.keys(profiles).map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+    if(keep) sel.value = keep;
+  } catch(e){ /* ignore */ }
+}
+function credsFromForm(){
+  return {
+    X_CP_API_ID: $('credCpApiId').value.trim(),
+    X_CP_API_KEY: $('credCpApiKey').value.trim(),
+    X_ECM_API_ID: $('credEcmApiId').value.trim(),
+    X_ECM_API_KEY: $('credEcmApiKey').value.trim(),
+  };
+}
+
+/* ============================= Tabs ============================= */
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  $('panel-browse').hidden = name !== 'browse';
+  $('panel-downloads').hidden = name !== 'downloads';
+  if(name === 'downloads'){ refreshFiles(); startJobPolling(); }
+}
+
+/* ============================= Events ============================= */
+function wire(){
+  // Dark mode
+  if(prefs.dark) document.body.classList.add('dark-mode');
+  $('darkModeToggle').onclick = () => {
+    document.body.classList.toggle('dark-mode');
+    prefs.dark = document.body.classList.contains('dark-mode');
+  };
+
+  // Tabs
+  document.querySelectorAll('.tab').forEach(t => { t.onclick = () => switchTab(t.dataset.tab); });
+
+  // Filters
+  let debounce;
+  $('searchInput').oninput = () => {
+    $('clearSearchBtn').style.display = $('searchInput').value ? 'block' : 'none';
+    clearTimeout(debounce);
+    debounce = setTimeout(() => { state.page = 1; applyFilters(); }, 160);
+  };
+  $('clearSearchBtn').onclick = () => {
+    $('searchInput').value = '';
+    $('clearSearchBtn').style.display = 'none';
+    state.page = 1; applyFilters();
+  };
+  $('modelFilter').oninput = () => { state.page = 1; applyFilters(); };
+  $('versionFilter').onchange = () => { state.page = 1; applyFilters(); };
+  $('hideDeprecated').onchange = () => { state.page = 1; applyFilters(); };
+  $('hideExpired').onchange = () => { state.page = 1; applyFilters(); };
+  $('hideMultiimage').onchange = () => { state.page = 1; applyFilters(); };
+  const reset = () => {
+    $('modelFilter').value = ''; $('versionFilter').value = '';
+    $('searchInput').value = ''; $('clearSearchBtn').style.display = 'none';
+    $('hideDeprecated').checked = true; $('hideExpired').checked = false;
+    $('hideMultiimage').checked = false;
+    state.cardFilter = 'all'; state.page = 1; applyFilters();
+  };
+  $('resetFiltersBtn').onclick = reset;
+  $('noResultsResetBtn').onclick = reset;
+
+  // Stat cards as filters
+  document.querySelectorAll('.stat-card[data-filter]').forEach(card => {
+    card.onclick = () => {
+      const f = card.dataset.filter;
+      if(f === 'ondisk' && !state.onDisk.size){
+        toast('No firmware downloaded yet', 'info');
+        return;
+      }
+      state.cardFilter = (state.cardFilter === f || f === 'all') ? 'all' : f;
+      state.page = 1;
+      applyFilters();
+    };
+  });
+
+  // Sorting (document-level delegation)
+  $('browseTable').querySelector('thead').addEventListener('click', e => {
+    const th = e.target.closest('th[data-key]');
+    if(!th) return;
+    const key = th.dataset.key;
+    state.sort = {key, dir: state.sort.key === key && state.sort.dir === 'asc' ? 'desc' : 'asc'};
+    updateSortIndicators($('browseTable'), state.sort);
+    applyFilters();
+  });
+  $('filesTable').querySelector('thead').addEventListener('click', e => {
+    const th = e.target.closest('th[data-key]');
+    if(!th) return;
+    const key = th.dataset.key;
+    state.filesSort = {key, dir: state.filesSort.key === key && state.filesSort.dir === 'asc' ? 'desc' : 'asc'};
+    renderFiles();
+  });
+
+  // Table body: selection, click-to-search, per-row download
+  $('browseBody').addEventListener('click', e => {
+    const check = e.target.closest('input.row-check');
+    if(check){
+      const id = check.dataset.id;
+      if(check.checked) state.selected.add(id); else state.selected.delete(id);
+      e.target.closest('tr').classList.toggle('selected', check.checked);
+      const pageIds = [...$('browseBody').querySelectorAll('input.row-check')].map(c => c.dataset.id);
+      $('selectAllCheck').checked = pageIds.every(id => state.selected.has(id));
+      updateSelectionBar();
+      return;
+    }
+    const dl = e.target.closest('button.dl-one');
+    if(dl){
+      const fw = state.firmwares.find(f => f.id === dl.dataset.id);
+      if(fw) startDownloads([fw], state.onDisk.has(fw.filename));
+      return;
+    }
+    const cell = e.target.closest('td.clickable');
+    if(cell){
+      $('searchInput').value = cell.dataset.search;
+      $('clearSearchBtn').style.display = 'block';
+      state.page = 1;
+      applyFilters();
+    }
+  });
+  $('selectAllCheck').onchange = e => {
+    const per = prefs.rows, start = (state.page - 1) * per;
+    state.filtered.slice(start, start + per).forEach(fw => {
+      if(e.target.checked) state.selected.add(fw.id); else state.selected.delete(fw.id);
+    });
+    renderBrowse();
+  };
+  $('clearSelectionBtn').onclick = () => { state.selected.clear(); renderBrowse(); };
+  $('downloadSelectedBtn').onclick = () => {
+    const chosen = state.firmwares.filter(fw => state.selected.has(fw.id));
+    const dupes = chosen.filter(fw => state.onDisk.has(fw.filename)).length;
+    if(dupes && !confirm(`${dupes} of ${chosen.length} selected image(s) are already on disk. Re-download and overwrite them?`)){
+      startDownloads(chosen.filter(fw => !state.onDisk.has(fw.filename)));
+    } else {
+      startDownloads(chosen, dupes > 0);
+    }
+    state.selected.clear();
+    renderBrowse();
+  };
+
+  // Pagination
+  $('prevPageBtn').onclick = () => { state.page--; renderBrowse(); };
+  $('nextPageBtn').onclick = () => { state.page++; renderBrowse(); };
+
+  // Catalog
+  $('refreshCatalogBtn').onclick = buildCatalog;
+  $('buildCatalogBtn').onclick = buildCatalog;
+
+  // Exports
+  $('exportCsvBtn').onclick = exportCsv;
+  $('exportPdfBtn').onclick = exportPdf;
+
+  // Jobs + files
+  $('jobList').addEventListener('click', async e => {
+    const btn = e.target.closest('button.cancel-job');
+    if(!btn) return;
+    try { await api(`/api/downloads/${btn.dataset.id}/cancel`, {method:'POST'}); refreshJobs(); }
+    catch(err){ toast(err.message, 'error'); }
+  });
+  $('cancelAllBtn').onclick = async () => {
+    const active = state.jobs.filter(j => j.state === 'queued' || j.state === 'downloading');
+    await Promise.all(active.map(j => api(`/api/downloads/${j.id}/cancel`, {method:'POST'}).catch(() => {})));
+    refreshJobs();
+  };
+  $('clearJobsBtn').onclick = async () => {
+    await api('/api/downloads/clear', {method:'POST'});
+    refreshJobs();
+  };
+  $('filesBody').addEventListener('click', async e => {
+    const del = e.target.closest('button.delete-file');
+    if(del){
+      if(!confirm(`Delete ${del.dataset.name}?`)) return;
+      try {
+        await api(`/api/files/${encodeURIComponent(del.dataset.name)}`, {method:'DELETE'});
+        toast('Deleted ' + del.dataset.name, 'success');
+        refreshFiles();
+      } catch(err){ toast(err.message, 'error'); }
+      return;
+    }
+    const ver = e.target.closest('button.verify-file');
+    if(ver){
+      ver.disabled = true; ver.textContent = 'Checking…';
+      try {
+        const res = await api(`/api/files/${encodeURIComponent(ver.dataset.name)}/verify`);
+        toast(res.in_catalog
+          ? `${res.name}: SHA-1 matches the NCM catalog`
+          : `${res.name}: SHA-1 ${res.sha1.slice(0,12)}… not found in the catalog`,
+          res.in_catalog ? 'success' : 'error', 5000);
+      } catch(err){ toast(err.message, 'error'); }
+      ver.disabled = false; ver.textContent = 'Verify';
+    }
+  });
+
+  // Settings modal
+  $('settingsBtn').onclick = openSettings;
+  $('closeSettingsBtn').onclick = () => $('settingsModal').classList.remove('show');
+  $('helpBtn').onclick = () => $('helpModal').classList.add('show');
+  $('closeHelpBtn').onclick = () => $('helpModal').classList.remove('show');
+  document.querySelectorAll('.modal').forEach(m => {
+    m.addEventListener('click', e => { if(e.target === m) m.classList.remove('show'); });
+  });
+  document.addEventListener('keydown', e => {
+    if(e.key === 'Escape') document.querySelectorAll('.modal.show').forEach(m => m.classList.remove('show'));
+  });
+  document.querySelectorAll('.eye-toggle').forEach(btn => {
+    btn.onclick = () => {
+      const input = $(btn.dataset.target);
+      input.type = input.type === 'password' ? 'text' : 'password';
+    };
+  });
+  $('applyCredsBtn').onclick = async () => {
+    try {
+      const res = await api('/api/credentials/apply', {
+        method:'POST', body: JSON.stringify({credentials: credsFromForm()}),
+      });
+      if(!res.credentials){ toast('All four keys are required', 'error'); return; }
+      toast('Credentials applied — rebuilding catalog', 'success');
+      $('settingsModal').classList.remove('show');
+      await loadStatus();
+      buildCatalog();
+    } catch(e){ toast(e.message, 'error'); }
+  };
+  $('saveProfileBtn').onclick = () => {
+    $('profileNameInput').value = $('profileSelect').value || '';
+    $('saveProfileModal').classList.add('show');
+    $('profileNameInput').focus();
+  };
+  $('closeSaveProfileBtn').onclick = $('cancelSaveProfileBtn').onclick =
+    () => $('saveProfileModal').classList.remove('show');
+  $('confirmSaveProfileBtn').onclick = async () => {
+    const name = $('profileNameInput').value.trim();
+    if(!name){ toast('Enter a profile name', 'error'); return; }
+    const body = {name, credentials: credsFromForm(), overwrite: false};
+    try {
+      await api('/api/profiles', {method:'POST', body: JSON.stringify(body)});
+    } catch(e){
+      if(e.status === 409){
+        if(!confirm(`Profile "${name}" exists. Overwrite?`)) return;
+        body.overwrite = true;
+        try { await api('/api/profiles', {method:'POST', body: JSON.stringify(body)}); }
+        catch(err){ toast(err.message, 'error'); return; }
+      } else { toast(e.message, 'error'); return; }
+    }
+    $('saveProfileModal').classList.remove('show');
+    toast(`Profile "${name}" saved`, 'success');
+    await loadProfileList();
+    $('profileSelect').value = name;
+  };
+  $('loadProfileBtn').onclick = async () => {
+    const name = $('profileSelect').value;
+    if(!name){ toast('Select a profile first', 'info'); return; }
+    try {
+      await api('/api/profiles/load', {method:'POST', body: JSON.stringify({name})});
+      toast(`Loaded "${name}" — rebuilding catalog`, 'success');
+      $('settingsModal').classList.remove('show');
+      await loadStatus();
+      buildCatalog();
+    } catch(e){ toast(e.message, 'error'); }
+  };
+  $('deleteProfileBtn').onclick = async () => {
+    const name = $('profileSelect').value;
+    if(!name){ toast('Select a profile first', 'info'); return; }
+    if(!confirm(`Delete profile "${name}"?`)) return;
+    try {
+      await api(`/api/profiles/${encodeURIComponent(name)}`, {method:'DELETE'});
+      toast(`Deleted "${name}"`, 'success');
+      await loadProfileList();
+    } catch(e){ toast(e.message, 'error'); }
+  };
+  $('saveSettingsBtn').onclick = async () => {
+    try {
+      const res = await api('/api/settings', {method:'POST', body: JSON.stringify({
+        download_dir: $('downloadDirInput').value.trim(),
+        concurrency: parseInt($('concurrencyInput').value, 10) || 3,
+        verify_sha1: $('verifySha1Input').checked,
+      })});
+      applyServerSettings(res);
+      toast('Download settings saved', 'success');
+      refreshFiles();
+    } catch(e){ toast(e.message, 'error'); }
+  };
+
+  // Display options
+  $('groupByModelToggle').checked = prefs.group;
+  $('showSizesToggle').checked = prefs.sizes;
+  $('rowsPerPageSelect').value = String(prefs.rows);
+  $('groupByModelToggle').onchange = e => { prefs.group = e.target.checked; renderBrowse(); };
+  $('showSizesToggle').onchange = e => { prefs.sizes = e.target.checked; renderBrowse(); };
+  $('rowsPerPageSelect').onchange = e => { prefs.rows = parseInt(e.target.value, 10); state.page = 1; renderBrowse(); };
+}
+
+/* ============================= Boot ============================= */
+(async function init(){
+  wire();
+  updateSortIndicators($('browseTable'), state.sort);
+  const status = await loadStatus();
+  await refreshFiles();
+  const ok = await loadCatalog();
+  if(!ok && status && status.credentials && status.catalog.state !== 'running'){
+    buildCatalog();   // first run: start building immediately
+  }
+  await refreshJobs();
+  setInterval(updateCatalogBadge, 60000);
+})();
+</script>
+</body>
+</html>

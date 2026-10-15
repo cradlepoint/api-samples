@@ -517,7 +517,7 @@ def build_mirror_payload(source_identities: Dict[str, Any],
 
 app = FastAPI(title="Host Identity Copier")
 
-STATIC_DIR = APP_DIR.parent / "script_manager" / "static"
+STATIC_DIR = APP_DIR / "static"
 if STATIC_DIR.is_dir():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 

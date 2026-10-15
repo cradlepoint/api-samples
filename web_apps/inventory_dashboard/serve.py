@@ -48,8 +48,8 @@ log = logging.getLogger("inventory_dashboard")
 
 app = FastAPI(title="Inventory Dashboard")
 
-# Serve logos from the shared static folder
-STATIC_DIR = Path(__file__).resolve().parent.parent / "script_manager" / "static"
+# Serve logos from this app's own static folder — the app is self-contained.
+STATIC_DIR = Path(__file__).resolve().parent / "static"
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 

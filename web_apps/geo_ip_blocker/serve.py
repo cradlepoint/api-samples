@@ -257,8 +257,8 @@ def _get_country_name(code: str) -> str:
 
 app = FastAPI(title="Geo IP Blocker")
 
-# Serve logos from the shared static folder
-STATIC_DIR = Path(__file__).resolve().parent.parent / "script_manager" / "static"
+# Serve logos from this app's own static folder — the app is self-contained.
+STATIC_DIR = Path(__file__).resolve().parent / "static"
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # Profiles storage

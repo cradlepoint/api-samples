@@ -685,3 +685,12 @@ concluding a filter does not exist" guidance.
 - Confirmed no API-behavior findings this session needed documenting: the one candidate,
   the `users` v2-versus-v3 discrepancy between steering and the stale mirror, is already
   corrected in `docs/api-v2-endpoints.md` and `docs/api-v3-endpoints.md`.
+
+## 2026-10-15 — Reflexion: Starlette TemplateResponse signature
+- Added entry to `docs/known-issues.md`: Starlette ≥0.29 requires `TemplateResponse(request, name, context)`; the legacy `TemplateResponse(name, {"request": ...})` form now raises `TypeError: unhashable type: 'dict'` (observed on Starlette 1.6.0). Fixed the occurrence in `web_apps/ncm_api_key_encryptor/ncm_api_key_encryptor.py` and noted this is a repo-wide migration risk for any app rendering Jinja templates.
+
+## 2026-10-15 — Reflexion: unpinned Starlette is the root cause
+- Extended the `docs/known-issues.md` TemplateResponse entry with root-cause analysis: Starlette is unpinned and only transitive (both `requirements.txt` files list bare `fastapi`, no Starlette), so the installed version floats to whatever PyPI served when the venv was last built — producing "worked then broke with no code change." Added two general takeaways: trust package/`dist-info` mtimes over memory when diagnosing such failures (the startup banner is not evidence a per-request route works), and pin the framework per app since each web app owns its own `requirements.txt`.
+
+## 2026-10-15 — Reflexion: pinning fastapi alone doesn't pin Starlette
+- Corrected the remediation takeaway in the `docs/known-issues.md` Starlette entry. The earlier wording ("pin the framework and let the transitive pin follow") was wrong: `fastapi==0.141.1` still resolves a range of Starlette versions, so an explicit `starlette==<version>` line is required alongside the `fastapi` pin. Recorded the applied fix (`fastapi==0.141.1`, `starlette==1.6.0`, `uvicorn==0.52.3` pinned in all five FastAPI requirements files, including two apps that pinned fastapi/uvicorn but had remained exposed), and added the `pip install --dry-run` no-op check as the way to confirm pins match the verified venv.

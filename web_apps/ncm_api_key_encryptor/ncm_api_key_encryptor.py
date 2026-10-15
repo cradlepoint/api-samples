@@ -123,8 +123,7 @@ async def index_get(request: Request):
     config_error = request.session.pop('config_error_message', None)
     messages = _get_flashed_messages(request)
 
-    return templates.TemplateResponse("index.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "index.html", {
         "admin_keys_set": request.session.get('admin_keys_set', False),
         "account_name": request.session.get('account_name'),
         "config_success_message": config_success,

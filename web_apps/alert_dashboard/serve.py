@@ -39,7 +39,7 @@ PROFILES_PATH = APP_DIR / "profiles.json"
 SETTINGS_PATH = APP_DIR / "settings.json"
 
 # Shared static directory for logos
-STATIC_DIR = Path(__file__).parent.parent / "script_manager" / "static"
+STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 # --- SSL verification state ---
 _ssl_verify = True

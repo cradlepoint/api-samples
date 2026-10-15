@@ -1,5 +1,11 @@
-fastapi
-uvicorn
-jinja2
-itsdangerous
-ncm
+# NCM API Key Encryptor — standalone dependencies
+# Versions pinned to the set this app was verified against. starlette is
+# pinned explicitly because it arrives transitively via fastapi and its
+# TemplateResponse signature changed in 0.29 — an unpinned rebuild would
+# otherwise silently 500 every template render.
+fastapi==0.141.1
+starlette==1.6.0
+uvicorn==0.52.3
+jinja2==3.1.6
+itsdangerous==2.2.0
+ncm==0.0.73

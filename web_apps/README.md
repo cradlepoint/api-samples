@@ -8,6 +8,8 @@ Interactive web applications for managing, configuring, and monitoring Cradlepoi
 |-----|------|-------------|-------------|
 | [inventory_dashboard](inventory_dashboard/) | 8060 | `serve.py` | Device inventory with license status, subscription details, and modem info |
 | [cellular_health_dashboard](cellular_health_dashboard/) | 8055 | `serve.py` | Cellular health metrics — signal strength, RSRP, SINR, health scores |
+| [modem_upgrades](modem_upgrades/) | 8085 | `serve.py` | Preview, launch, monitor and report modem firmware upgrades for a group |
+| [ncos_downloader](ncos_downloader/) | 8075 | `serve.py` | Browse and download NCOS firmware images with SHA-1 verification |
 | [alert_dashboard](alert_dashboard/) | 8065 | `serve.py` | Alert dashboard with type/account filters, ACK tracking, auto-refresh, and export |
 | [geo_ip_blocker](geo_ip_blocker/) | 8065 | `serve.py` | Convert country IP ranges into zone firewall deny rules and push to groups |
 | [host_identity_copier](host_identity_copier/) | 8070 | `serve.py` | Copy host address identities from a master group to many destination groups |
@@ -17,10 +19,15 @@ Interactive web applications for managing, configuring, and monitoring Cradlepoi
 | [ncm_api_key_encryptor](ncm_api_key_encryptor/) | 8000 | `ncm_api_key_encryptor.py` | Encrypt NCM API keys for embedding in SDK app configurations |
 | [netcloud_router_lookup](netcloud_router_lookup/) | 8000 | `router_lookup.py` | Search routers across multiple accounts |
 | [rma_wizard](rma_wizard/) | 8080 | `rma_wizard.py` | Step-by-step wizard for migrating configuration from a failed router to its RMA replacement |
+| [revert_device_firewall](revert_device_firewall/) | 8090 | `serve.py` | Remove device-level `security` (zone firewall) config overrides so devices inherit their group's firewall config |
 | [cisco_to_cradlepoint_zfw_converter](cisco_to_cradlepoint_zfw_converter/) | 5001 | `app.py` | Convert Cisco router configs to Cradlepoint zone firewall format |
 | [web_app_template](web_app_template/) | 8000 | `serve.py` | Style/layout starting point for new apps, not a tool in itself |
 
 Some ports are shared by more than one app (8000 and 8065), so run those apps one at a time.
+
+`modem_upgrades` and `revert_device_firewall` bind `127.0.0.1` rather than `0.0.0.0`,
+since they can push firmware or config changes to a fleet. Every other app binds all
+interfaces.
 
 ## Running a Web App
 

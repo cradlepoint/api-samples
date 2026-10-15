@@ -1833,3 +1833,62 @@ Generalizes to two things worth separating when auditing agent instructions: *wh
 file is loaded* (always-on versus on demand) and *whether its content is a copy*. A
 full mirror is a maintenance liability on its own, and an always-on mirror is also a
 per-request tax. A pointer costs one read only on the turns that need it.
+
+### Starlette's `TemplateResponse` now requires `request` as the first positional arg; the old `(name, {"request": ...})` form fails with `TypeError: unhashable type: 'dict'` (discovered 2026-10-15)
+`web_apps/ncm_api_key_encryptor/` returned a 500 on every page load under Starlette
+1.6.0. The handler called the legacy signature:
+
+```python
+templates.TemplateResponse("index.html", {"request": request, ...})   # old, removed
+```
+
+Modern Starlette (the deprecation landed in 0.29 and the old form is now gone) expects
+the `Request` first:
+
+```python
+templates.TemplateResponse(request, "index.html", {...})              # correct
+```
+
+With the old call, Starlette reads the context *dict* as the template `name` and uses
+it as a cache key — a dict is unhashable, so you get `TypeError: unhashable type:
+'dict'` from deep inside `jinja2/utils.py` (`self._mapping[key]`), not from your code.
+The traceback points at the `TemplateResponse` line but names no obvious cause, which
+makes it easy to misread as a Jinja/template-cache bug rather than a signature change.
+
+Two practical notes:
+- Drop the now-redundant `"request": request` key from the context — Starlette injects
+  the request into the template context automatically under the new signature.
+- This is **not app-specific**. Any web app in this repo still on the two-arg form
+  breaks identically the moment Starlette is ≥0.29. When touching an app that renders
+  Jinja templates, grep it for `TemplateResponse(` and migrate any `(name, {...})`
+  calls. A clean startup banner proves nothing here — the failure is per-request, so
+  confirm by actually hitting the route and asserting a 200.
+
+#### Root cause of the above is an unpinned, transitive Starlette — "worked then broke with no code change" (2026-10-15)
+The `TemplateResponse` break above surfaced with *no change to the app* (last commit
+2026-06-08) and *no recent dependency install* — Starlette 1.6.0 had been in the venv
+since 2026-08-14. The explanation is that **Starlette is never pinned, and never even
+listed**: both `requirements.txt` and `web_apps/ncm_api_key_encryptor/requirements.txt`
+declare only `fastapi` with no version, and Starlette arrives transitively through
+FastAPI. So the installed Starlette is "whatever PyPI served the day this venv was
+last built," not a deliberate choice. Rebuild the venv on a later day and the version
+silently moves — which is exactly how an app can "work a couple weeks ago" and 500 now
+with an unchanged tree.
+
+Two generally-applicable takeaways:
+- When diagnosing a "worked before, broke now, code unchanged" failure, trust package
+  mtimes and `dist-info` over memory of when it last ran. The dates here contradicted
+  the "couple of weeks ago" recollection (packages were two months old), and the app's
+  startup banner prints fine regardless because the fault is per-request — so "I saw it
+  running" is not evidence the route worked.
+- A floating transitive dependency is the real defect. **Pinning `fastapi` alone does
+  not fix it** — Starlette is a transitive dependency, and `fastapi==0.141.1` still
+  resolves a *range* of Starlette versions, so a rebuild can move it. You must add an
+  explicit `starlette==<version>` line alongside the `fastapi` pin. The fix for this
+  repo pinned `fastapi==0.141.1`, `starlette==1.6.0`, `uvicorn==0.52.3` in every
+  FastAPI app. Note the repo convention that each web app owns a `requirements.txt` of
+  only what it imports — so the explicit Starlette pin has to be added per app, not
+  just at the root (`ncos_downloader` and `revert_device_firewall` already pinned
+  `fastapi`/`uvicorn` but were still exposed until Starlette was pinned too). Verify by
+  dry-running `pip install -r <file>` against the known-good venv: a clean no-op resolve
+  confirms the pins match the verified set rather than silently upgrading anything.

@@ -1,6 +1,11 @@
 ncm
-fastapi
-uvicorn
+# Web stack pinned to the verified set. starlette is pinned explicitly
+# because it arrives transitively via fastapi and its TemplateResponse
+# signature changed in 0.29 — an unpinned rebuild silently breaks template
+# rendering in the web apps.
+fastapi==0.141.1
+starlette==1.6.0
+uvicorn==0.52.3
 httpx
 requests
 python-dateutil

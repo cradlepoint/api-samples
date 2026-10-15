@@ -1,0 +1,15 @@
+# NCOS Downloader — standalone dependencies
+# Python 3.9+ (tested on 3.12.5)
+#
+#   python3 -m venv .venv
+#   source .venv/bin/activate          # Windows: .venv\Scripts\activate
+#   pip install -r requirements.txt
+#   python3 serve.py
+
+fastapi==0.141.1
+# Pinned explicitly: starlette comes in transitively via fastapi and an
+# unpinned rebuild can move it to an incompatible release.
+starlette==1.6.0
+uvicorn==0.52.3
+requests==2.34.2
+python-dotenv==1.2.2

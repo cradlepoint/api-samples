@@ -1,3 +1,8 @@
-fastapi
-uvicorn
-httpx
+# NetCloud Router Lookup — standalone dependencies
+# Versions pinned to the set this app was verified against. starlette is
+# pinned explicitly because it arrives transitively via fastapi; leaving it
+# unpinned lets a venv rebuild move it to an incompatible release.
+fastapi==0.141.1
+starlette==1.6.0
+uvicorn==0.52.3
+httpx==0.28.1
