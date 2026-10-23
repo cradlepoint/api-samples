@@ -3,7 +3,7 @@ The script works by iterating through a CSV file with Router IDs as the
 first column.  It adds the unique settings needed for that router into
 the json and then PATCHes the results to the router.  It then moves on
 to the next Router ID until it reaches the bottom of the CSV.  It also
-saves a backup of each routers configuration before making the PATCH.
+saves a backup of each router's configuration before making the PATCH.
 
 By modifying the /configs/indi_config.json file and the CSV this can be
 easily adapted to push any DMVPN configuration you want.
@@ -119,7 +119,7 @@ def push_configs():
                     print('Config patch sent to router {}\nResponse = {}\n'.format(router_id, patch_result))
 
                     # Catch failed status codes and log them
-                    if patch_result is not 202:
+                    if patch_result != 202:
                         print("Patch unsuccessful. Status code {}, Response: {}\n".format(patch_result, patch.text))
                         patch_text = patch.text
 
