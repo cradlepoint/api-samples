@@ -174,7 +174,7 @@ All web applications live in `web_apps/`. See [web_apps/README.md](web_apps/READ
 | App | Port | Entry point | Description |
 |-----|------|-------------|-------------|
 | [inventory_dashboard](web_apps/inventory_dashboard/) | 8060 | `serve.py` | Device inventory with license status, subscriptions, modem info |
-| [cellular_health_dashboard](web_apps/cellular_health_dashboard/) | 8055 | `serve.py` | Cellular health scores and signal metrics — RSRP, SINR, health scores |
+| [cellular_health_dashboard](web_apps/cellular_health_dashboard/) | 8000 | `serve.py` | Cellular health scores and signal metrics — RSRP, SINR, health scores, modem uptime |
 | [alert_dashboard](web_apps/alert_dashboard/) | 8065 | `serve.py` | Custom alerts with type/account filters, ACK tracking, auto-refresh, export |
 | [geo_ip_blocker](web_apps/geo_ip_blocker/) | 8065 | `serve.py` | Turn country IP ranges into zone firewall deny rules and push to groups |
 | [host_identity_copier](web_apps/host_identity_copier/) | 8070 | `serve.py` | Copy host address identities from a master group to many destinations |

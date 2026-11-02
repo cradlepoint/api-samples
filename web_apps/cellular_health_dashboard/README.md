@@ -22,7 +22,7 @@ source .venv/bin/activate
 python web_apps/cellular_health_dashboard/serve.py
 ```
 
-Open http://localhost:8055 → click the gear icon → enter API credentials → Apply & Refresh.
+Open http://localhost:8000 → click the gear icon → enter API credentials → Apply & Refresh.
 
 ## Command-Line Options
 
@@ -37,6 +37,7 @@ python serve.py -ro -p "Name"  # Read-only with specific profile
 ## Features
 
 - Health score, RSSI, RSRP, RSRQ, SINR for all devices
+- Modem uptime (how long each modem has been connected)
 - Signal quality indicators (Excellent/Good/Fair/Poor)
 - Stat card filters, sortable columns, full-text search
 - Per-device history charts (Recent 24h + Daily long-term)

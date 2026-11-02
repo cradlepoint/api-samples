@@ -5,7 +5,7 @@ in a sub-account.
 Usage:
     .venv/bin/python scripts/cellular_health_dashboard/serve.py
 
-Then open http://localhost:8055 in your browser.
+Then open http://localhost:8000 in your browser.
 """
 
 import os
@@ -589,6 +589,9 @@ def _get_cellular_health():
             'signal_strength': metrics.get('signal_strength'),
             'cinr': metrics.get('cinr'),
             'ecio': metrics.get('ecio'),
+            # Modem uptime in seconds (net_devices.uptime). Null when the
+            # device hasn't reported one — frontend renders that as "—".
+            'uptime': nd.get('uptime'),
             'updated_at': metrics.get('update_ts') or nd.get('updated_at', ''),
         })
 
@@ -1076,5 +1079,5 @@ if __name__ == "__main__":
 
     mode_str = " (read-only)" if _readonly_mode else ""
     print(f"Cellular Health Dashboard starting{mode_str}...")
-    print("Open http://localhost:8055 in your browser")
-    uvicorn.run(app, host="0.0.0.0", port=8055, log_level="info")
+    print("Open http://localhost:8000 in your browser")
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")

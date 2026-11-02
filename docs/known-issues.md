@@ -443,6 +443,17 @@ rsrp, rsrq, sinr, signal_percent). These fields only exist on the
 hardware info: carrier, model, mfg_model, mfg_product, connection_state,
 imei, iccid, apn, modem_fw, etc.
 
+### `net_devices.uptime` Is Seconds-as-Float, Often Null (discovered 2026-11-02)
+The `/net_devices/` field table in `api-v2-full-reference.md` shows `uptime` with
+a `null` sample, which reads as if the field is unusable. It is not: on a live
+account it holds a **float of seconds** — the modem interface's connection uptime
+(e.g. `8912.47` ≈ 2h 28m, `747706.06` ≈ 8.6 days). It is `null` for many records
+(modems that have not reported one), so any consumer must handle `None`. It is a
+per-net_device (per-modem) value, not a router-level uptime. To display it, floor
+to an int and format as `Xd Yh Zm`; render `null` as a dash. No extra API call is
+needed — it rides along on the `/net_devices/` record a cellular health join
+already fetches.
+
 ### `net_devices` `router` Field Can Be Null (discovered 2026-06-06)
 The `router` field on `/net_devices/` can be `null` for orphaned or
 unassigned modems. Code that assumes `router` is always a URL will fail.

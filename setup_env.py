@@ -861,7 +861,7 @@ def print_next_steps(creds: dict[str, str]) -> None:
     print("  Then run a dashboard:")
     print()
     print(f"    {activated_python_command()} web_apps/inventory_dashboard/serve.py        # http://localhost:8060")
-    print(f"    {activated_python_command()} web_apps/cellular_health_dashboard/serve.py  # http://localhost:8055")
+    print(f"    {activated_python_command()} web_apps/cellular_health_dashboard/serve.py  # http://localhost:8000")
     print()
     print("  Or just ask Kiro in chat, for example:")
     print()

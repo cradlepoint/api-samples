@@ -241,6 +241,7 @@
                             <th data-key="rsrq">RSRQ (dB) <span class="sort-arrow">↕</span></th>
                             <th data-key="sinr">SINR (dB) <span class="sort-arrow">↕</span></th>
                             <th data-key="signal_strength">Signal % <span class="sort-arrow">↕</span></th>
+                            <th data-key="uptime">Uptime <span class="sort-arrow">↕</span></th>
                             <th data-key="updated_at">Last Updated <span class="sort-arrow">↕</span></th>
                         </tr></thead>
                         <tbody id="tableBody"></tbody>
@@ -599,6 +600,21 @@
 
         function fmt(val) { return (val == null || val === '') ? '—' : val; }
         function fmtDate(d) { if (!d) return '—'; try { return new Date(d).toLocaleString(); } catch { return d; } }
+        // Uptime arrives as a number of seconds (net_devices.uptime). Render it
+        // as a compact "Xd Yh Zm" string; "—" when the modem reports nothing.
+        function fmtUptime(secs) {
+            if (secs == null || secs === '') return '—';
+            let s = Math.floor(Number(secs));
+            if (!isFinite(s) || s < 0) return '—';
+            const d = Math.floor(s / 86400); s -= d * 86400;
+            const h = Math.floor(s / 3600); s -= h * 3600;
+            const m = Math.floor(s / 60);
+            const parts = [];
+            if (d) parts.push(d + 'd');
+            if (h) parts.push(h + 'h');
+            if (m || !parts.length) parts.push(m + 'm');
+            return parts.join(' ');
+        }
         function escapeHtml(t) { if (!t) return ''; const d=document.createElement('div'); d.textContent=t; return d.innerHTML; }
 
         // Stat card click filtering
@@ -730,7 +746,7 @@
             }
 
             if (pageData.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="14" style="text-align:center;padding:2rem;color:var(--text-secondary);">No cellular modems match the current filters.</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="15" style="text-align:center;padding:2rem;color:var(--text-secondary);">No cellular modems match the current filters.</td></tr>`;
                 return;
             }
 
@@ -764,6 +780,7 @@
                     <td>${fmt(row.rsrq)}</td>
                     <td>${fmt(row.sinr)}</td>
                     <td>${fmt(row.signal_strength)}</td>
+                    <td>${fmtUptime(row.uptime)}</td>
                     <td>${fmtDate(row.updated_at)}</td>
                 </tr>`;
             }).join('');
@@ -791,11 +808,16 @@
         // Export CSV
         document.getElementById('exportCsvBtn').addEventListener('click', () => {
             if (!filteredData.length) return;
-            const cols = ['router_name','router_state','model','interface_name','carrier','health_category','dbm','rsrp','rsrq','sinr','signal_strength','updated_at'];
-            const headers = ['Router Name','Status','Model','Interface','Carrier','Health','RSSI (dBm)','RSRP (dBm)','RSRQ (dB)','SINR (dB)','Signal %','Last Updated'];
+            const cols = ['router_name','router_state','model','interface_name','carrier','health_category','dbm','rsrp','rsrq','sinr','signal_strength','uptime','updated_at'];
+            const headers = ['Router Name','Status','Model','Interface','Carrier','Health','RSSI (dBm)','RSRP (dBm)','RSRQ (dB)','SINR (dB)','Signal %','Uptime','Last Updated'];
             let csv = headers.join(',') + '\n';
             filteredData.forEach(row => {
-                csv += cols.map(c => { let v = row[c] != null ? String(row[c]) : ''; if (v.includes(',') || v.includes('"')) v = '"' + v.replace(/"/g, '""') + '"'; return v; }).join(',') + '\n';
+                csv += cols.map(c => {
+                    let v = c === 'uptime' ? fmtUptime(row[c]) : (row[c] != null ? String(row[c]) : '');
+                    if (v === '—') v = '';
+                    if (v.includes(',') || v.includes('"')) v = '"' + v.replace(/"/g, '""') + '"';
+                    return v;
+                }).join(',') + '\n';
             });
             const blob = new Blob([csv], {type: 'text/csv'});
             const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
@@ -831,7 +853,7 @@
             doc.text(`Online: ${online}  |  Offline: ${offline}  |  Excellent: ${excellent}  |  Good: ${good}  |  Fair: ${fair}  |  Poor: ${poor}`, 14, 27);
 
             // Table
-            const headers = ['Router Name', 'Status', 'Model', 'Carrier', 'Health', 'Score', 'RSSI', 'RSRP', 'RSRQ', 'SINR', 'Sig%'];
+            const headers = ['Router Name', 'Status', 'Model', 'Carrier', 'Health', 'Score', 'RSSI', 'RSRP', 'RSRQ', 'SINR', 'Sig%', 'Uptime'];
             const rows = filteredData.map(r => [
                 r.router_name || '',
                 r.router_state || '',
@@ -844,6 +866,7 @@
                 r.rsrq != null ? r.rsrq : '',
                 r.sinr != null ? r.sinr : '',
                 r.signal_strength != null ? r.signal_strength : '',
+                r.uptime != null ? fmtUptime(r.uptime) : '',
             ]);
 
             doc.autoTable({
@@ -877,6 +900,7 @@
                     8: { cellWidth: 14, halign: 'center' },
                     9: { cellWidth: 14, halign: 'center' },
                     10: { cellWidth: 12, halign: 'center' },
+                    11: { cellWidth: 22, halign: 'center' },
                 },
                 didParseCell: function(data) {
                     // Color-code health column

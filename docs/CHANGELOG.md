@@ -3,6 +3,14 @@
 This file tracks updates made to the documentation, especially those made
 automatically by the reflexion system.
 
+## 2026-11-02 — Reflexion: net_devices.uptime Is Usable Seconds, Not Just Null
+
+- Added known issue to `known-issues.md`: `net_devices.uptime` is a float of
+  seconds (per-modem connection uptime), frequently `null`. The full-reference
+  sample showing `null` is misleading — the field is populated on live accounts.
+  Verified against a live account while adding an uptime column to the cellular
+  health dashboard.
+
 ## 2026-03-31 — Initial Documentation
 
 - Created consolidated API documentation from developer.cradlepoint.com
