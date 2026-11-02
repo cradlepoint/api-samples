@@ -1892,3 +1892,115 @@ Two generally-applicable takeaways:
   `fastapi`/`uvicorn` but were still exposed until Starlette was pinned too). Verify by
   dry-running `pip install -r <file>` against the known-good venv: a clean no-op resolve
   confirms the pins match the verified set rather than silently upgrading anything.
+
+### SDK v3 List Helpers Return Only the First 50 Records Unless `limit=0` (discovered 2026-10-31)
+`NcmClientv3.__get_json` sets `limit = 50` whenever the caller passes no `limit`,
+then stops paginating at 50 results. So a bare call like
+`get_remote_connect_profiles()` or `get_lan_manager_options()` silently returns
+**exactly 50** records with no warning, even though `links.next` is present.
+This was verified live on those two endpoints: 50 returned by default, against
+573 and 613 with `limit=0`. The same code path backs every v3 list helper that
+routes through `__get_json`.
+
+Pass `limit=0` to get everything. `__get_json` treats `0` as unlimited and caps
+`page[size]` at 50. A default of exactly 50 results is the telltale sign of this
+cap.
+
+### Remote Connect Profile Names Are Not Unique per Router (discovered 2026-10-31)
+`/api/v3/remote_connect_profiles` accepts more than one profile with the same
+`name` on the same router. A live account had 6 router/name pairs with more than
+one profile each. Bulk "push this profile" code must look up existing profiles by
+router + name and PUT over them, deleting any extra same-name copies. A plain
+POST creates a duplicate.
+
+Two related details:
+- `filter[name]` is an exact, **case-sensitive** match (`Foo` doesn't match
+  `foo`). Leading whitespace in the filter value was trimmed in one test, so a
+  name with a leading space still matched. Do case-insensitive or substring
+  searches client-side.
+- Both `remote_connect_profiles` and `lan_manager_options` cap `page[size]` at
+  50. Asking for more returns `400` with "You requested a size of 100, but 50 is
+  the maximum."
+
+### v2 `/routers/{id}/` Returns 403 for Missing Routers, So You Can't Tell "Deleted" From "No Access" (discovered 2026-10-31)
+`GET /api/v2/routers/{id}/` returns **`403 Forbidden`** for a router ID that
+doesn't exist, not `404`. Router ID `1` returned 403 in a test, and so did all 208
+IDs in the orphan check below. A router in an account your keys can't see also
+returns 403. So a 403 here doesn't tell you whether the router was deleted or is
+out of scope. Don't code a "router deleted" check that waits for a 404. Compare
+against the full `/routers/` list instead, and use the record's `account` to judge
+scope.
+
+### v3 Remote Connect Records Outlive Their Routers (discovered 2026-10-31)
+`remote_connect_profiles` and `lan_manager_options` appear to keep their records
+after a router is unregistered or deleted. In one account, 281 of 573 profiles
+(on 208 routers) and 322 of 613 `lan_manager_options` records pointed at router
+IDs that weren't in the v2 `/routers/` list. Every one of those profiles belonged
+to an account the same v2 keys **could** see, so out-of-scope accounts don't
+explain the gap. Their creation dates go back to 2017.
+
+**Not fully proven.** A router moved into an account the keys can't see would
+look the same, because the profile keeps the account it was created under, and
+the v2 detail read returns 403 either way (previous entry). Spot-check a few IDs
+in the NCM UI before bulk-deleting.
+
+Practical consequences:
+- Join v3 profile/option records to v2 routers by the `router` relationship ID
+  (it's the v2 router ID), and expect unmatched IDs. Don't assume every record
+  resolves to a named router.
+- Profiles can be removed with `DELETE /remote_connect_profiles/{id}`.
+  `lan_manager_options` has **no DELETE**. A live
+  `DELETE /lan_manager_options/{id}` returned `404 {"message": "no Route matched
+  with those values"}`, which is a gateway route miss, not "record not found".
+  Once a router has an options record it can only be set to `enabled: false`,
+  never removed.
+
+### Listing Every v2 Group Can Take a Minute; Fetch Only the Groups Routers Use (discovered 2026-10-31)
+An account can hold thousands of groups, most of them empty. In one account,
+`get_groups(limit='all', fields='id,name,account')` returned 6,018 groups in
+**61 s**, while only 759 of those groups contained any routers. The fix:
+1. List routers first (1,763 routers took about 5 s).
+2. Collect their distinct group IDs.
+3. Fetch just those groups with `get_groups(id__in=",".join(ids), ...)`.
+
+The SDK chunks `__in` into batches of 100. The routers and groups fetch together
+dropped to about **12 s**, and no router was missing its group. An empty group
+has no routers to target anyway, so a picker that targets routers loses nothing.
+
+### SDK Remote Connect Write Helpers Mishandle 200, 204 and 403/409 (found by reading the SDK, 2026-10-31)
+In `ncm/ncm/ncm.py`, the v3 `create_`, `update_` and `delete_remote_connect_profile`
+helpers, and the `create_`/`update_lan_manager_option` helpers, all return
+`self._return_handler(ncm.status_code, ncm.json(), call_type)`. That has three
+consequences:
+- **DELETE:** the endpoint returns `204 No Content`, so `ncm.json()` raises
+  `requests.exceptions.JSONDecodeError` **before** the handler runs. A
+  successful delete therefore surfaces as an exception.
+- **PUT:** a `200` returns the string `"<call_type> operation successful."`, not
+  the updated record.
+- **403 and 409:** these return `None` silently (see the `_return_handler` entry
+  above).
+
+This was found by reading the code, not by running these helpers live. To get
+the 409 rate-limit handling and still see the real status and body, call the
+client's `_v3_request(verb, url, json=...)` directly and check `status_code`
+yourself. `web_apps/lan_manager_profile_manager/serve.py` does this.
+
+### SSH Remote Connect Profiles Can Exist Without a `username`, but the API Can't Create One (discovered 2026-11-01)
+In one account, 54 of 114 `remote_connect_ssh_profile` records had
+`"username": null`. That's a real null, not an empty string. They were created
+from 2017-09 through 2026-10. The v3 API itself still enforces the documented
+rule. In a live test on one router, each of these returned
+`400 "username is required for ssh_profile"` (pointer `/data`):
+- POST with `username` omitted
+- POST with `"username": null`
+- PUT setting `username` to `null` on an existing SSH profile (the record
+  kept its old value)
+
+So these profiles come from somewhere other than the public v3 API, most likely
+the NCM UI. Consequences:
+- Read and compare them normally. A null SSH username is a valid stored state.
+- They **can't be copied or re-pushed as-is** through the API. A copy needs a
+  username supplied.
+- Any PUT to one of them must include a username, because PUT requires the full
+  attribute set. You can't "just rename" such a profile without giving it one.
+- Not tested: whether `""` is accepted.

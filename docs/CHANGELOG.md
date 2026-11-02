@@ -694,3 +694,19 @@ concluding a filter does not exist" guidance.
 
 ## 2026-10-15 — Reflexion: pinning fastapi alone doesn't pin Starlette
 - Corrected the remediation takeaway in the `docs/known-issues.md` Starlette entry. The earlier wording ("pin the framework and let the transitive pin follow") was wrong: `fastapi==0.141.1` still resolves a range of Starlette versions, so an explicit `starlette==<version>` line is required alongside the `fastapi` pin. Recorded the applied fix (`fastapi==0.141.1`, `starlette==1.6.0`, `uvicorn==0.52.3` pinned in all five FastAPI requirements files, including two apps that pinned fastapi/uvicorn but had remained exposed), and added the `pip install --dry-run` no-op check as the way to confirm pins match the verified venv.
+
+## 2026-10-31 — Reflexion: Remote Connect / LAN Manager endpoints
+
+- Added "Remote Connect (LAN Manager)" section to `api-v3-endpoints.md` covering `lan_manager_options` and `remote_connect_profiles`: attributes per profile type, filters, `page[size]` max 50, router relationship = v2 router ID, LAN Manager must be enabled first
+- Added known issue: SDK v3 list helpers silently return only the first 50 records unless `limit=0` is passed (verified live)
+- Added known issue: Remote Connect profile names are not unique per router; `filter[name]` is exact and case-sensitive
+- Added known issue: v2 `/routers/{id}/` returns 403 (not 404) for router IDs that don't exist, so "deleted" can't be told apart from "no access"
+- Added known issue: v3 `remote_connect_profiles` / `lan_manager_options` records appear to outlive their routers (281 profiles and 322 options on routers missing from v2); not fully proven, spot-check before bulk deletes
+- Added known issue: listing all v2 groups is slow on large accounts (6,018 groups in 61 s); fetch only the groups routers reference via `id__in` (about 12 s total)
+- Added known issue: SDK Remote Connect / LAN Manager write helpers call `.json()` on the 204 DELETE response (raises), return a string on PUT 200, and return `None` on 403/409 (found by reading the SDK; use `_v3_request` directly)
+- Verified live on one router: `lan_manager_options` has no DELETE (404 "no Route matched"); profile POST works without `account`; PUT `username: null` clears an RDP username; enabling LAN Manager and creating a profile can happen back-to-back
+
+## 2026-11-01 — Reflexion: SSH profiles without a username
+
+- Added known issue: SSH Remote Connect profiles can exist with a null `username` (54 of 114 in one account, created 2017–2026), but the v3 API rejects a missing or null SSH username on both POST and PUT (verified live: `400 "username is required for ssh_profile"`). These profiles can't be copied as-is through the API.
+- `api-v3-endpoints.md`: SSH `username` is now noted as required on POST and PUT (verified), with existing records possibly null.

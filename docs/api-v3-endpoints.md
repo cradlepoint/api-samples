@@ -363,6 +363,70 @@ GET /api/v3/public_sim_mgmt_assets
 GET /api/v3/public_sim_mgmt_rate_plans
 ```
 
+## Remote Connect (LAN Manager)
+
+Served at the bare `/api/v3/` base with **no trailing slash**. A router must have
+LAN Manager enabled through `lan_manager_options` before Remote Connect profiles
+can be created on it. The `router` relationship ID on both endpoints is the **v2
+router ID**. There is no v3 `/routers` endpoint, so router names and groups come
+from v2 `/routers/`.
+
+### lan_manager_options
+
+```
+GET  /api/v3/lan_manager_options[/{id}]
+POST /api/v3/lan_manager_options
+PUT  /api/v3/lan_manager_options/{id}
+```
+
+Attributes: `enabled` (required on create), `created_at`, `updated_at`.
+Relationships: `router` (required), `account` (optional). Filters: `filter[enabled]`,
+`filter[router]`. `page[size]` max 50 (larger is a `400`). POST can return `409`.
+No duplicates were seen across 613 records, so in practice each router has at
+most one record. To enable a router that already has a record, PUT that record;
+don't POST another. There is **no DELETE**: it returns `404 no Route matched`
+(verified 2026-10-31), so a record can be disabled but never removed.
+
+Verified live: POSTing `enabled: true` for a router with no record returned
+`201`, and a profile created on that router straight afterwards succeeded. No
+wait is needed between enabling and creating.
+
+### remote_connect_profiles
+
+```
+GET    /api/v3/remote_connect_profiles[/{id}]
+POST   /api/v3/remote_connect_profiles
+PUT    /api/v3/remote_connect_profiles/{id}
+DELETE /api/v3/remote_connect_profiles/{id}      → 204 No Content
+```
+
+The resource is polymorphic. `data.type` is one of `remote_connect_ssh_profile`,
+`_http_profile`, `_https_profile`, `_rdp_profile`, `_vnc_profile` or
+`_serial_profile`.
+
+| Type | Attributes beyond `name` (max 32) and `port` |
+|---|---|
+| ssh | `address` (IPv4), `username` (required on POST and PUT, max 64; existing profiles can still have `null`, see `known-issues.md`) |
+| http / https | `address` |
+| rdp | `address`, `resolution` (required), `username` (optional) |
+| vnc | `address`, `username` (optional) |
+| serial | no `address`; `port` must be 1-8 |
+
+Default ports: ssh 22, http 80, https 443, rdp 3389, vnc 5900. The `router`
+relationship is immutable on PUT. PUT requires the full attribute set for the
+type.
+
+Verified live (2026-10-31):
+- **POST works with or without the `account` relationship.** Without it, the
+  account is inferred from the router.
+- **PUT with `"username": null` clears an optional RDP username.** The re-read
+  shows `null`.
+- **PUT can change a profile's name, including its case.** Changing only the
+  type was not tested; the app deletes and re-creates instead. Filters: `filter[name]`, `filter[router]`, `filter[address]` and
+`filter[type]` (the full or short form, e.g. `ssh_profile`). `page[size]` max 50.
+Profile names are **not unique per router**: the API accepts several profiles
+with the same name on one router (see `known-issues.md`).
+
 ## JSON:API Response Format
 
 v3 responses follow JSON:API format:

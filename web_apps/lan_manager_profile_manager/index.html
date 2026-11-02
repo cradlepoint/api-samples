@@ -1,0 +1,1518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LAN Manager Profile Manager</title>
+    <link rel="icon" type="image/png" href="/static/logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #4f46e5;
+            --primary-dark: #3730a3;
+            --secondary-color: #6b7280;
+            --success-color: #059669;
+            --warning-color: #d97706;
+            --danger-color: #dc2626;
+            --info-color: #0284c7;
+            --light-bg: #f9fafb;
+            --light-surface: #ffffff;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --text-light: #9ca3af;
+            --border-color: #d1d5db;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+            --radius-sm: 0.375rem;
+            --radius-md: 0.5rem;
+            --radius-lg: 0.75rem;
+            --radius-xl: 1rem;
+            --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            height: 100vh; color: var(--text-primary); line-height: 1.6; overflow: hidden;
+        }
+        .app-container { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        .app-header { background: var(--light-bg); border-bottom: 1px solid var(--border-color); box-shadow: var(--shadow-md); z-index: 100; }
+        .header-content { padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; gap: 2rem; }
+        .logo-section { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+        .app-logo { height: 40px; width: auto; }
+        body.dark-mode .app-logo { content: url('/static/logo_dark.png'); }
+        #app-title { font-size: 1.5rem; font-weight: 700; margin: 0; background: linear-gradient(135deg, var(--primary-color), var(--info-color)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .header-actions { display: flex; align-items: center; gap: 0.75rem; }
+        .dark-mode-toggle { background: var(--light-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.75rem; cursor: pointer; transition: var(--transition); color: var(--text-primary); box-shadow: var(--shadow-sm); display: flex; align-items: center; justify-content: center; }
+        .dark-mode-toggle:hover { background: var(--light-bg); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+        .meta-text { font-size: 0.8125rem; color: var(--text-secondary); }
+
+        .app-main { flex: 1; display: flex; gap: 1.5rem; padding: 1.5rem 2rem; max-width: 1760px; margin: 0 auto; width: 100%; overflow: hidden; min-height: 0; }
+        .sidebar { width: 300px; flex-shrink: 0; display: flex; flex-direction: column; gap: 1rem; overflow-y: auto; }
+        .content-area { flex: 1; display: flex; flex-direction: column; gap: 1rem; min-width: 0; min-height: 0; overflow-y: auto; padding-bottom: 1rem; }
+
+        .panel { background: var(--light-surface); border: 1px solid var(--border-color); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+        .panel-header { padding: 0.875rem 1.25rem; border-bottom: 1px solid var(--border-color); background: var(--light-bg); display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
+        .panel-header h2 { font-size: 1rem; font-weight: 600; }
+        .panel-sub { padding: 0.6rem 1.25rem; border-bottom: 1px solid var(--border-color); display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; font-size: 0.8125rem; color: var(--text-secondary); }
+        .panel-body { padding: 1.25rem; overflow-y: auto; }
+        .panel-body.flush { padding: 0; }
+        .scroll-box { max-height: 420px; overflow-y: auto; }
+        .scroll-box.tall { max-height: 520px; }
+
+        .notice { border-left: 4px solid var(--info-color); background: rgba(2, 132, 199, 0.07); padding: 0.75rem 1rem; border-radius: var(--radius-md); font-size: 0.8125rem; color: var(--text-secondary); }
+        .notice strong { color: var(--text-primary); }
+        .notice.warn { border-left-color: var(--warning-color); background: rgba(217, 119, 6, 0.08); }
+        .notice.danger { border-left-color: var(--danger-color); background: rgba(220, 38, 38, 0.07); }
+
+        .field-label { display: block; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary); margin-bottom: 0.4rem; }
+        .mode-toggle { display: inline-flex; border: 1px solid var(--border-color); border-radius: var(--radius-md); overflow: hidden; }
+        .mode-toggle button { padding: 0.45rem 0.9rem; border: none; background: var(--light-surface); color: var(--text-secondary); font-family: inherit; font-size: 0.8125rem; font-weight: 500; cursor: pointer; transition: var(--transition); }
+        .mode-toggle button.active { background: var(--primary-color); color: #fff; }
+        .mode-toggle button:not(.active):hover { background: var(--light-bg); color: var(--text-primary); }
+
+        .nav-list { display: flex; flex-direction: column; gap: 0.4rem; }
+        .nav-btn { text-align: left; padding: 0.6rem 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--light-surface); color: var(--text-primary); font-family: inherit; cursor: pointer; transition: var(--transition); }
+        .nav-btn .nav-title { font-size: 0.875rem; font-weight: 600; display: block; }
+        .nav-btn .nav-hint { font-size: 0.75rem; color: var(--text-secondary); display: block; line-height: 1.35; }
+        .nav-btn:hover { border-color: var(--primary-color); }
+        .nav-btn.active { border-color: var(--primary-color); background: rgba(79, 70, 229, 0.08); box-shadow: inset 3px 0 0 var(--primary-color); }
+        .nav-btn.danger.active { border-color: var(--danger-color); background: rgba(220, 38, 38, 0.06); box-shadow: inset 3px 0 0 var(--danger-color); }
+
+        .search-input, .select-input, .text-input { width: 100%; padding: 0.55rem 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 0.875rem; font-family: inherit; background: var(--light-surface); color: var(--text-primary); transition: var(--transition); }
+        .search-input:focus, .select-input:focus, .text-input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
+        .search-wrap { position: relative; }
+        .search-wrap .search-input { padding-right: 2rem; }
+        .clear-x { position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-light); font-size: 1rem; display: none; padding: 0.25rem; }
+
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
+        .form-grid label { display: block; font-size: 0.8125rem; font-weight: 500; margin-bottom: 0.25rem; }
+        .form-grid .req::after { content: ' *'; color: var(--danger-color); }
+        .form-grid .hint { font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.2rem; }
+        .form-errors { color: var(--danger-color); font-size: 0.8125rem; margin-top: 0.75rem; }
+
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.6rem 1.1rem; border: none; border-radius: var(--radius-md); font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: var(--transition); box-shadow: var(--shadow-sm); font-family: inherit; }
+        .btn-primary { background: linear-gradient(135deg, var(--primary-color), var(--primary-dark)); color: #fff; }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--shadow-lg); }
+        .btn-danger { background: linear-gradient(135deg, #ef4444, var(--danger-color)); color: #fff; }
+        .btn-danger:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--shadow-lg); }
+        .btn-secondary { background: var(--light-surface); color: var(--text-primary); border: 1px solid var(--border-color); }
+        .btn-secondary:hover:not(:disabled) { background: var(--light-bg); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn-sm { padding: 0.35rem 0.7rem; font-size: 0.78125rem; }
+        .btn-block { width: 100%; }
+        .link-btn { background: none; border: none; color: var(--primary-color); cursor: pointer; font-family: inherit; font-size: 0.8125rem; font-weight: 500; padding: 0; }
+
+        .pick-table { width: 100%; border-collapse: collapse; }
+        .pick-table th, .pick-table td { padding: 0.5rem 0.85rem; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 0.8125rem; vertical-align: middle; }
+        .pick-table th { background: var(--light-bg); font-weight: 600; position: sticky; top: 0; z-index: 10; color: var(--text-secondary); text-transform: uppercase; font-size: 0.6875rem; letter-spacing: 0.05em; cursor: pointer; user-select: none; white-space: nowrap; }
+        .pick-table th.nosort { cursor: default; }
+        .pick-table th .sort-arrow { margin-left: 4px; opacity: 0.4; }
+        .pick-table th.sorted .sort-arrow { opacity: 1; }
+        .pick-table tbody tr[data-id], .pick-table tbody tr[data-pid] { cursor: pointer; }
+        .pick-table tbody tr:hover { background: var(--light-bg); }
+        .pick-table tbody tr.selected { background: rgba(79, 70, 229, 0.08); }
+        .pick-table tbody tr.muted td { color: var(--text-light); }
+        .pick-table input[type="checkbox"], .pick-table input[type="radio"] { width: 1rem; height: 1rem; cursor: pointer; vertical-align: middle; }
+        .cell-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.75rem; color: var(--text-secondary); }
+        .truncate { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        .badge { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.15rem 0.5rem; border-radius: 9999px; font-size: 0.6875rem; font-weight: 600; white-space: nowrap; }
+        .badge.ok, .badge.online, .badge.enabled, .badge.changed, .badge.create { background: rgba(5, 150, 105, 0.12); color: var(--success-color); }
+        .badge.bad, .badge.offline, .badge.failed { background: rgba(220, 38, 38, 0.12); color: var(--danger-color); }
+        .badge.warn, .badge.disabled, .badge.replace, .badge.canceled, .badge.orphan { background: rgba(217, 119, 6, 0.15); color: var(--warning-color); }
+        .badge.info, .badge.running, .badge.update, .badge.dedupe { background: rgba(2, 132, 199, 0.14); color: var(--info-color); }
+        .badge.neutral, .badge.none, .badge.pending, .badge.unchanged { background: rgba(107, 114, 128, 0.12); color: var(--secondary-color); }
+
+        .variant { border: 1px solid var(--border-color); border-radius: var(--radius-lg); margin: 0.75rem 1.25rem; overflow: hidden; }
+        .variant-head { display: flex; align-items: center; gap: 0.75rem; padding: 0.65rem 0.9rem; background: var(--light-bg); flex-wrap: wrap; }
+        .variant-head input { width: 1rem; height: 1rem; cursor: pointer; }
+        .variant-tag { font-weight: 700; font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: var(--radius-sm); background: var(--primary-color); color: #fff; }
+        .variant-name { font-weight: 600; font-size: 0.875rem; }
+        .variant-summary { font-size: 0.8125rem; color: var(--text-secondary); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+        .variant-count { margin-left: auto; font-size: 0.8125rem; color: var(--text-secondary); }
+        .variant-body { max-height: 260px; overflow-y: auto; border-top: 1px solid var(--border-color); }
+
+        .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0.75rem; }
+        .stat-card { background: var(--light-surface); border: 2px solid var(--border-color); border-radius: var(--radius-lg); padding: 0.65rem 0.9rem; box-shadow: var(--shadow-sm); cursor: pointer; transition: var(--transition); }
+        .stat-card.active { border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15); }
+        .stat-card .stat-label { font-size: 0.6875rem; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+        .stat-card .stat-value { font-size: 1.4rem; font-weight: 700; line-height: 1.2; }
+        .stat-value.ok { color: var(--success-color); }
+        .stat-value.bad { color: var(--danger-color); }
+        .stat-value.warn { color: var(--warning-color); }
+        .stat-value.muted { color: var(--text-secondary); }
+
+        .progress-track { height: 10px; background: var(--border-color); border-radius: 9999px; overflow: hidden; }
+        .progress-fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--primary-color), var(--info-color)); border-radius: 9999px; transition: width 0.3s ease; }
+        .progress-fill.done { background: linear-gradient(90deg, var(--success-color), #10b981); }
+        .progress-fill.failed { background: linear-gradient(90deg, var(--danger-color), #f87171); }
+        .progress-meta { display: flex; justify-content: space-between; font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.5rem; }
+
+        .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2.5rem 2rem; color: var(--text-secondary); text-align: center; gap: 0.5rem; }
+        .empty-state .empty-icon { font-size: 2rem; opacity: 0.45; }
+        .spinner { display: inline-block; width: 28px; height: 28px; border: 3px solid var(--border-color); border-top-color: var(--primary-color); border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .notification { position: fixed; bottom: 2rem; right: 2rem; padding: 1rem 1.5rem; background: var(--light-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-xl); display: none; z-index: 2000; max-width: 460px; font-size: 0.875rem; }
+        .notification.show { display: block; }
+        .notification.success { border-left: 4px solid var(--success-color); }
+        .notification.error { border-left: 4px solid var(--danger-color); }
+        .notification.info { border-left: 4px solid var(--info-color); }
+
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.show { display: flex; }
+        .modal-card { background: var(--light-surface); border-radius: var(--radius-xl); box-shadow: var(--shadow-xl); width: 90%; max-width: 580px; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; }
+        .modal-card.wide { max-width: 780px; }
+        .modal-head { display: flex; justify-content: space-between; align-items: center; padding: 1.1rem 1.5rem; border-bottom: 1px solid var(--border-color); background: var(--light-bg); }
+        .modal-head h2 { font-size: 1.0625rem; font-weight: 600; }
+        .modal-body { padding: 1.5rem; overflow-y: auto; flex: 1; }
+        .modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary); width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); }
+        .cred-grid { display: flex; flex-direction: column; gap: 0.9rem; }
+        .cred-grid label { display: block; font-size: 0.8125rem; font-weight: 500; margin-bottom: 0.25rem; }
+        .cred-grid input { width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 0.875rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--light-surface); color: var(--text-primary); }
+        .eye-wrap { position: relative; }
+        .eye-wrap input { padding-right: 2.5rem; }
+        .eye-toggle { position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 0.25rem; }
+        .modal-help h3 { font-size: 0.9375rem; font-weight: 600; margin: 1.25rem 0 0.5rem; }
+        .modal-help h3:first-child { margin-top: 0; }
+        .modal-help p, .modal-help li { font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 0.5rem; }
+        .modal-help ul, .modal-help ol { padding-left: 1.25rem; }
+        .modal-help code, .notice code { background: var(--light-bg); border: 1px solid var(--border-color); padding: 0.0625rem 0.3rem; border-radius: 3px; font-size: 0.8125rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+        body.dark-mode { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #f9fafb; }
+        body.dark-mode .app-header, body.dark-mode .panel, body.dark-mode .stat-card, body.dark-mode .modal-card, body.dark-mode .nav-btn, body.dark-mode .variant { background: #1e293b; border-color: #4b5563; color: #f9fafb; }
+        body.dark-mode .panel-header, body.dark-mode .modal-head, body.dark-mode .variant-head { background: #273449; border-color: #4b5563; color: #f9fafb; }
+        body.dark-mode .panel-sub, body.dark-mode .variant-body { border-color: #4b5563; }
+        body.dark-mode .nav-btn.active { background: rgba(79, 70, 229, 0.22); border-color: var(--primary-color); }
+        body.dark-mode .nav-btn.danger.active { background: rgba(220, 38, 38, 0.18); border-color: var(--danger-color); }
+        body.dark-mode #app-title { -webkit-text-fill-color: #f9fafb; color: #f9fafb; }
+        body.dark-mode .pick-table th { background: #374151; color: #d1d5db; border-color: #4b5563; }
+        body.dark-mode .pick-table td { border-color: #4b5563; color: #f9fafb; }
+        body.dark-mode .pick-table tbody tr:hover { background: #374151; }
+        body.dark-mode .pick-table tbody tr.selected { background: rgba(79, 70, 229, 0.22); }
+        body.dark-mode .pick-table tbody tr.muted td { color: #6b7280; }
+        body.dark-mode .search-input, body.dark-mode .select-input, body.dark-mode .text-input, body.dark-mode .cred-grid input { background: #374151; border-color: #4b5563; color: #f9fafb; }
+        body.dark-mode .btn-secondary, body.dark-mode .dark-mode-toggle { background: #374151; border-color: #4b5563; color: #f9fafb; }
+        body.dark-mode .mode-toggle { border-color: #4b5563; }
+        body.dark-mode .mode-toggle button { background: #374151; color: #9ca3af; }
+        body.dark-mode .mode-toggle button.active { background: var(--primary-color); color: #fff; }
+        body.dark-mode .notification { background: #1e293b; border-color: #4b5563; color: #f9fafb; }
+        body.dark-mode .progress-track { background: #4b5563; }
+        body.dark-mode .cell-mono, body.dark-mode .stat-card .stat-label, body.dark-mode .field-label, body.dark-mode .progress-meta, body.dark-mode .notice, body.dark-mode .modal-help p, body.dark-mode .modal-help li, body.dark-mode .meta-text, body.dark-mode .nav-btn .nav-hint, body.dark-mode .panel-sub, body.dark-mode .variant-summary, body.dark-mode .variant-count, body.dark-mode .form-grid .hint { color: #9ca3af; }
+        body.dark-mode .stat-card .stat-value { color: #f9fafb; }
+        body.dark-mode .stat-value.ok { color: #34d399; }
+        body.dark-mode .stat-value.bad { color: #f87171; }
+        body.dark-mode .stat-value.warn { color: #fbbf24; }
+        body.dark-mode .notice strong, body.dark-mode .modal-help h3 { color: #f9fafb; }
+        body.dark-mode .modal-help code, body.dark-mode .notice code { background: #374151; border-color: #4b5563; color: #d1d5db; }
+
+        @media (max-width: 1024px) { .app-main { flex-direction: column; overflow-y: auto; } .sidebar { width: 100%; } .content-area { overflow: visible; } .truncate { max-width: 160px; } }
+        @media (max-width: 768px) { .header-content { padding: 1rem; } #app-title { font-size: 1.125rem; } .app-main { padding: 1rem; } .stats-row { grid-template-columns: repeat(2, 1fr); } }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <header class="app-header">
+        <div class="header-content">
+            <div class="logo-section">
+                <img src="/static/logo.png" alt="Logo" class="app-logo">
+                <h1 id="app-title">LAN Manager Profile Manager</h1>
+                <span id="inventoryMeta" class="meta-text"></span>
+            </div>
+            <div class="header-actions">
+                <button class="dark-mode-toggle" id="refreshBtn" aria-label="Refresh inventory" title="Re-read routers, groups and profiles">↻</button>
+                <button class="dark-mode-toggle" id="helpBtn" aria-label="User guide" title="User guide" style="font-size:1.125rem;font-weight:700;width:46px;">?</button>
+                <button class="dark-mode-toggle" id="settingsBtn" aria-label="API settings" title="API settings">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                </button>
+                <button class="dark-mode-toggle" id="darkModeToggle" aria-label="Toggle dark mode" title="Toggle dark mode">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="app-main">
+        <aside class="sidebar">
+            <div class="panel">
+                <div class="panel-header"><h2>Action</h2></div>
+                <div class="panel-body">
+                    <nav class="nav-list" aria-label="Actions">
+                        <button class="nav-btn active" data-action="create"><span class="nav-title">Create profile</span><span class="nav-hint">Define a profile and push it to routers or groups</span></button>
+                        <button class="nav-btn" data-action="copy"><span class="nav-title">Copy profile</span><span class="nav-hint">Copy profiles from one router to many</span></button>
+                        <button class="nav-btn danger" data-action="delete"><span class="nav-title">Delete profiles</span><span class="nav-hint">By router, group, or profile name</span></button>
+                        <button class="nav-btn danger" data-action="disable"><span class="nav-title">Disable LAN Manager</span><span class="nav-hint">Turn LAN Manager off on routers or groups</span></button>
+                        <button class="nav-btn danger" data-action="orphans"><span class="nav-title">Orphaned profiles <span id="orphanCount" class="badge orphan" style="display:none;"></span></span><span class="nav-hint">Profiles on routers that no longer exist</span></button>
+                    </nav>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header"><h2>Run</h2></div>
+                <div class="panel-body" style="display:flex;flex-direction:column;gap:0.6rem;">
+                    <p id="runSummary" class="meta-text">Nothing selected</p>
+                    <button class="btn btn-secondary btn-block" id="previewBtn" disabled>Preview (read-only)</button>
+                    <button class="btn btn-primary btn-block" id="runBtn" disabled>Run</button>
+                    <button class="btn btn-secondary btn-block" id="cancelBtn" style="display:none;">Cancel run</button>
+                    <div class="notice" id="actionNotice"></div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header"><h2>Run log</h2></div>
+                <div class="panel-body" style="display:flex;flex-direction:column;gap:0.6rem;">
+                    <p id="logCurrent" class="meta-text">No run yet this session.</p>
+                    <select id="logSelect" class="select-input" aria-label="Past run logs"><option value="">— Past run logs —</option></select>
+                    <button class="btn btn-secondary btn-block btn-sm" id="downloadLogBtn" disabled>Download selected log</button>
+                </div>
+            </div>
+        </aside>
+
+        <div class="content-area">
+            <div class="notice warn" id="credNotice" style="display:none;"></div>
+
+            <!-- Create: profile definition -->
+            <div class="panel" id="profilePanel">
+                <div class="panel-header"><h2>1 · Profile</h2><span class="meta-text">Pushing replaces any existing profile with the same name (case-insensitive)</span></div>
+                <div class="panel-body">
+                    <div class="form-grid">
+                        <div><label for="fType" class="req">Type</label><select id="fType" class="select-input"></select></div>
+                        <div><label for="fName" class="req">Name</label><input id="fName" class="text-input" maxlength="32" autocomplete="off"><div class="hint">Max 32 characters</div></div>
+                        <div><label for="fPort" class="req">Port</label><input id="fPort" class="text-input" type="number" min="1" max="65535"><div class="hint" id="fPortHint"></div></div>
+                        <div data-field="address"><label for="fAddress" class="req">Address</label><input id="fAddress" class="text-input" placeholder="192.168.0.10" autocomplete="off"><div class="hint">IPv4 address of the LAN device</div></div>
+                        <div data-field="username"><label for="fUsername" id="fUsernameLabel">Username</label><input id="fUsername" class="text-input" maxlength="64" autocomplete="off"></div>
+                        <div data-field="resolution"><label for="fResolution" class="req">Resolution</label><input id="fResolution" class="text-input" list="resolutionList" placeholder="1024x768" autocomplete="off"><datalist id="resolutionList"></datalist><div class="hint">Suggestions are values already used in this fleet</div></div>
+                    </div>
+                    <div class="form-errors" id="formErrors"></div>
+                </div>
+            </div>
+
+            <!-- Copy: source router + profiles -->
+            <div class="panel" id="sourcePanel" style="display:none;">
+                <div class="panel-header">
+                    <h2>1 · Source router</h2>
+                    <div class="search-wrap" style="width:300px;">
+                        <input type="text" class="search-input" id="sourceSearch" placeholder="Search router name, group, account, router ID, group ID…" aria-label="Search source router">
+                        <button class="clear-x" data-clear="sourceSearch" aria-label="Clear search">✕</button>
+                    </div>
+                </div>
+                <div class="panel-sub" id="sourceSummary">Pick the router that has the correct profile. Only routers with profiles are listed.</div>
+                <div class="panel-body flush scroll-box" id="sourceList" style="max-height:260px;"></div>
+                <div id="sourceProfilesWrap" style="display:none;border-top:1px solid var(--border-color);">
+                    <div class="panel-sub"><strong id="sourceRouterLabel"></strong><span>— tick the profile(s) to copy</span><button class="btn btn-secondary btn-sm" id="sourceChangeBtn" style="margin-left:auto;">Change router</button></div>
+                    <div class="panel-body flush scroll-box" id="sourceProfiles" style="max-height:260px;"></div>
+                </div>
+            </div>
+
+            <!-- Orphans -->
+            <div class="panel" id="orphanPanel" style="display:none;">
+                <div class="panel-header">
+                    <h2>Orphaned profiles</h2>
+                    <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+                        <div class="search-wrap" style="width:280px;">
+                            <input type="text" class="search-input" id="orphanSearch" placeholder="Search name, router ID, profile ID, account…" aria-label="Search orphaned profiles">
+                            <button class="clear-x" data-clear="orphanSearch" aria-label="Clear search">✕</button>
+                        </div>
+                        <button class="btn btn-secondary btn-sm" id="orphanAllBtn">Select all shown</button>
+                        <button class="btn btn-secondary btn-sm" id="orphanClearBtn">Clear</button>
+                        <button class="btn btn-secondary btn-sm" id="orphanCsvBtn">Export CSV</button>
+                    </div>
+                </div>
+                <div class="panel-sub" id="orphanSummary"></div>
+                <div class="panel-body flush scroll-box tall" id="orphanList"></div>
+            </div>
+
+            <!-- Destination / target -->
+            <div class="panel" id="destPanel">
+                <div class="panel-header">
+                    <h2 id="destTitle">2 · Destination</h2>
+                    <div class="mode-toggle" role="group" aria-label="Select by">
+                        <button type="button" data-mode="routers" class="active">Routers</button>
+                        <button type="button" data-mode="groups">Groups</button>
+                        <button type="button" data-mode="name" id="modeNameBtn">Profile name</button>
+                    </div>
+                </div>
+                <div class="panel-sub">
+                    <div class="search-wrap" style="width:320px;">
+                        <input type="text" class="search-input" id="destSearch" placeholder="Search…" aria-label="Search destination">
+                        <button class="clear-x" data-clear="destSearch" aria-label="Clear search">✕</button>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" id="destAllBtn">Select all shown</button>
+                    <button class="btn btn-secondary btn-sm" id="destClearBtn">Clear</button>
+                    <span id="destSummary" style="margin-left:auto;">Nothing selected</span>
+                </div>
+                <div class="panel-body flush scroll-box tall" id="destList">
+                    <div class="empty-state"><div class="spinner"></div><p>Loading routers, groups and profiles…</p></div>
+                </div>
+            </div>
+
+            <!-- Delete by router/group: which names -->
+            <div class="panel" id="delNamesPanel" style="display:none;">
+                <div class="panel-header">
+                    <h2>3 · Profiles to delete</h2>
+                    <label style="font-size:0.8125rem;display:flex;gap:0.4rem;align-items:center;cursor:pointer;"><input type="checkbox" id="delAllChk"> Delete <strong>all</strong> profiles on these routers</label>
+                </div>
+                <div class="panel-sub" id="delNamesSummary">Profile names found on the selected routers (case-insensitive). Tick the ones to delete.</div>
+                <div class="panel-body flush scroll-box" id="delNamesList"></div>
+            </div>
+
+            <!-- Preview -->
+            <div class="panel" id="previewPanel" style="display:none;">
+                <div class="panel-header">
+                    <h2>Preview</h2>
+                    <div style="display:flex;gap:0.6rem;align-items:center;">
+                        <span id="previewSummary" class="meta-text"></span>
+                        <button class="btn btn-secondary btn-sm" id="closePreviewBtn">Close</button>
+                    </div>
+                </div>
+                <div class="panel-sub">From cached data. Every router is re-read live when the run starts.</div>
+                <div class="panel-body flush scroll-box" id="previewBody"></div>
+            </div>
+
+            <!-- Progress -->
+            <div class="panel" id="progressPanel" style="display:none;">
+                <div class="panel-header">
+                    <h2 id="progressTitle">Progress</h2>
+                    <div style="display:flex;gap:0.6rem;align-items:center;">
+                        <span id="progressState" class="meta-text"></span>
+                        <button class="btn btn-secondary btn-sm" id="progressCsvBtn">Export CSV</button>
+                    </div>
+                </div>
+                <div class="panel-body" style="display:flex;flex-direction:column;gap:1rem;">
+                    <div class="stats-row" id="progressStats">
+                        <div class="stat-card" data-filter=""><div class="stat-label">Total</div><div class="stat-value muted" id="statTotal">0</div></div>
+                        <div class="stat-card" data-filter="changed"><div class="stat-label">Changed</div><div class="stat-value ok" id="statChanged">0</div></div>
+                        <div class="stat-card" data-filter="unchanged"><div class="stat-label">Unchanged</div><div class="stat-value muted" id="statUnchanged">0</div></div>
+                        <div class="stat-card" data-filter="failed"><div class="stat-label">Failed</div><div class="stat-value bad" id="statFailed">0</div></div>
+                    </div>
+                    <div>
+                        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+                        <div class="progress-meta"><span id="progressCount">0 of 0</span><span id="progressElapsed"></span></div>
+                    </div>
+                </div>
+                <div class="panel-body flush scroll-box" style="border-top:1px solid var(--border-color);">
+                    <table class="pick-table">
+                        <thead><tr><th class="nosort">Router</th><th class="nosort">Group</th><th class="nosort">Account</th><th class="nosort">Status</th><th class="nosort">Detail</th></tr></thead>
+                        <tbody id="progressBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<div class="notification" id="notification" role="status" aria-live="polite"></div>
+
+<div class="modal" id="settingsModal">
+    <div class="modal-card">
+        <div class="modal-head"><h2>Settings</h2><button class="modal-close" id="closeSettingsBtn" aria-label="Close">×</button></div>
+        <div class="modal-body">
+            <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:1.25rem;">
+                <select id="credProfileSelect" class="select-input" style="flex:1;" aria-label="Saved credential profiles"><option value="">— Select saved profile —</option></select>
+                <button class="btn btn-secondary btn-sm" id="loadCredBtn">Load</button>
+                <button class="btn btn-secondary btn-sm" id="deleteCredBtn" style="color:var(--danger-color);">Delete</button>
+            </div>
+            <div class="cred-grid">
+                <div><label for="c_X_CP_API_ID">X_CP_API_ID</label><input type="text" id="c_X_CP_API_ID" autocomplete="off" spellcheck="false"></div>
+                <div><label for="c_X_CP_API_KEY">X_CP_API_KEY</label><div class="eye-wrap"><input type="password" id="c_X_CP_API_KEY" autocomplete="off" spellcheck="false"><button type="button" class="eye-toggle" data-target="c_X_CP_API_KEY" aria-label="Toggle visibility">👁</button></div></div>
+                <div><label for="c_X_ECM_API_ID">X_ECM_API_ID</label><input type="text" id="c_X_ECM_API_ID" autocomplete="off" spellcheck="false"></div>
+                <div><label for="c_X_ECM_API_KEY">X_ECM_API_KEY</label><div class="eye-wrap"><input type="password" id="c_X_ECM_API_KEY" autocomplete="off" spellcheck="false"><button type="button" class="eye-toggle" data-target="c_X_ECM_API_KEY" aria-label="Toggle visibility">👁</button></div></div>
+                <div><label for="c_NCM_API_TOKEN">NCM_API_TOKEN <span class="meta-text">(required — profiles are v3-only)</span></label><div class="eye-wrap"><input type="password" id="c_NCM_API_TOKEN" autocomplete="off" spellcheck="false"><button type="button" class="eye-toggle" data-target="c_NCM_API_TOKEN" aria-label="Toggle visibility">👁</button></div></div>
+            </div>
+            <div style="display:flex;gap:0.5rem;margin-top:1.5rem;flex-wrap:wrap;">
+                <button class="btn btn-primary" id="applyCredsBtn">Apply &amp; Reload</button>
+                <button class="btn btn-secondary" id="saveCredBtn">Save profile</button>
+                <button class="btn btn-secondary" id="saveAsCredBtn">Save as…</button>
+            </div>
+            <div class="notice" style="margin-top:1.25rem;">Keys are stored in plaintext in <code>profiles.json</code> beside this app, and this server has no authentication. Keep it on localhost.</div>
+            <div style="margin-top:1.5rem;padding-top:1.25rem;border-top:1px solid var(--border-color);">
+                <label class="field-label" for="threadsSelect">Threads</label>
+                <select id="threadsSelect" class="select-input"></select>
+                <p class="meta-text" style="margin-top:0.45rem;">Routers processed in parallel. Each router takes 3–6 API calls; NCM allows roughly 500 calls a minute per account. Remembered in this browser.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="helpModal">
+    <div class="modal-card wide">
+        <div class="modal-head"><h2>User guide</h2><button class="modal-close" id="closeHelpBtn" aria-label="Close">×</button></div>
+        <div class="modal-body modal-help">
+            <h3>What this manages</h3>
+            <p>Remote Connect LAN Manager profiles (SSH, HTTP, HTTPS, RDP, VNC, Serial) stored per router in NCM, and the per-router LAN Manager on/off switch. Both live in the NCM API v3, so an <code>NCM_API_TOKEN</code> is required.</p>
+            <h3>How pushes work (Create and Copy)</h3>
+            <ul>
+                <li>LAN Manager is <strong>enabled automatically</strong> on every router a profile is pushed to.</li>
+                <li>Profiles are matched by <strong>name, ignoring case</strong>. If a router already has one, it is updated in place. Any extra copies with the same name are deleted, so a router never ends up with duplicates.</li>
+                <li>If the type differs (e.g. SSH → HTTPS), the new profile is created first and the old one deleted after.</li>
+                <li>A router that already has an identical profile is left alone and reported as <em>unchanged</em>.</li>
+                <li>Pushes are safe to repeat. Add routers to a group, push to the group again, and only the new routers change.</li>
+                <li>Each router is re-read live at run time and re-read again after writing, to verify.</li>
+            </ul>
+            <h3>Finding wrong profiles (Profile name)</h3>
+            <p>In the destination, choose <strong>Profile name</strong> and search a name (case-insensitive). Every router with a profile of that name appears, <strong>grouped into variants</strong>. A variant is a set of profiles that are identical in type, exact name, port, address, username and resolution. The largest variant is usually the correct one.</p>
+            <ol>
+                <li>Choose <strong>Copy profile</strong>, then in Profile name mode click <strong>Use as source</strong> on the correct variant.</li>
+                <li>Tick the wrong variants (or individual routers inside them) as the destination.</li>
+                <li>Preview, then Run. The wrong ones are overwritten with the correct one.</li>
+            </ol>
+            <h3>Deleting</h3>
+            <ul>
+                <li><strong>Routers / Groups:</strong> pick routers, then tick which profile names to delete from them (or all).</li>
+                <li><strong>Profile name:</strong> tick whole variants or individual routers. Only those exact profiles are deleted.</li>
+                <li>Deleting profiles <strong>never</strong> disables LAN Manager. Use <strong>Disable LAN Manager</strong> for that.</li>
+            </ul>
+            <h3>Orphaned profiles</h3>
+            <p>NCM keeps profiles after a router is unregistered or deleted. This view lists profiles whose router ID is not in your v2 router list. Note that a router moved into an account these API keys cannot see would also show here, so spot-check before deleting.</p>
+            <h3>Logs</h3>
+            <p>Every run writes <code>logs/lan_manager_&lt;action&gt;_&lt;timestamp&gt;.log</code> with each router, every create/update/delete, and the previous values of anything replaced or deleted, so a change can be undone by hand.</p>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    // ------------------------------------------------------------------ state
+    let cfg = { types: [], max_threads: 8, default_threads: 4 };
+    let inv = { routers: [], groups: [], profiles: [], resolutions: [] };
+    let routerById = new Map();
+    let groupById = new Map();
+    let profilesByRouter = new Map();
+    let nameIndex = [];            // [{key, names:{display:count}, count, routers:Set}]
+
+    let action = 'create';
+    const dest = { mode: 'routers', routers: new Set(), groups: new Set(), profileIds: new Set(),
+                   nameKey: null, variants: [], loadingVariants: false };
+    const source = { routerId: null, profiles: [], selected: new Set(), loading: false };
+    const delNames = new Set();
+    let delAll = false;
+    const orphanSel = new Set();
+    const sorts = {
+        destRouters: { key: 'name', dir: 1 }, destGroups: { key: 'name', dir: 1 },
+        destNames: { key: 'count', dir: -1 }, source: { key: 'name', dir: 1 },
+        orphans: { key: 'router_id', dir: 1 },
+    };
+    let pollTimer = null;
+    let lastJob = null;
+    let progressFilter = '';
+    let prevType = null;
+
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s === null || s === undefined ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    const fold = (s) => String(s === null || s === undefined ? '' : s).trim().toLowerCase();
+    const plural = (n, word) => n + ' ' + word + (n === 1 ? '' : 's');
+    const typeLabel = (t) => ({ ssh: 'SSH', http: 'HTTP', https: 'HTTPS', rdp: 'RDP', vnc: 'VNC', serial: 'Serial' }[t] || t);
+
+    let notifyTimer = null;
+    function notify(message, kind) {
+        const el = $('notification');
+        el.textContent = message;
+        el.className = 'notification show ' + (kind || 'info');
+        clearTimeout(notifyTimer);
+        notifyTimer = setTimeout(() => { el.className = 'notification'; }, 7000);
+    }
+
+    async function api(url, options) {
+        const opts = Object.assign({}, options || {});
+        if (opts.json !== undefined) {
+            opts.method = opts.method || 'POST';
+            opts.headers = { 'Content-Type': 'application/json' };
+            opts.body = JSON.stringify(opts.json);
+            delete opts.json;
+        }
+        const resp = await fetch(url, opts);
+        let body = null;
+        try { body = await resp.json(); } catch (e) { /* non-JSON */ }
+        if (!resp.ok) {
+            const err = new Error((body && (body.message || body.error)) || ('HTTP ' + resp.status));
+            err.status = resp.status; err.body = body;
+            throw err;
+        }
+        return body;
+    }
+
+    // ---------------------------------------------------------- dark / modals
+    $('darkModeToggle').addEventListener('click', () => {
+        document.body.classList.toggle('dark-mode');
+        localStorage.setItem('lmpmDarkMode', document.body.classList.contains('dark-mode'));
+    });
+    if (localStorage.getItem('lmpmDarkMode') === 'true') document.body.classList.add('dark-mode');
+
+    function wireModal(modalId, openId, closeId) {
+        const modal = $(modalId);
+        if (openId) $(openId).addEventListener('click', () => modal.classList.add('show'));
+        $(closeId).addEventListener('click', () => modal.classList.remove('show'));
+        modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('show'); });
+        return modal;
+    }
+    const helpModal = wireModal('helpModal', 'helpBtn', 'closeHelpBtn');
+    const settingsModal = wireModal('settingsModal', null, 'closeSettingsBtn');
+    function openSettings() { settingsModal.classList.add('show'); refreshCredProfiles(); loadCurrentCreds(); }
+    $('settingsBtn').addEventListener('click', openSettings);
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') { helpModal.classList.remove('show'); settingsModal.classList.remove('show'); }
+    });
+
+    // -------------------------------------------------------- generic helpers
+    function sortRows(rows, sort) {
+        const key = sort.key, dir = sort.dir;
+        return rows.slice().sort((a, b) => {
+            let av = a[key], bv = b[key];
+            const an = typeof av === 'number' || /^\d+$/.test(String(av || ''));
+            const bn = typeof bv === 'number' || /^\d+$/.test(String(bv || ''));
+            if (an && bn) return (Number(av || 0) - Number(bv || 0)) * dir;
+            av = fold(av); bv = fold(bv);
+            if (!av && bv) return 1;          // blanks last regardless of direction
+            if (av && !bv) return -1;
+            return av < bv ? -dir : (av > bv ? dir : 0);
+        });
+    }
+    function th(sortName, key, label) {
+        const s = sorts[sortName];
+        const on = s.key === key;
+        return '<th data-sortset="' + sortName + '" data-sort="' + key + '"' + (on ? ' class="sorted"' : '') + '>'
+            + esc(label) + '<span class="sort-arrow">' + (on ? (s.dir === 1 ? '↑' : '↓') : '↕') + '</span></th>';
+    }
+    // Document-level delegation for every sortable header.
+    document.addEventListener('click', (e) => {
+        const h = e.target.closest('th[data-sortset]');
+        if (!h) return;
+        const s = sorts[h.dataset.sortset];
+        const key = h.dataset.sort;
+        sorts[h.dataset.sortset] = { key: key, dir: s.key === key ? -s.dir : (key === 'count' || key === 'profile_count' || key === 'device_count' ? -1 : 1) };
+        renderAll();
+    });
+    function stateBadge(state) {
+        const s = fold(state);
+        if (!s) return '<span class="badge neutral">—</span>';
+        return '<span class="badge ' + (s === 'online' ? 'online' : (s === 'offline' ? 'offline' : 'neutral')) + '">' + esc(state) + '</span>';
+    }
+    function lmBadge(lm) {
+        return '<span class="badge ' + esc(lm || 'none') + '">' + esc(lm === 'none' || !lm ? 'off (no record)' : lm) + '</span>';
+    }
+    function emptyState(text, icon) {
+        return '<div class="empty-state"><div class="empty-icon">' + (icon || '○') + '</div><p>' + text + '</p></div>';
+    }
+    // Router rows: name, group name, account, router ID, group ID.
+    function routerMatches(r, q) {
+        return !q || fold(r.name).includes(q) || fold(r.group_name).includes(q)
+            || fold(r.account_name).includes(q) || String(r.id).includes(q)
+            || String(r.group_id || '').includes(q);
+    }
+    // Profile rows (variants): same fields, from the profile's router.
+    function profileRouterMatches(p, q) {
+        return !q || fold(p.router_name).includes(q) || fold(p.group_name).includes(q)
+            || fold(p.account_name).includes(q) || String(p.router_id).includes(q)
+            || String(p.group_id || '').includes(q) || String(p.id).includes(q);
+    }
+    function groupCell(name, id) {
+        return esc(name || '—') + (id ? ' <span class="cell-mono">' + esc(id) + '</span>' : '');
+    }
+    document.querySelectorAll('.clear-x').forEach((btn) => {
+        const input = $(btn.dataset.clear);
+        input.addEventListener('input', () => { btn.style.display = input.value ? 'block' : 'none'; });
+        btn.addEventListener('click', () => { input.value = ''; btn.style.display = 'none'; input.dispatchEvent(new Event('input')); });
+    });
+    function downloadCsv(filename, header, rows) {
+        const cell = (v) => {
+            const s = String(v === null || v === undefined ? '' : v);
+            return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+        };
+        const text = [header.map(cell).join(',')].concat(rows.map((r) => r.map(cell).join(','))).join('\n');
+        const blob = new Blob([text], { type: 'text/csv' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+
+    // -------------------------------------------------------------- inventory
+    function indexInventory() {
+        routerById = new Map(inv.routers.map((r) => [r.id, r]));
+        groupById = new Map(inv.groups.map((g) => [g.id, g]));
+        profilesByRouter = new Map();
+        inv.profiles.forEach((p) => {
+            if (!profilesByRouter.has(p.router_id)) profilesByRouter.set(p.router_id, []);
+            profilesByRouter.get(p.router_id).push(p);
+        });
+        const names = new Map();
+        inv.profiles.forEach((p) => {
+            let e = names.get(p.name_key);
+            if (!e) { e = { key: p.name_key, names: {}, count: 0, routers: new Set(), groups: new Set() }; names.set(p.name_key, e); }
+            e.names[p.name] = (e.names[p.name] || 0) + 1;
+            e.count += 1;
+            e.routers.add(p.router_id);
+            const r = routerById.get(p.router_id);
+            if (r && r.group_id) e.groups.add(r.group_id);
+        });
+        nameIndex = Array.from(names.values()).map((e) => Object.assign(e, {
+            display: Object.keys(e.names).sort((a, b) => e.names[b] - e.names[a]).join(' / '),
+            router_count: e.routers.size,
+            spellings: Object.keys(e.names).length,
+        }));
+        $('resolutionList').innerHTML = (inv.resolutions || []).map((r) => '<option value="' + esc(r) + '">').join('');
+        const orphans = inv.profiles.filter((p) => p.orphan).length;
+        $('orphanCount').textContent = orphans;
+        $('orphanCount').style.display = orphans ? 'inline-flex' : 'none';
+        $('inventoryMeta').textContent = inv.routers.length + ' routers · ' + inv.groups.length + ' groups · '
+            + inv.profiles.length + ' profiles';
+        // Drop selections that no longer exist.
+        Array.from(orphanSel).forEach((id) => { if (!inv.profiles.some((p) => p.id === id && p.orphan)) orphanSel.delete(id); });
+    }
+
+    async function loadInventory(refresh) {
+        $('destList').innerHTML = '<div class="empty-state"><div class="spinner"></div><p>Loading routers, groups and profiles…</p></div>';
+        try {
+            const data = await api('/api/inventory' + (refresh ? '?refresh=' + refresh : ''));
+            inv = data;
+            indexInventory();
+            $('credNotice').style.display = 'none';
+            if (dest.mode === 'name' && dest.nameKey) await loadVariants(dest.nameKey, true);
+            renderAll();
+        } catch (err) {
+            $('destList').innerHTML = emptyState(esc(err.message) + '<br><span style="font-size:0.8125rem;">Check credentials in Settings (gear icon).</span>', '!');
+            if (err.body && err.body.error_type === 'ssl_error') {
+                if (confirm(err.message + '\n\nDisable SSL verification and retry?')) {
+                    await api('/api/ssl-noverify', { method: 'POST' });
+                    return loadInventory('all');
+                }
+            } else {
+                notify(err.message, 'error');
+            }
+        }
+    }
+    $('refreshBtn').addEventListener('click', () => loadInventory('all'));
+
+    // ------------------------------------------------------------------ action
+    const NOTICES = {
+        create: 'Enables LAN Manager where needed, then creates or updates the profile on each router. Existing same-name profiles (any case) are replaced, never duplicated.',
+        copy: 'Copies the ticked profile(s) exactly. Enables LAN Manager where needed. Existing same-name profiles (any case) are replaced, never duplicated. The source router is not changed.',
+        delete: 'Deletes profiles only. <strong>LAN Manager stays as it is.</strong>',
+        disable: 'Sets LAN Manager to disabled. Profiles are <strong>not</strong> deleted. Routers without a LAN Manager record are skipped.',
+        orphans: 'Deletes the ticked profiles by ID. These routers are not in your v2 router list.',
+    };
+    function setAction(next) {
+        action = next;
+        document.querySelectorAll('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.action === action));
+        $('profilePanel').style.display = action === 'create' ? 'flex' : 'none';
+        $('sourcePanel').style.display = action === 'copy' ? 'flex' : 'none';
+        $('orphanPanel').style.display = action === 'orphans' ? 'flex' : 'none';
+        $('destPanel').style.display = action === 'orphans' ? 'none' : 'flex';
+        $('modeNameBtn').style.display = action === 'disable' ? 'none' : '';
+        if (action === 'disable' && dest.mode === 'name') setDestMode('routers');
+        $('destTitle').textContent = { create: '2 · Destination', copy: '2 · Destination', delete: '1 · Delete from', disable: 'Routers' }[action] || '';
+        $('actionNotice').innerHTML = NOTICES[action];
+        $('actionNotice').className = 'notice' + (action === 'create' || action === 'copy' ? '' : ' danger');
+        $('runBtn').className = 'btn btn-block ' + (action === 'create' || action === 'copy' ? 'btn-primary' : 'btn-danger');
+        $('previewPanel').style.display = 'none';
+        renderAll();
+    }
+    document.querySelectorAll('.nav-btn').forEach((b) => b.addEventListener('click', () => setAction(b.dataset.action)));
+
+    // ------------------------------------------------------------ create form
+    function typeDef(t) { return cfg.types.find((x) => x.id === t) || { fields: [], required: [], default_port: '' }; }
+    function buildTypeSelect() {
+        $('fType').innerHTML = cfg.types.map((t) => '<option value="' + esc(t.id) + '">' + esc(t.label) + '</option>').join('');
+        $('fType').value = 'ssh';
+        onTypeChange();
+    }
+    function onTypeChange() {
+        const t = $('fType').value;
+        const def = typeDef(t);
+        document.querySelectorAll('#profilePanel [data-field]').forEach((el) => {
+            el.style.display = def.fields.includes(el.dataset.field) ? '' : 'none';
+        });
+        $('fUsernameLabel').className = def.required.includes('username') ? 'req' : '';
+        const port = $('fPort').value;
+        if (!port || (prevType && String(typeDef(prevType).default_port) === String(port))) $('fPort').value = def.default_port;
+        $('fPort').max = t === 'serial' ? 8 : 65535;
+        $('fPortHint').textContent = t === 'serial' ? 'Serial port number, 1–8' : 'Default ' + def.default_port;
+        prevType = t;
+        validateForm();
+    }
+    function formSpec() {
+        const t = $('fType').value;
+        const def = typeDef(t);
+        const spec = { type: t, name: $('fName').value.trim(), port: $('fPort').value.trim() };
+        def.fields.forEach((f) => { spec[f] = $('f' + f.charAt(0).toUpperCase() + f.slice(1)).value.trim(); });
+        return spec;
+    }
+    function formProblems() {
+        const s = formSpec();
+        const def = typeDef(s.type);
+        const p = [];
+        if (!s.name) p.push('Name is required');
+        else if (s.name.length > 32) p.push('Name must be 32 characters or fewer');
+        const port = Number(s.port);
+        if (!s.port || !Number.isInteger(port)) p.push('Port must be a whole number');
+        else if (s.type === 'serial' ? (port < 1 || port > 8) : (port < 1 || port > 65535)) p.push(s.type === 'serial' ? 'Serial port must be 1–8' : 'Port must be 1–65535');
+        def.required.forEach((f) => { if (!s[f]) p.push(f.charAt(0).toUpperCase() + f.slice(1) + ' is required'); });
+        if (s.address && !/^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/.test(s.address)) p.push('Address must be an IPv4 address');
+        return p;
+    }
+    function validateForm() {
+        if (action !== 'create') return;
+        const p = formProblems();
+        const touched = $('fName').value || $('fAddress').value;
+        $('formErrors').textContent = touched && p.length ? p.join(' · ') : '';
+        updateRunState();
+    }
+    $('fType').addEventListener('change', onTypeChange);
+    ['fName', 'fPort', 'fAddress', 'fUsername', 'fResolution'].forEach((id) => $(id).addEventListener('input', validateForm));
+
+    // ----------------------------------------------------------------- source
+    $('sourceSearch').addEventListener('input', renderSource);
+    function renderSource() {
+        if (action !== 'copy') return;
+        if (source.routerId) {
+            $('sourceList').style.display = 'none';
+            $('sourceProfilesWrap').style.display = 'block';
+            const r = routerById.get(source.routerId) || { name: '', id: source.routerId };
+            $('sourceRouterLabel').textContent = (r.name || '(router not in v2)') + ' [' + source.routerId + ']'
+                + (r.group_name ? ' · ' + r.group_name : '');
+            $('sourceSummary').textContent = source.selected.size
+                ? plural(source.selected.size, 'profile') + ' selected to copy'
+                : 'Tick the profile(s) to copy.';
+            renderSourceProfiles();
+            return;
+        }
+        $('sourceList').style.display = 'block';
+        $('sourceProfilesWrap').style.display = 'none';
+        $('sourceSummary').textContent = 'Pick the router that has the correct profile. Only routers with profiles are listed.';
+        const q = fold($('sourceSearch').value);
+        const rows = sortRows(inv.routers.filter((r) => r.profile_count > 0 && routerMatches(r, q)), sorts.source);
+        if (!rows.length) { $('sourceList').innerHTML = emptyState(q ? 'No router with profiles matches that search.' : 'No routers have profiles yet.'); return; }
+        let html = '<table class="pick-table"><thead><tr><th class="nosort" style="width:36px;"></th>'
+            + th('source', 'name', 'Router') + th('source', 'group_name', 'Group') + th('source', 'account_name', 'Account')
+            + th('source', 'profile_count', 'Profiles') + th('source', 'id', 'ID') + '</tr></thead><tbody>';
+        rows.slice(0, 500).forEach((r) => {
+            html += '<tr data-id="' + esc(r.id) + '"><td><input type="radio" name="srcRouter" tabindex="-1" aria-label="Select ' + esc(r.name) + '"></td>'
+                + '<td class="truncate" title="' + esc(r.name) + '">' + esc(r.name || '(unnamed)') + '</td>'
+                + '<td class="truncate">' + groupCell(r.group_name, r.group_id) + '</td>'
+                + '<td class="truncate">' + esc(r.account_name || '—') + '</td>'
+                + '<td>' + esc(r.profile_count) + '</td><td class="cell-mono">' + esc(r.id) + '</td></tr>';
+        });
+        if (rows.length > 500) html += '<tr><td colspan="6" class="meta-text" style="text-align:center;">Showing 500 of ' + rows.length + ' — refine the search</td></tr>';
+        $('sourceList').innerHTML = html + '</tbody></table>';
+    }
+    $('sourceList').addEventListener('click', (e) => {
+        const tr = e.target.closest('tr[data-id]');
+        if (tr) pickSource(tr.dataset.id, null);
+    });
+    async function pickSource(routerId, preselectProfileId) {
+        source.routerId = routerId;
+        source.selected = new Set(preselectProfileId ? [preselectProfileId] : []);
+        source.profiles = (profilesByRouter.get(routerId) || []).slice();
+        source.loading = true;
+        renderSource();
+        updateRunState();
+        try {
+            const data = await api('/api/routers/' + encodeURIComponent(routerId) + '/profiles');
+            if (source.routerId !== routerId) return;
+            source.profiles = data.profiles || [];
+            const ids = new Set(source.profiles.map((p) => p.id));
+            Array.from(source.selected).forEach((id) => { if (!ids.has(id)) source.selected.delete(id); });
+        } catch (err) {
+            notify('Could not read the source router live: ' + err.message + ' (showing cached profiles)', 'error');
+        } finally {
+            source.loading = false;
+            renderSource();
+            updateRunState();
+        }
+    }
+    function renderSourceProfiles() {
+        const rows = sortRows(source.profiles, { key: 'name', dir: 1 });
+        if (!rows.length) {
+            $('sourceProfiles').innerHTML = source.loading ? '<div class="empty-state"><div class="spinner"></div></div>' : emptyState('This router has no profiles.');
+            return;
+        }
+        let html = '<table class="pick-table"><thead><tr><th class="nosort" style="width:36px;"></th><th class="nosort">Name</th><th class="nosort">Type</th><th class="nosort">Settings</th><th class="nosort">ID</th></tr></thead><tbody>';
+        rows.forEach((p) => {
+            const on = source.selected.has(p.id);
+            html += '<tr data-pid="' + esc(p.id) + '"' + (on ? ' class="selected"' : '') + '><td><input type="checkbox" tabindex="-1"' + (on ? ' checked' : '') + ' aria-label="Copy ' + esc(p.name) + '"></td>'
+                + '<td><strong>' + esc(p.name) + '</strong></td><td>' + esc(typeLabel(p.type)) + '</td>'
+                + '<td class="cell-mono">' + esc(p.summary) + '</td><td class="cell-mono">' + esc(p.id) + '</td></tr>';
+        });
+        $('sourceProfiles').innerHTML = html + '</tbody></table>' + (source.loading ? '<p class="meta-text" style="padding:0.5rem 1rem;">Re-reading live…</p>' : '');
+    }
+    $('sourceProfiles').addEventListener('click', (e) => {
+        const tr = e.target.closest('tr[data-pid]');
+        if (!tr) return;
+        const id = tr.dataset.pid;
+        if (source.selected.has(id)) source.selected.delete(id); else source.selected.add(id);
+        renderSource();
+        updateRunState();
+    });
+    $('sourceChangeBtn').addEventListener('click', () => {
+        source.routerId = null; source.selected.clear(); source.profiles = [];
+        renderSource(); updateRunState();
+    });
+
+    // ------------------------------------------------------------ destination
+    function setDestMode(mode) {
+        dest.mode = mode;
+        document.querySelectorAll('#destPanel .mode-toggle button').forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
+        $('destSearch').value = '';
+        $('destSearch').dispatchEvent(new Event('input'));
+        $('previewPanel').style.display = 'none';
+        renderAll();
+    }
+    document.querySelectorAll('#destPanel .mode-toggle button').forEach((b) => b.addEventListener('click', () => setDestMode(b.dataset.mode)));
+    $('destSearch').addEventListener('input', () => { renderDest(); });
+
+    function visibleDestRows() {
+        const q = fold($('destSearch').value);
+        if (dest.mode === 'routers') return sortRows(inv.routers.filter((r) => routerMatches(r, q)), sorts.destRouters);
+        if (dest.mode === 'groups') return sortRows(inv.groups.filter((g) => !q || fold(g.name).includes(q) || fold(g.account_name).includes(q) || String(g.id).includes(q)), sorts.destGroups);
+        // Names match by substring; a numeric query also lists the names found
+        // on that exact router ID or group ID.
+        const isId = /^\d+$/.test(q);
+        return sortRows(nameIndex.filter((e) => !q || e.key.includes(q)
+            || (isId && (e.routers.has(q) || e.groups.has(q)))), sorts.destNames);
+    }
+
+    function renderDest() {
+        if (action === 'orphans') return;
+        const box = $('destList');
+        $('destSearch').placeholder = dest.mode === 'routers' ? 'Search router name, group, account, router ID, group ID…'
+            : (dest.mode === 'groups' ? 'Search group name, account, group ID…'
+                : (dest.nameKey ? 'Filter routers: name, group, account, router ID, group ID…'
+                    : 'Search profile name, or a router ID / group ID…'));
+        // The bare name list has nothing to tick; every other view does.
+        $('destAllBtn').style.display = dest.mode === 'name' && !dest.nameKey ? 'none' : '';
+        if (!inv.routers.length && !inv.profiles.length) { updateDestSummary(); return; }
+
+        if (dest.mode === 'name' && dest.nameKey) { renderVariants(); updateDestSummary(); return; }
+        const rows = visibleDestRows();
+        if (!rows.length) { box.innerHTML = emptyState($('destSearch').value ? 'Nothing matches that search.' : 'Nothing to show.'); updateDestSummary(); return; }
+
+        let html = '<table class="pick-table"><thead><tr>';
+        const cap = 1000;
+        if (dest.mode === 'routers') {
+            html += '<th class="nosort" style="width:36px;"></th>' + th('destRouters', 'name', 'Router') + th('destRouters', 'group_name', 'Group')
+                + th('destRouters', 'account_name', 'Account') + th('destRouters', 'state', 'State')
+                + th('destRouters', 'lan_manager', 'LAN Manager') + th('destRouters', 'profile_count', 'Profiles') + th('destRouters', 'id', 'ID') + '</tr></thead><tbody>';
+            rows.slice(0, cap).forEach((r) => {
+                const on = dest.routers.has(r.id);
+                const isSrc = action === 'copy' && r.id === source.routerId;
+                html += '<tr data-id="' + esc(r.id) + '" class="' + (on ? 'selected' : '') + (isSrc ? ' muted' : '') + '"><td><input type="checkbox" tabindex="-1"' + (on ? ' checked' : '') + ' aria-label="Select ' + esc(r.name) + '"></td>'
+                    + '<td class="truncate" title="' + esc(r.name) + '">' + esc(r.name || '(unnamed)') + (isSrc ? ' <span class="badge info">source</span>' : '') + '</td>'
+                    + '<td class="truncate">' + groupCell(r.group_name, r.group_id) + '</td><td class="truncate">' + esc(r.account_name || '—') + '</td>'
+                    + '<td>' + stateBadge(r.state) + '</td><td>' + lmBadge(r.lan_manager) + '</td>'
+                    + '<td>' + esc(r.profile_count) + '</td><td class="cell-mono">' + esc(r.id) + '</td></tr>';
+            });
+        } else if (dest.mode === 'groups') {
+            html += '<th class="nosort" style="width:36px;"></th>' + th('destGroups', 'name', 'Group') + th('destGroups', 'account_name', 'Account')
+                + th('destGroups', 'device_count', 'Routers') + th('destGroups', 'id', 'ID') + '</tr></thead><tbody>';
+            rows.slice(0, cap).forEach((g) => {
+                const on = dest.groups.has(g.id);
+                html += '<tr data-id="' + esc(g.id) + '"' + (on ? ' class="selected"' : '') + '><td><input type="checkbox" tabindex="-1"' + (on ? ' checked' : '') + ' aria-label="Select ' + esc(g.name) + '"></td>'
+                    + '<td class="truncate" title="' + esc(g.name) + '">' + esc(g.name || '(unnamed)') + '</td>'
+                    + '<td class="truncate">' + esc(g.account_name || '—') + '</td><td>' + esc(g.device_count) + '</td><td class="cell-mono">' + esc(g.id) + '</td></tr>';
+            });
+        } else {
+            html += th('destNames', 'display', 'Profile name (spellings)') + th('destNames', 'count', 'Profiles')
+                + th('destNames', 'router_count', 'Routers') + th('destNames', 'spellings', 'Spellings') + '</tr></thead><tbody>';
+            rows.slice(0, cap).forEach((e) => {
+                html += '<tr data-name="' + esc(e.key) + '" style="cursor:pointer;"><td class="truncate" style="max-width:420px;" title="' + esc(e.display) + '"><strong>' + esc(e.display) + '</strong></td>'
+                    + '<td>' + esc(e.count) + '</td><td>' + esc(e.router_count) + '</td><td>' + esc(e.spellings) + '</td></tr>';
+            });
+        }
+        if (rows.length > cap) html += '<tr><td colspan="8" class="meta-text" style="text-align:center;">Showing ' + cap + ' of ' + rows.length + ' — refine the search</td></tr>';
+        box.innerHTML = html + '</tbody></table>';
+        updateDestSummary();
+    }
+
+    $('destList').addEventListener('click', (e) => {
+        if (e.target.closest('th')) return;
+        const nameRow = e.target.closest('tr[data-name]');
+        // The box held the name query; inside variants it filters routers instead.
+        if (nameRow) { clearDestSearch(); loadVariants(nameRow.dataset.name); return; }
+        const back = e.target.closest('[data-back]');
+        if (back) { dest.nameKey = null; dest.variants = []; dest.profileIds.clear(); clearDestSearch(); renderAll(); return; }
+        const useSrc = e.target.closest('[data-use-source]');
+        if (useSrc) { useVariantAsSource(Number(useSrc.dataset.useSource)); return; }
+        const vchk = e.target.closest('input[data-variant]');
+        if (vchk) {
+            const v = dest.variants[Number(vchk.dataset.variant)];
+            const ids = selectableIds(v);
+            const all = ids.length && ids.every((id) => dest.profileIds.has(id));
+            ids.forEach((id) => { if (all) dest.profileIds.delete(id); else dest.profileIds.add(id); });
+            renderAll();
+            return;
+        }
+        const ptr = e.target.closest('tr[data-pid]');
+        if (ptr) {
+            if (ptr.classList.contains('muted')) return;
+            const id = ptr.dataset.pid;
+            if (dest.profileIds.has(id)) dest.profileIds.delete(id); else dest.profileIds.add(id);
+            renderAll();
+            return;
+        }
+        const tr = e.target.closest('tr[data-id]');
+        if (!tr) return;
+        const set = dest.mode === 'routers' ? dest.routers : dest.groups;
+        const id = tr.dataset.id;
+        if (set.has(id)) set.delete(id); else set.add(id);
+        renderAll();
+    });
+
+    $('destAllBtn').addEventListener('click', () => {
+        if (dest.mode === 'routers') visibleDestRows().forEach((r) => dest.routers.add(r.id));
+        else if (dest.mode === 'groups') visibleDestRows().forEach((g) => dest.groups.add(g.id));
+        else if (dest.nameKey) dest.variants.forEach((v) => selectableIds(v).forEach((id) => dest.profileIds.add(id)));
+        renderAll();
+    });
+    $('destClearBtn').addEventListener('click', () => {
+        if (dest.mode === 'routers') dest.routers.clear();
+        else if (dest.mode === 'groups') dest.groups.clear();
+        else dest.profileIds.clear();
+        renderAll();
+    });
+
+    // Profile-name variants
+    async function loadVariants(key, quiet) {
+        dest.nameKey = key;
+        dest.loadingVariants = true;
+        if (!quiet) { dest.profileIds.clear(); $('destList').innerHTML = '<div class="empty-state"><div class="spinner"></div><p>Grouping profiles…</p></div>'; }
+        try {
+            const data = await api('/api/variants', { json: { name: key } });
+            dest.variants = data.variants || [];
+            const valid = new Set();
+            dest.variants.forEach((v) => v.profiles.forEach((p) => valid.add(p.id)));
+            Array.from(dest.profileIds).forEach((id) => { if (!valid.has(id)) dest.profileIds.delete(id); });
+        } catch (err) {
+            notify('Could not group profiles: ' + err.message, 'error');
+            dest.variants = [];
+        } finally {
+            dest.loadingVariants = false;
+            renderAll();
+        }
+    }
+    // Rows of a variant that pass the search box (router/group name or ID, account).
+    function shownProfiles(v) {
+        const q = fold($('destSearch').value);
+        return v.profiles.filter((p) => profileRouterMatches(p, q));
+    }
+    // Orphan routers can't receive a push, so they're only selectable for delete.
+    // Acts on the rows currently shown, so a filtered variant checkbox selects
+    // just the filtered routers.
+    function selectableIds(v) {
+        return shownProfiles(v).filter((p) => action === 'delete' || !p.orphan).map((p) => p.id);
+    }
+    function clearDestSearch() {
+        $('destSearch').value = '';
+        $('destSearch').dispatchEvent(new Event('input'));
+    }
+    function useVariantAsSource(i) {
+        const v = dest.variants[i];
+        const p = v.profiles.find((x) => !x.orphan) || v.profiles[0];
+        if (!p) return;
+        v.profiles.forEach((x) => dest.profileIds.delete(x.id));
+        pickSource(p.router_id, p.id);
+        notify('Source set to ' + (p.router_name || p.router_id) + ' — "' + p.name + '". Now tick the variants to overwrite.', 'success');
+        renderAll();
+    }
+    function renderVariants() {
+        const box = $('destList');
+        const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        const total = dest.variants.reduce((n, v) => n + v.profiles.length, 0);
+        const filtering = !!fold($('destSearch').value);
+        const shownTotal = dest.variants.reduce((n, v) => n + shownProfiles(v).length, 0);
+        let html = '<div class="panel-sub" style="border-bottom:none;"><button class="link-btn" data-back="1">← All profile names</button>'
+            + '<span>' + plural(total, 'profile') + ' in ' + plural(dest.variants.length, 'variant') + ', largest first'
+            + (filtering ? ' · ' + shownTotal + ' match the filter' : '') + '</span></div>';
+        if (!dest.variants.length) { box.innerHTML = html + emptyState(dest.loadingVariants ? 'Loading…' : 'No profiles with that name.'); return; }
+        if (filtering && !shownTotal) { box.innerHTML = html + emptyState('No routers in these variants match the filter.'); return; }
+        dest.variants.forEach((v, i) => {
+            const shown = shownProfiles(v);
+            if (filtering && !shown.length) return;
+            const ids = selectableIds(v);
+            const picked = ids.filter((id) => dest.profileIds.has(id)).length;
+            const tag = i < 26 ? letters[i] : String(i + 1);
+            const names = Array.from(new Set(v.profiles.map((p) => p.name)));
+            const srcHere = action === 'copy' && v.profiles.some((p) => p.router_id === source.routerId && source.selected.has(p.id));
+            html += '<div class="variant"><div class="variant-head">'
+                + '<input type="checkbox" data-variant="' + i + '"' + (ids.length && picked === ids.length ? ' checked' : '') + (ids.length ? '' : ' disabled') + ' aria-label="Select variant ' + tag + '">'
+                + '<span class="variant-tag">Variant ' + tag + '</span>'
+                + '<span class="variant-name">' + esc(names.join(' / ')) + '</span>'
+                + '<span class="variant-summary">' + esc(v.summary) + '</span>'
+                + (srcHere ? '<span class="badge info">copy source</span>' : '')
+                + '<span class="variant-count">' + plural(v.router_count, 'router')
+                + (filtering ? ' · ' + shown.length + ' shown' : '')
+                + (picked ? ' · ' + picked + ' selected' : '') + '</span>'
+                + (action === 'copy' ? '<button class="btn btn-secondary btn-sm" data-use-source="' + i + '">Use as source</button>' : '')
+                + '</div><div class="variant-body"><table class="pick-table"><tbody>';
+            shown.forEach((p) => {
+                const on = dest.profileIds.has(p.id);
+                const blocked = action !== 'delete' && p.orphan;
+                const isSrc = action === 'copy' && p.router_id === source.routerId;
+                html += '<tr data-pid="' + esc(p.id) + '" class="' + (on ? 'selected' : '') + (blocked ? ' muted' : '') + '">'
+                    + '<td style="width:36px;"><input type="checkbox" tabindex="-1"' + (on ? ' checked' : '') + (blocked ? ' disabled' : '') + ' aria-label="Select ' + esc(p.router_name || p.router_id) + '"></td>'
+                    + '<td class="truncate" title="' + esc(p.router_name) + '">' + (p.orphan ? '<span class="badge orphan">router not in v2</span>' : esc(p.router_name || '(unnamed)'))
+                    + (isSrc ? ' <span class="badge info">source</span>' : '') + '</td>'
+                    + '<td class="truncate">' + groupCell(p.group_name, p.group_id) + '</td><td class="truncate">' + esc(p.account_name || '—') + '</td>'
+                    + '<td class="cell-mono">router ' + esc(p.router_id) + '</td><td class="cell-mono">profile ' + esc(p.id) + '</td></tr>';
+            });
+            html += '</tbody></table></div></div>';
+        });
+        box.innerHTML = html;
+        // indeterminate can only be set from JS
+        box.querySelectorAll('input[data-variant]').forEach((chk) => {
+            const v = dest.variants[Number(chk.dataset.variant)];
+            const ids = selectableIds(v);
+            const picked = ids.filter((id) => dest.profileIds.has(id)).length;
+            chk.indeterminate = picked > 0 && picked < ids.length;
+        });
+    }
+
+    function destRouterIds() {
+        if (dest.mode === 'routers') return Array.from(dest.routers);
+        if (dest.mode === 'groups') return inv.routers.filter((r) => dest.groups.has(r.group_id)).map((r) => r.id);
+        const ids = new Set();
+        inv.profiles.forEach((p) => { if (dest.profileIds.has(p.id)) ids.add(p.router_id); });
+        return Array.from(ids);
+    }
+    function destTarget() {
+        if (dest.mode === 'routers') return { mode: 'routers', ids: Array.from(dest.routers) };
+        if (dest.mode === 'groups') return { mode: 'groups', ids: Array.from(dest.groups) };
+        return { mode: 'profiles', ids: Array.from(dest.profileIds) };
+    }
+    function updateDestSummary() {
+        let text;
+        const n = destRouterIds().length;
+        if (dest.mode === 'routers') text = dest.routers.size ? plural(dest.routers.size, 'router') + ' selected' : 'Nothing selected';
+        else if (dest.mode === 'groups') text = dest.groups.size ? plural(dest.groups.size, 'group') + ' selected — ' + plural(n, 'router') : 'Nothing selected';
+        else text = dest.profileIds.size ? plural(dest.profileIds.size, 'profile') + ' on ' + plural(n, 'router') + ' selected' : (dest.nameKey ? 'Tick variants or routers' : 'Click a profile name to see its variants');
+        $('destSummary').textContent = text;
+    }
+
+    // --------------------------------------------- delete: names on routers
+    function renderDelNames() {
+        const show = action === 'delete' && dest.mode !== 'name';
+        $('delNamesPanel').style.display = show ? 'flex' : 'none';
+        if (!show) return;
+        const rids = new Set(destRouterIds());
+        const agg = new Map();
+        rids.forEach((rid) => (profilesByRouter.get(rid) || []).forEach((p) => {
+            let e = agg.get(p.name_key);
+            if (!e) { e = { key: p.name_key, names: new Set(), count: 0, routers: new Set() }; agg.set(p.name_key, e); }
+            e.names.add(p.name); e.count += 1; e.routers.add(rid);
+        }));
+        Array.from(delNames).forEach((k) => { if (!agg.has(k)) delNames.delete(k); });
+        $('delAllChk').checked = delAll;
+        if (!rids.size) { $('delNamesList').innerHTML = emptyState('Select routers or groups first.'); return; }
+        if (!agg.size) { $('delNamesList').innerHTML = emptyState('The selected routers have no profiles (per the cached inventory).'); return; }
+        const rows = Array.from(agg.values()).sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
+        let html = '<table class="pick-table"><thead><tr><th class="nosort" style="width:36px;"></th><th class="nosort">Profile name (spellings)</th><th class="nosort">Profiles</th><th class="nosort">Routers</th></tr></thead><tbody>';
+        rows.forEach((e) => {
+            const on = delAll || delNames.has(e.key);
+            html += '<tr data-key="' + esc(e.key) + '" class="' + (on ? 'selected' : '') + '" style="cursor:pointer;"><td><input type="checkbox" tabindex="-1"' + (on ? ' checked' : '') + (delAll ? ' disabled' : '') + '></td>'
+                + '<td><strong>' + esc(Array.from(e.names).join(' / ')) + '</strong></td><td>' + e.count + '</td><td>' + e.routers.size + '</td></tr>';
+        });
+        $('delNamesList').innerHTML = html + '</tbody></table>';
+        $('delNamesSummary').textContent = delAll ? 'Every profile on the selected routers will be deleted.'
+            : (delNames.size ? plural(delNames.size, 'name') + ' ticked. Routers are re-read live at run time, so profiles added since the last refresh are included.'
+                : 'Profile names found on the selected routers (case-insensitive). Tick the ones to delete.');
+    }
+    $('delNamesList').addEventListener('click', (e) => {
+        const tr = e.target.closest('tr[data-key]');
+        if (!tr || delAll) return;
+        const k = tr.dataset.key;
+        if (delNames.has(k)) delNames.delete(k); else delNames.add(k);
+        renderAll();
+    });
+    $('delAllChk').addEventListener('change', (e) => { delAll = e.target.checked; renderAll(); });
+
+    // ---------------------------------------------------------------- orphans
+    $('orphanSearch').addEventListener('input', renderOrphans);
+    function visibleOrphans() {
+        const q = fold($('orphanSearch').value);
+        return sortRows(inv.profiles.filter((p) => p.orphan && (!q || p.name_key.includes(q) || String(p.router_id).includes(q)
+            || String(p.id).includes(q) || fold(p.account_name).includes(q) || fold(p.type).includes(q))), sorts.orphans);
+    }
+    function renderOrphans() {
+        if (action !== 'orphans') return;
+        const rows = visibleOrphans();
+        const all = inv.profiles.filter((p) => p.orphan);
+        const routers = new Set(all.map((p) => p.router_id));
+        $('orphanSummary').innerHTML = '<span>' + esc(plural(all.length, 'profile')) + ' on ' + esc(plural(routers.size, 'router')) + ' not found in the v2 router list'
+            + (orphanSel.size ? ' · <strong>' + orphanSel.size + ' selected</strong>' : '')
+            + '. A router moved to an account these keys cannot see looks the same, so spot-check before deleting.</span>';
+        if (!rows.length) { $('orphanList').innerHTML = emptyState(all.length ? 'Nothing matches that search.' : 'No orphaned profiles found.', '✓'); return; }
+        let html = '<table class="pick-table"><thead><tr><th class="nosort" style="width:36px;"></th>' + th('orphans', 'router_id', 'Router ID')
+            + th('orphans', 'account_name', 'Account') + th('orphans', 'name', 'Profile') + th('orphans', 'type', 'Type')
+            + '<th class="nosort">Settings</th>' + th('orphans', 'created_at', 'Created') + th('orphans', 'id', 'Profile ID') + '</tr></thead><tbody>';
+        rows.forEach((p) => {
+            const on = orphanSel.has(p.id);
+            html += '<tr data-pid="' + esc(p.id) + '"' + (on ? ' class="selected"' : '') + '><td><input type="checkbox" tabindex="-1"' + (on ? ' checked' : '') + ' aria-label="Select ' + esc(p.name) + '"></td>'
+                + '<td class="cell-mono">' + esc(p.router_id) + '</td><td class="truncate">' + esc(p.account_name || p.account_id || '—') + '</td>'
+                + '<td><strong>' + esc(p.name) + '</strong></td><td>' + esc(typeLabel(p.type)) + '</td><td class="cell-mono">' + esc(p.summary) + '</td>'
+                + '<td class="cell-mono">' + esc((p.created_at || '').slice(0, 10)) + '</td><td class="cell-mono">' + esc(p.id) + '</td></tr>';
+        });
+        $('orphanList').innerHTML = html + '</tbody></table>';
+    }
+    $('orphanList').addEventListener('click', (e) => {
+        const tr = e.target.closest('tr[data-pid]');
+        if (!tr) return;
+        const id = tr.dataset.pid;
+        if (orphanSel.has(id)) orphanSel.delete(id); else orphanSel.add(id);
+        renderAll();
+    });
+    $('orphanAllBtn').addEventListener('click', () => { visibleOrphans().forEach((p) => orphanSel.add(p.id)); renderAll(); });
+    $('orphanClearBtn').addEventListener('click', () => { orphanSel.clear(); renderAll(); });
+    $('orphanCsvBtn').addEventListener('click', () => {
+        const rows = visibleOrphans();
+        downloadCsv('orphaned_remote_connect_profiles.csv',
+            ['profile_id', 'profile_name', 'type', 'settings', 'router_id', 'account_id', 'account_name', 'created_at'],
+            rows.map((p) => [p.id, p.name, p.type, p.summary, p.router_id, p.account_id, p.account_name, p.created_at]));
+    });
+
+    // ------------------------------------------------------------ run / state
+    function requestBody() {
+        const threads = parseInt($('threadsSelect').value, 10) || cfg.default_threads;
+        if (action === 'create') return { specs: [formSpec()], target: destTarget(), threads: threads };
+        if (action === 'copy') return { source_profile_ids: Array.from(source.selected), source_router_id: source.routerId, target: destTarget(), threads: threads };
+        if (action === 'delete') {
+            if (dest.mode === 'name') return { target: destTarget(), threads: threads };
+            return { target: destTarget(), names: Array.from(delNames), all_profiles: delAll, threads: threads };
+        }
+        if (action === 'disable') return { target: destTarget(), threads: threads };
+        return { target: { mode: 'profiles', ids: Array.from(orphanSel) }, orphans: true, threads: threads };
+    }
+    function readiness() {
+        const busy = !!pollTimer;
+        const nRouters = destRouterIds().length;
+        if (action === 'create') {
+            const p = formProblems();
+            if (p.length) return { ok: false, text: 'Fill in the profile: ' + p[0] };
+            if (!nRouters) return { ok: false, text: 'Select a destination' };
+            return { ok: !busy, text: 'Push "' + $('fName').value.trim() + '" to ' + plural(nRouters, 'router'), run: 'Push to ' + plural(nRouters, 'router') };
+        }
+        if (action === 'copy') {
+            if (!source.routerId) return { ok: false, text: 'Pick a source router' };
+            if (!source.selected.size) return { ok: false, text: 'Tick the profile(s) to copy' };
+            const n = destRouterIds().filter((id) => id !== source.routerId).length;
+            if (!n) return { ok: false, text: 'Select a destination' };
+            return { ok: !busy, text: 'Copy ' + plural(source.selected.size, 'profile') + ' to ' + plural(n, 'router'), run: 'Copy to ' + plural(n, 'router') };
+        }
+        if (action === 'delete') {
+            if (dest.mode === 'name') {
+                if (!dest.profileIds.size) return { ok: false, text: 'Tick the profiles to delete' };
+                return { ok: !busy, text: 'Delete ' + plural(dest.profileIds.size, 'profile') + ' from ' + plural(nRouters, 'router'), run: 'Delete ' + plural(dest.profileIds.size, 'profile') };
+            }
+            if (!nRouters) return { ok: false, text: 'Select routers or groups' };
+            if (!delAll && !delNames.size) return { ok: false, text: 'Tick the profile names to delete' };
+            return { ok: !busy, text: 'Delete ' + (delAll ? 'all profiles' : plural(delNames.size, 'name')) + ' on ' + plural(nRouters, 'router'), run: 'Delete from ' + plural(nRouters, 'router') };
+        }
+        if (action === 'disable') {
+            if (!nRouters) return { ok: false, text: 'Select routers or groups' };
+            const on = destRouterIds().filter((id) => (routerById.get(id) || {}).lan_manager === 'enabled').length;
+            return { ok: !busy, text: 'Disable LAN Manager on ' + plural(nRouters, 'router') + ' (' + on + ' currently enabled)', run: 'Disable on ' + plural(nRouters, 'router') };
+        }
+        if (!orphanSel.size) return { ok: false, text: 'Tick orphaned profiles to delete' };
+        return { ok: !busy, text: 'Delete ' + plural(orphanSel.size, 'orphaned profile'), run: 'Delete ' + plural(orphanSel.size, 'profile') };
+    }
+    function updateRunState() {
+        const r = readiness();
+        $('runSummary').textContent = pollTimer ? 'A run is in progress…' : r.text;
+        $('runBtn').disabled = !r.ok;
+        $('previewBtn').disabled = !r.ok;
+        $('runBtn').textContent = r.run || 'Run';
+    }
+    function renderAll() {
+        renderSource();
+        renderDest();
+        renderDelNames();
+        renderOrphans();
+        updateRunState();
+    }
+
+    // ---------------------------------------------------------------- preview
+    async function fetchPreview() {
+        const body = requestBody();
+        if (action === 'create' || action === 'copy') return { kind: 'push', data: await api('/api/preview/push', { json: body }) };
+        if (action === 'disable') {
+            const rows = destRouterIds().map((id) => routerById.get(id)).filter(Boolean);
+            return { kind: 'disable', data: { rows: rows } };
+        }
+        return { kind: 'delete', data: await api('/api/preview/delete', { json: body }) };
+    }
+    function renderPreview(p) {
+        $('previewPanel').style.display = 'flex';
+        let html = '<table class="pick-table"><thead><tr>';
+        if (p.kind === 'push') {
+            const t = p.data.totals;
+            const parts = [];
+            if (t.create) parts.push(t.create + ' create');
+            if (t.update) parts.push(t.update + ' update');
+            if (t.replace) parts.push(t.replace + ' replace (type change)');
+            if (t.dedupe) parts.push(t.dedupe + ' dedupe');
+            if (t.unchanged) parts.push(t.unchanged + ' already correct');
+            if (t.lm_enable) parts.push('LAN Manager enabled on ' + t.lm_enable);
+            if (t.skipped) parts.push(t.skipped + ' skipped (not in v2)');
+            $('previewSummary').textContent = plural(p.data.rows.length, 'router') + ': ' + (parts.join(' · ') || 'nothing to do');
+            html += '<th class="nosort">Router</th><th class="nosort">Group</th><th class="nosort">LAN Manager</th><th class="nosort">Profiles</th></tr></thead><tbody>';
+            p.data.rows.forEach((r) => {
+                const lm = r.note ? '' : (r.lm === 'enabled' ? lmBadge('enabled') : '<span class="badge create">will enable</span>');
+                const outs = r.note ? '<span class="meta-text">' + esc(r.note) + '</span>' : r.outcomes.map((o) =>
+                    '<span class="badge ' + esc(o.outcome) + '">' + esc(o.outcome === 'unchanged' ? 'already correct' : o.outcome) + '</span> ' + esc(o.name)
+                    + (o.deletes ? ' <span class="meta-text">(−' + o.deletes + ')</span>' : '')).join('<br>');
+                html += '<tr><td class="truncate">' + esc(r.name || '(unnamed)') + ' <span class="cell-mono">' + esc(r.id) + '</span></td><td class="truncate">' + esc(r.group_name || '—') + '</td><td>' + lm + '</td><td>' + outs + '</td></tr>';
+            });
+        } else if (p.kind === 'delete') {
+            $('previewSummary').textContent = plural(p.data.profiles, 'profile') + ' on ' + plural(p.data.routers, 'router') + ' (from cache)';
+            html += '<th class="nosort">Router</th><th class="nosort">Group</th><th class="nosort">Profiles to delete</th></tr></thead><tbody>';
+            p.data.rows.forEach((r) => {
+                html += '<tr><td class="truncate">' + (r.orphan ? '<span class="badge orphan">not in v2</span>' : esc(r.name || '(unnamed)')) + ' <span class="cell-mono">' + esc(r.id) + '</span></td><td class="truncate">' + esc(r.group_name || '—') + '</td><td>'
+                    + r.profiles.map((x) => '<strong>' + esc(x.name) + '</strong> <span class="cell-mono">' + esc(x.summary) + '</span>').join('<br>') + '</td></tr>';
+            });
+            if (!p.data.rows.length) html += '<tr><td colspan="3" class="meta-text" style="text-align:center;">No matching profiles in the cached inventory. Routers are still re-read live at run time.</td></tr>';
+        } else {
+            const on = p.data.rows.filter((r) => r.lan_manager === 'enabled').length;
+            $('previewSummary').textContent = on + ' of ' + plural(p.data.rows.length, 'router') + ' will be disabled; the rest are skipped';
+            html += '<th class="nosort">Router</th><th class="nosort">Group</th><th class="nosort">LAN Manager now</th><th class="nosort">Profiles kept</th></tr></thead><tbody>';
+            p.data.rows.forEach((r) => {
+                html += '<tr><td class="truncate">' + esc(r.name || '(unnamed)') + '</td><td class="truncate">' + esc(r.group_name || '—') + '</td><td>' + lmBadge(r.lan_manager) + '</td><td>' + esc(r.profile_count) + '</td></tr>';
+            });
+        }
+        $('previewBody').innerHTML = html + '</tbody></table>';
+    }
+    $('previewBtn').addEventListener('click', async () => {
+        $('previewBtn').disabled = true;
+        try { renderPreview(await fetchPreview()); $('previewPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+        catch (err) { notify('Preview failed: ' + err.message, 'error'); }
+        finally { updateRunState(); }
+    });
+    $('closePreviewBtn').addEventListener('click', () => { $('previewPanel').style.display = 'none'; });
+
+    $('runBtn').addEventListener('click', async () => {
+        let preview;
+        $('runBtn').disabled = true;
+        try { preview = await fetchPreview(); renderPreview(preview); }
+        catch (err) { notify('Could not prepare the run: ' + err.message, 'error'); updateRunState(); return; }
+        const threads = parseInt($('threadsSelect').value, 10) || cfg.default_threads;
+        let msg;
+        if (preview.kind === 'push') {
+            const s = preview.data.specs.map((x) => '  • ' + x.settings.name + ' — ' + x.summary).join('\n');
+            msg = (action === 'copy' ? 'Copy' : 'Push') + ' to ' + plural(preview.data.rows.length, 'router') + ':\n' + s + '\n\n' + $('previewSummary').textContent
+                + '\n\nSame-name profiles (any case) are replaced. LAN Manager is enabled where needed.';
+        } else if (preview.kind === 'delete') {
+            msg = 'DELETE ' + $('previewSummary').textContent + '?\n\nThis cannot be undone from this app (previous values are written to the run log).'
+                + (action === 'delete' && dest.mode !== 'name' ? '\nEach router is re-read live, so matching profiles added since the last refresh are deleted too.' : '')
+                + '\nLAN Manager is not changed.';
+        } else {
+            msg = 'Disable LAN Manager on ' + plural(preview.data.rows.length, 'router') + '?\n\nProfiles are kept.';
+        }
+        if (!confirm(msg + '\n\nThreads: ' + threads)) { updateRunState(); return; }
+        const url = { create: '/api/jobs/push', copy: '/api/jobs/push', delete: '/api/jobs/delete', orphans: '/api/jobs/delete', disable: '/api/jobs/lan-disable' }[action];
+        try {
+            const data = await api(url, { json: requestBody() });
+            $('logCurrent').innerHTML = 'Current run: <span class="cell-mono">' + esc(data.log_name) + '</span>';
+            $('previewPanel').style.display = 'none';
+            notify('Run started on ' + plural(data.total, 'router') + ' with ' + data.threads + ' thread(s).', 'success');
+            startPolling();
+        } catch (err) {
+            notify('Could not start: ' + err.message, 'error');
+            updateRunState();
+        }
+    });
+    $('cancelBtn').addEventListener('click', async () => {
+        if (!confirm('Stop the run?\n\nRouters already changed stay changed.')) return;
+        try { await api('/api/jobs/cancel', { method: 'POST' }); notify('Cancel requested.', 'info'); }
+        catch (err) { notify('Cancel failed: ' + err.message, 'error'); }
+    });
+
+    // -------------------------------------------------------------- progress
+    function startPolling() {
+        $('progressPanel').style.display = 'flex';
+        $('progressPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        $('cancelBtn').style.display = 'block';
+        if (pollTimer) clearInterval(pollTimer);
+        pollTimer = setInterval(pollStatus, 1000);
+        updateRunState();
+        pollStatus();
+    }
+    function stopPolling() {
+        if (pollTimer) clearInterval(pollTimer);
+        pollTimer = null;
+        $('cancelBtn').style.display = 'none';
+        updateRunState();
+    }
+    const TERMINAL = { done: 1, canceled: 1, error: 1 };
+    async function pollStatus() {
+        let job;
+        try { job = await api('/api/jobs/status'); } catch (err) { return; }
+        if (!job || job.state === 'idle') { stopPolling(); return; }
+        lastJob = job;
+        renderProgress(job);
+        if (TERMINAL[job.state]) {
+            stopPolling();
+            refreshLogList();
+            if (job.state === 'error') notify('Run failed: ' + (job.error || 'unknown error'), 'error');
+            else notify(job.label + ' ' + (job.state === 'canceled' ? 'canceled' : 'complete') + ' — ' + job.changed + ' changed, '
+                + job.unchanged + ' unchanged, ' + job.failed + ' failed.', job.failed ? 'error' : 'success');
+            orphanSel.clear();
+            if (action === 'delete' && dest.mode === 'name') dest.profileIds.clear();
+            await loadInventory('');   // server already re-read v3 after the run
+            if (action === 'copy' && source.routerId) pickSource(source.routerId, null);
+        }
+    }
+    function renderProgress(job) {
+        const total = job.total || 0, done = job.processed || 0;
+        const pct = total ? Math.round((done / total) * 100) : 0;
+        $('progressTitle').textContent = job.label || 'Progress';
+        $('statTotal').textContent = total;
+        $('statChanged').textContent = job.changed || 0;
+        $('statUnchanged').textContent = job.unchanged || 0;
+        $('statFailed').textContent = job.failed || 0;
+        const fill = $('progressFill');
+        fill.style.width = pct + '%';
+        fill.className = 'progress-fill' + (job.state === 'error' || job.failed ? ' failed' : (TERMINAL[job.state] ? ' done' : ''));
+        $('progressCount').textContent = done + ' of ' + total + ' (' + pct + '%)' + (job.canceled ? ' · ' + job.canceled + ' canceled' : '');
+        const labels = { running: 'Working…', refreshing: 'Re-reading profiles…', done: 'Complete', canceled: 'Canceled', error: 'Failed' };
+        $('progressState').textContent = (labels[job.state] || job.state) + (job.threads ? ' · ' + job.threads + ' thread(s)' : '');
+        if (job.started_at) {
+            const end = job.finished_at || (Date.now() / 1000);
+            $('progressElapsed').textContent = Math.max(0, Math.round(end - job.started_at)) + 's';
+        }
+        document.querySelectorAll('#progressStats .stat-card').forEach((c) => c.classList.toggle('active', !!progressFilter && c.dataset.filter === progressFilter));
+        let body = '';
+        (job.rows || []).filter((r) => !progressFilter || r.status === progressFilter).forEach((r) => {
+            body += '<tr><td class="truncate" title="' + esc(r.router_name) + '">' + (r.orphan ? '<span class="badge orphan">not in v2</span> ' : '') + esc(r.router_name || '') + ' <span class="cell-mono">' + esc(r.router_id) + '</span></td>'
+                + '<td class="truncate">' + esc(r.group_name || '—') + '</td><td class="truncate">' + esc(r.account_name || '—') + '</td>'
+                + '<td><span class="badge ' + esc(r.status) + '">' + esc(r.status) + '</span></td>'
+                + '<td style="max-width:460px;white-space:normal;font-size:0.78rem;">' + esc(r.message || '') + '</td></tr>';
+        });
+        $('progressBody').innerHTML = body || '<tr><td colspan="5" class="meta-text" style="text-align:center;">No rows match this filter.</td></tr>';
+    }
+    document.querySelectorAll('#progressStats .stat-card').forEach((c) => c.addEventListener('click', () => {
+        progressFilter = progressFilter === c.dataset.filter ? '' : c.dataset.filter;
+        if (lastJob) renderProgress(lastJob);
+    }));
+    $('progressCsvBtn').addEventListener('click', () => {
+        if (!lastJob) return;
+        downloadCsv((lastJob.log_name || 'run').replace(/\.log$/, '') + '.csv', ['router_id', 'router_name', 'group', 'account', 'status', 'detail'],
+            (lastJob.rows || []).filter((r) => !progressFilter || r.status === progressFilter)
+                .map((r) => [r.router_id, r.router_name, r.group_name, r.account_name, r.status, r.message]));
+    });
+
+    // ------------------------------------------------------------------- logs
+    async function refreshLogList() {
+        try {
+            const data = await api('/api/logs');
+            const sel = $('logSelect');
+            sel.innerHTML = '<option value="">— Past run logs —</option>' + (data.logs || []).map((l) => '<option value="' + esc(l.name) + '">' + esc(l.name) + '</option>').join('');
+            if (data.logs && data.logs.length) sel.value = data.logs[0].name;
+            $('downloadLogBtn').disabled = !sel.value;
+        } catch (err) { /* non-critical */ }
+    }
+    $('logSelect').addEventListener('change', () => { $('downloadLogBtn').disabled = !$('logSelect').value; });
+    $('downloadLogBtn').addEventListener('click', () => {
+        const name = $('logSelect').value;
+        if (name) window.open('/api/log?name=' + encodeURIComponent(name), '_blank');
+    });
+
+    // --------------------------------------------------------------- settings
+    const CRED_KEYS = ['X_CP_API_ID', 'X_CP_API_KEY', 'X_ECM_API_ID', 'X_ECM_API_KEY', 'NCM_API_TOKEN'];
+    document.querySelectorAll('.eye-toggle').forEach((btn) => btn.addEventListener('click', () => {
+        const input = $(btn.dataset.target);
+        const hidden = input.type === 'password';
+        input.type = hidden ? 'text' : 'password';
+        btn.textContent = hidden ? '🙈' : '👁';
+    }));
+    function credFields() { const o = {}; CRED_KEYS.forEach((k) => { o[k] = $('c_' + k).value.trim(); }); return o; }
+    async function refreshCredProfiles() {
+        try {
+            const profiles = await api('/api/profiles');
+            $('credProfileSelect').innerHTML = '<option value="">— Select saved profile —</option>'
+                + Object.keys(profiles).sort().map((n) => '<option value="' + esc(n) + '">' + esc(n) + '</option>').join('');
+        } catch (err) { notify('Could not list saved profiles: ' + err.message, 'error'); }
+    }
+    async function loadCurrentCreds() {
+        try {
+            const cur = await api('/api/profiles/current');
+            CRED_KEYS.forEach((k) => { $('c_' + k).value = (cur[k] && cur[k].value) || ''; });
+        } catch (err) { /* ignore */ }
+    }
+    $('loadCredBtn').addEventListener('click', async () => {
+        const name = $('credProfileSelect').value;
+        if (!name) return notify('Pick a saved profile first.', 'info');
+        try { await api('/api/profiles/load', { json: { name: name } }); await loadCurrentCreds(); notify('Loaded "' + name + '".', 'success'); settingsModal.classList.remove('show'); await reloadConfig(); loadInventory(''); }
+        catch (err) { notify(err.message, 'error'); }
+    });
+    $('deleteCredBtn').addEventListener('click', async () => {
+        const name = $('credProfileSelect').value;
+        if (!name || !confirm('Delete saved profile "' + name + '"?')) return;
+        try { await api('/api/profiles/' + encodeURIComponent(name), { method: 'DELETE' }); refreshCredProfiles(); notify('Deleted.', 'success'); }
+        catch (err) { notify(err.message, 'error'); }
+    });
+    $('applyCredsBtn').addEventListener('click', async () => {
+        try { await api('/api/credentials/apply', { json: { credentials: credFields() } }); settingsModal.classList.remove('show'); await reloadConfig(); loadInventory(''); }
+        catch (err) { notify(err.message, 'error'); }
+    });
+    async function saveCreds(name, overwrite) {
+        try {
+            await api('/api/profiles', { json: { name: name, credentials: credFields(), overwrite: overwrite } });
+            notify('Saved "' + name + '".', 'success');
+            await refreshCredProfiles();
+            $('credProfileSelect').value = name;
+        } catch (err) {
+            if (err.status === 409 && confirm(err.message + '. Overwrite?')) return saveCreds(name, true);
+            if (err.status !== 409) notify(err.message, 'error');
+        }
+    }
+    $('saveCredBtn').addEventListener('click', () => {
+        const name = $('credProfileSelect').value || prompt('Profile name:');
+        if (name) saveCreds(name.trim(), !!$('credProfileSelect').value);
+    });
+    $('saveAsCredBtn').addEventListener('click', () => { const n = prompt('New profile name:'); if (n) saveCreds(n.trim(), false); });
+
+    function buildThreads() {
+        const sel = $('threadsSelect');
+        sel.innerHTML = '';
+        for (let i = 1; i <= cfg.max_threads; i++) sel.insertAdjacentHTML('beforeend', '<option value="' + i + '">' + (i === 1 ? '1 (sequential)' : i) + '</option>');
+        const saved = parseInt(localStorage.getItem('lmpmThreads'), 10);
+        sel.value = String(saved >= 1 && saved <= cfg.max_threads ? saved : cfg.default_threads);
+    }
+    $('threadsSelect').addEventListener('change', (e) => localStorage.setItem('lmpmThreads', e.target.value));
+
+    async function reloadConfig() {
+        cfg = await api('/api/config');
+        const missing = cfg.missing_credentials || [];
+        if (missing.length) {
+            $('credNotice').innerHTML = 'Missing credentials: <strong>' + esc(missing.join(', ')) + '</strong>. Open Settings (gear icon) to add them.'
+                + (missing.includes('NCM_API_TOKEN') ? ' The v3 token is required because profiles and LAN Manager settings are v3-only.' : '');
+            $('credNotice').style.display = 'block';
+        }
+        return missing;
+    }
+
+    // ------------------------------------------------------------------- init
+    (async function init() {
+        try {
+            const missing = await reloadConfig();
+            buildTypeSelect();
+            buildThreads();
+            setAction('create');
+            refreshLogList();
+            if (missing.length) { openSettings(); $('destList').innerHTML = emptyState('Add credentials in Settings to load the fleet.', '!'); return; }
+            await loadInventory('');
+        } catch (err) {
+            notify('Startup failed: ' + err.message, 'error');
+        }
+    })();
+})();
+</script>
+</body>
+</html>
