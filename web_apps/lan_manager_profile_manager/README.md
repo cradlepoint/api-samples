@@ -1,4 +1,4 @@
-# LAN Manager Profile Manager
+<img width="1587" height="847" alt="image" src="https://github.com/user-attachments/assets/8c74a0a6-eea9-4c90-975f-99d29f843786" />
 
 A web app for managing Remote Connect LAN Manager profiles (SSH, HTTP, HTTPS,
 RDP, VNC and Serial) across your whole fleet at once — create them, copy them,
