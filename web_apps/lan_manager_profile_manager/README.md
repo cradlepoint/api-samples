@@ -1,84 +1,98 @@
 # LAN Manager Profile Manager
 
-Bulk-manage Remote Connect LAN Manager profiles (SSH, HTTP, HTTPS, RDP, VNC and
-Serial) across a fleet.
+A web app for managing Remote Connect LAN Manager profiles (SSH, HTTP, HTTPS,
+RDP, VNC and Serial) across your whole fleet at once — create them, copy them,
+delete them, turn LAN Manager on or off, and clean up leftovers.
 
-| | |
-|---|---|
-| Port | 8095 (binds `127.0.0.1`) |
-| Entry point | `serve.py` |
-| APIs | v2 `routers` / `groups` / `accounts` (read-only); v3 `remote_connect_profiles`, `lan_manager_options` |
-| Credentials | `X_CP_API_ID`, `X_CP_API_KEY`, `X_ECM_API_ID`, `X_ECM_API_KEY` **and `NCM_API_TOKEN`**. Profiles exist only in v3. |
+## What you need
 
-## Run
+- Python 3.9 or newer
+- Your NCM API credentials:
+  - `X_CP_API_ID`, `X_CP_API_KEY`, `X_ECM_API_ID`, `X_ECM_API_KEY`
+  - `NCM_API_TOKEN` — **required**. LAN Manager profiles only exist in the v3
+    API, and this token is what unlocks it. Without it the app can't do its job.
+
+You can type the credentials into the app's Settings panel the first time you
+run it, so you don't have to set anything up in advance.
+
+## Start it
 
 ```bash
-source .venv/bin/activate && python3 -u web_apps/lan_manager_profile_manager/serve.py
+pip install -r requirements.txt
+python serve.py
 ```
 
-Open http://localhost:8095. Credentials come from the environment or `.env`, or
-you can enter them in the Settings panel (gear icon).
+Then open **http://localhost:8000** in your browser.
 
-## Actions
+If you installed the project's shared environment, activate it first:
 
-- **Create profile**: define a profile and push it to routers, groups, or the
-  routers found by a profile-name search.
-- **Copy profile**: pick a source router (searchable), tick one or more of its
-  profiles, and push them to a destination. The source router isn't changed.
-- **Delete profiles**:
-  - by router or group: choose which profile names to delete, or all of them
-  - by profile name: tick whole variants, or individual routers within them
-- **Disable LAN Manager**: turn LAN Manager off on routers or groups. Profiles
-  are kept.
-- **Orphaned profiles**: list and delete profiles whose router ID isn't in the
-  v2 router list. These are profiles left behind after a router was
-  unregistered or deleted.
+```bash
+source .venv/bin/activate && python3 -u serve.py    # macOS/Linux
+.venv\Scripts\activate.bat && python -u serve.py    # Windows
+```
 
-## Rules
+The first time it loads, click the gear icon and enter your credentials, then
+Apply. You can save them as a named profile so you don't retype them.
 
-- **Searches ignore case.** That includes profile-name matching.
-- **Pushes enable LAN Manager automatically.** Before writing any profiles, the
-  app updates the router's `lan_manager_options` record if one exists and
-  creates one if it doesn't.
-- **Pushes never duplicate.** Existing profiles are matched by name, ignoring
-  case and surrounding spaces:
-  - no match: the profile is created
-  - one or more matches of the same type: one is kept and updated in place (an
-    already-identical one is preferred), and the rest are deleted
-  - a match of a different type: the new profile is created first, then the old
-    one is deleted
-  - already identical: reported as *unchanged* and not written
-- **Pushes are safe to repeat.** Push to a group, add routers to it later, and
-  push again. Only the new routers change.
-- **Deletes never touch LAN Manager.**
-- **Variants** group profiles that have the same name and identical settings:
-  type, exact name (case included), port, address, username and resolution.
-  Variants are sorted largest first, since the most common one is usually the
-  correct one.
-- **Every router is re-read live when the run starts, and re-read after the
-  write to verify it.** Previews use cached data.
+> The app runs on your own machine and has no login. Keep it on `localhost` —
+> don't put it on a shared network, because anyone who could reach it would see
+> your saved credentials.
 
-## Fixing profiles that were created wrong
+## What you can do
 
-1. Choose **Copy profile**, set the destination to **Profile name**, and search
-   the name.
-2. On the correct variant, click **Use as source**.
-3. Tick the wrong variants, or individual routers within them.
+- **Create a profile** — define one profile (say, an SSH profile on port 22)
+  and push it to the routers or groups you pick.
+- **Copy profiles** — grab one or more profiles off an existing router and push
+  copies to other routers or groups. The original router isn't touched.
+- **Delete profiles** — remove profiles by router, by group, or by profile
+  name. Pick specific names or clear them all.
+- **Disable LAN Manager** — switch LAN Manager off on routers or groups. Your
+  profiles stay in place.
+- **Clean up orphans** — find and delete profiles left behind by routers that
+  no longer exist in your account.
+
+## Good things to know
+
+- **Nothing happens until you click Run.** Every action shows a preview first,
+  so you can see exactly which routers will change.
+- **You won't create duplicates.** When you push a profile, the app matches it
+  to any existing profile with the same name (ignoring capitalization and extra
+  spaces), updates that one in place, and clears out duplicates. Pushing the
+  same thing twice is safe.
+- **Pushing a profile turns LAN Manager on automatically** for every router it
+  reaches. Deleting profiles never turns LAN Manager off — that's a separate
+  action.
+- **Push to a group, add routers later, push again** — only the new routers get
+  changed.
+- **Searches ignore capitalization**, including when you search by profile name.
+
+## Fixing a profile you created wrong
+
+1. Choose **Copy profile** and set the destination to **Profile name**, then
+   search for the name.
+2. Find the correct version and click **Use as source**.
+3. Tick the wrong ones (whole groups or individual routers).
 4. Click **Preview**, then **Run**.
 
 ## Logs
 
-Each run writes `logs/lan_manager_<action>_<timestamp>.log`. Every create,
-update and delete is logged along with the **previous values** of anything that
-was replaced or deleted. The `logs/` folder is gitignored.
+Every run is saved to a timestamped file in the `logs/` folder. The log records
+each profile created, updated or deleted — including the old values of anything
+that was replaced — so you always have a record of what changed.
 
-## Notes
+## Settings
 
-- Routers that aren't in the v2 list can't receive pushes. They're skipped and
-  shown as "router not in v2".
-- Only groups that contain routers are listed. An account can hold thousands of
-  empty groups, and listing them all made loading take minutes.
-- There's no authentication. Anyone who can reach the port can read the saved
-  credentials and change profiles, so keep the app on localhost.
-- Threads are set in Settings (default 4). Each router takes 3–6 API calls, and
-  NCM allows roughly 500 calls per minute.
+- **Credentials** — enter and save them under the gear icon.
+- **Threads** (default 4) — how many routers the app works on at once. Higher is
+  faster, but NCM allows roughly 500 API calls per minute and each router takes
+  a handful, so leave it low for very large fleets.
+
+## Troubleshooting
+
+- **"Missing NCM_API_TOKEN"** — add your v3 token in the Settings panel. Profiles
+  can't be read or written without it.
+- **Port 8000 already in use** — another app is on that port. Stop it first
+  (several apps in this collection share port 8000, so run them one at a time).
+- **A router shows "router not in v2"** — that router isn't in your account's
+  router list, so it can't receive pushes. It's skipped. These usually turn up
+  under the orphan cleanup.

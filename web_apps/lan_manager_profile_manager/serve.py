@@ -25,7 +25,7 @@ v3 needs NCM_API_TOKEN, and the v3 `router` relationship ID is the v2 router ID.
 Usage:
     source .venv/bin/activate && python3 -u web_apps/lan_manager_profile_manager/serve.py
 
-Then open http://localhost:8095 in your browser.
+Then open http://localhost:8000 in your browser.
 
 Binds 127.0.0.1 because it writes to fleet configuration. There is no
 authentication: anyone who can reach the port can read the credentials in the
@@ -63,7 +63,7 @@ APP_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(APP_DIR))
 import profile_logic as pl  # noqa: E402
 
-PORT = 8095
+PORT = 8000
 MAX_THREADS = 8
 DEFAULT_THREADS = 4
 
