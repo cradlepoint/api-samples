@@ -2,6 +2,7 @@
 
 Provides:
 - get_subscriptions: Query subscriptions
+- get_regrade: Retrieve a single regrade job by ID
 - manage_subscription: Upgrade/downgrade/unlicense devices
 """
 
@@ -42,6 +43,18 @@ def register(mcp, client):
             return handle_ncm_response(result, "get_subscriptions")
         except Exception as e:
             return handle_exception(e, "get_subscriptions")
+
+    @mcp.tool()
+    def get_regrade(regrade_id: str = None) -> dict:
+        """Retrieve a single regrade job by its identifier. Requires regrade_id."""
+        try:
+            err = validate_required_params(regrade_id=regrade_id)
+            if err is not None:
+                return err
+            result = client.get_regrade(regrade_id)
+            return handle_ncm_response(result, "get_regrade")
+        except Exception as e:
+            return handle_exception(e, "get_regrade")
 
     @mcp.tool()
     def manage_subscription(

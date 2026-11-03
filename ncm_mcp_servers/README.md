@@ -10,7 +10,7 @@ A suite of three focused MCP (Model Context Protocol) servers for the Ericsson E
 |--------|------|--------|-------|
 | `ncm-fleet` | 3001 | Routers, groups, accounts, locations, configurations, firmware, products | 17 |
 | `ncm-monitoring` | 3002 | Net devices, alerts/logs, speed tests | 6 |
-| `ncm-cloud-services` | 3003 | Users, subscriptions, private cellular, exchange | 13 |
+| `ncm-cloud-services` | 3003 | Users, subscriptions, exchange, tenants, eSIM, Starlink, LAN, remote connect, modem upgrades, migrations, Wi-Fi passwords | 34 |
 
 All servers default to **Streamable HTTP transport** with **stateless mode** enabled, supporting both the MCP 2026-07-28 (stateless) and 2025-11-25 (legacy session-based) protocol versions simultaneously. Servers run together in a single container.
 
@@ -182,8 +182,15 @@ ncm_mcp_servers/
 │       └── tools/
 │           ├── users.py
 │           ├── subscriptions.py
-│           ├── private_cellular.py
-│           └── exchange.py
+│           ├── exchange.py
+│           ├── tenants.py
+│           ├── esim.py
+│           ├── starlink.py
+│           ├── lan.py
+│           ├── remote_connect.py
+│           ├── modem_upgrades.py
+│           ├── migrations.py
+│           └── wifi.py
 └── README.md
 ```
 
@@ -222,20 +229,83 @@ ncm_mcp_servers/
 | `create_speed_test` | Run speed test on devices or all modems on a router |
 | `get_speed_test` | Get speed test status and results |
 
-### ncm-cloud-services (13 tools)
+### ncm-cloud-services (34 tools)
+
+Users & subscriptions:
 
 | Tool | Description |
 |------|-------------|
 | `get_users` | Query NCM users |
 | `manage_user` | Create, update, delete users, change role |
 | `get_subscriptions` | Query subscriptions |
+| `get_regrade` | Get a single regrade job by ID |
 | `manage_subscription` | Regrade or unlicense devices |
-| `get_networks` | Query private cellular networks |
-| `manage_network` | Create, update, delete networks |
-| `get_radios` | Query radios and operational status |
-| `manage_radio` | Update radio settings |
-| `manage_sim` | Query or update SIMs |
+
+Exchange (NetCloud Exchange):
+
+| Tool | Description |
+|------|-------------|
 | `get_exchange_sites` | Query exchange sites |
 | `manage_exchange_site` | Create, update, delete sites |
 | `get_exchange_resources` | Query exchange resources |
 | `manage_exchange_resource` | Create, update, delete resources |
+
+Tenants:
+
+| Tool | Description |
+|------|-------------|
+| `get_tenants` | Query tenants |
+| `get_tenant_authorizations` | Query tenant authorizations |
+| `manage_tenant_authorization` | Update a tenant authorization |
+
+eSIM:
+
+| Tool | Description |
+|------|-------------|
+| `get_esim_profiles` | Query eSIM profiles |
+| `get_esim_profiles_manage` | Query managed eSIM profiles |
+| `manage_esim_profiles_manage` | Create a managed eSIM profile |
+| `get_esim_profile_activations` | Query eSIM profile activations |
+| `manage_esim_profile_activation` | Create (multipart) or update an activation |
+
+Starlink:
+
+| Tool | Description |
+|------|-------------|
+| `get_starlink_interfaces` | Query Starlink interfaces |
+| `get_starlink_interface_reboots` | Query interface reboots |
+| `get_starlink_interface_stows` | Query interface stows |
+| `get_starlink_diagnostics` | Query Starlink diagnostics |
+| `manage_starlink_interface` | Request a reboot or stow/unstow |
+
+LAN:
+
+| Tool | Description |
+|------|-------------|
+| `get_lan_devices` | Query LAN devices |
+| `get_lan_product_infos` | Query LAN product infos |
+| `get_lan_manager_options` | Query LAN manager options |
+| `manage_lan_manager_option` | Create or update a LAN manager option |
+
+Remote connect:
+
+| Tool | Description |
+|------|-------------|
+| `get_remote_connect_profiles` | Query remote connect profiles |
+| `manage_remote_connect_profile` | Create, update, delete a profile |
+
+Modem upgrades:
+
+| Tool | Description |
+|------|-------------|
+| `get_modem_software_versions` | Query available modem software versions (requires group) |
+| `get_modem_upgrades` | Query modem upgrade jobs |
+| `manage_modem_upgrade` | Create or update a modem upgrade job |
+
+Migrations & Wi-Fi:
+
+| Tool | Description |
+|------|-------------|
+| `get_migrations` | Query organization migration jobs |
+| `manage_migration` | Create an organization migration job |
+| `get_unmasked_wifi_passwords` | Retrieve unmasked Wi-Fi passwords for routers (requires router) |

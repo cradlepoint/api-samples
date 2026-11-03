@@ -1,14 +1,26 @@
 """NCM Cloud Services MCP Server entry point.
 
-Manages users, subscriptions, private cellular networks, and
-NetCloud Exchange via the NCM v3 API.
+Manages users, subscriptions, NetCloud Exchange, tenants, eSIM, Starlink,
+LAN, remote connect, modem upgrades, migrations, and Wi-Fi passwords via
+the NCM v3 API.
 
-Tools (13 total):
+Tools:
 - get_users, manage_user
-- get_subscriptions, manage_subscription
-- get_networks, manage_network, get_radios, manage_radio, manage_sim
+- get_subscriptions, get_regrade, manage_subscription
 - get_exchange_sites, manage_exchange_site, get_exchange_resources,
   manage_exchange_resource
+- get_tenants, get_tenant_authorizations, manage_tenant_authorization
+- get_esim_profiles, get_esim_profiles_manage, manage_esim_profiles_manage,
+  get_esim_profile_activations, manage_esim_profile_activation
+- get_starlink_interfaces, get_starlink_interface_reboots,
+  get_starlink_interface_stows, get_starlink_diagnostics,
+  manage_starlink_interface
+- get_lan_devices, get_lan_product_infos, get_lan_manager_options,
+  manage_lan_manager_option
+- get_remote_connect_profiles, manage_remote_connect_profile
+- get_modem_software_versions, get_modem_upgrades, manage_modem_upgrade
+- get_migrations, manage_migration
+- get_unmasked_wifi_passwords
 """
 
 import os

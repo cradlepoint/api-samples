@@ -9,8 +9,15 @@ if TYPE_CHECKING:
 from ncm_mcp_servers.ncm_cloud_services.tools import (
     users,
     subscriptions,
-    private_cellular,
     exchange,
+    tenants,
+    esim,
+    starlink,
+    lan,
+    remote_connect,
+    modem_upgrades,
+    migrations,
+    wifi,
 )
 
 
@@ -18,5 +25,12 @@ def register_all(mcp: "MCPServer", client: "NcmClientv3") -> None:
     """Registers all cloud services tools with the MCP server."""
     users.register(mcp, client)
     subscriptions.register(mcp, client)
-    private_cellular.register(mcp, client)
     exchange.register(mcp, client)
+    tenants.register(mcp, client)
+    esim.register(mcp, client)
+    starlink.register(mcp, client)
+    lan.register(mcp, client)
+    remote_connect.register(mcp, client)
+    modem_upgrades.register(mcp, client)
+    migrations.register(mcp, client)
+    wifi.register(mcp, client)
