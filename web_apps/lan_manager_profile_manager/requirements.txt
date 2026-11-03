@@ -26,4 +26,4 @@ python-dotenv==1.2.2
 
 # Imported directly to silence insecure-request warnings when TLS
 # verification is turned off
-urllib3==2.7.0
+urllib3==2.8.0
