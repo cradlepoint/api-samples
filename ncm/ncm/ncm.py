@@ -2701,32 +2701,6 @@ class NcmClientv3(BaseNcmClient):
             'Accept': V3_ATOMIC_MEDIA_TYPE
         }
 
-    def _v3_host_root(self):
-        """
-        Derives the scheme+host root from ``self.base_url`` for endpoints whose
-        Swagger path sits outside the configured ``/api/v3`` base (Req 4.5,
-        4.6). ``exchange_resources`` is the sole in-scope endpoint of this kind:
-        its Swagger path is ``/beta/exchange_resources`` with no ``/api/v3``
-        prefix.
-
-        Behavior:
-          - If ``base_url`` ends with ``/api/v3`` (optionally with a trailing
-            slash), return the portion before that segment, e.g.
-            ``https://api.cradlepointecm.com/api/v3`` ->
-            ``https://api.cradlepointecm.com``.
-          - Otherwise, return ``base_url`` verbatim with any trailing slash
-            removed.
-
-        This keeps the derivation resilient to ``CP_BASE_URL_V3`` overrides
-        whose path is ``/api/v3`` (e.g. the test override
-        ``https://api.example.test/api/v3`` -> ``https://api.example.test``).
-        """
-        base = self.base_url.rstrip('/')
-        suffix = '/api/v3'
-        if base.endswith(suffix):
-            return base[:-len(suffix)]
-        return base
-
     @staticmethod
     def _response_has_errors_array(response):
         """
@@ -3029,7 +3003,8 @@ class NcmClientv3(BaseNcmClient):
         :return: A list of users with details.
         """
         call_type = 'Users'
-        get_url = f'{self.base_url}/users/'
+        # No trailing slash: /api/v3/users/ is a 404 (verified 2026-11-19).
+        get_url = f'{self.base_url}/users'
 
         allowed_params = ['email',
                           'email__not',
@@ -3068,7 +3043,7 @@ class NcmClientv3(BaseNcmClient):
         """
         call_type = 'User'
         self.__check_token()
-        post_url = f'{self.base_url}/users/'
+        post_url = f'{self.base_url}/users'
 
         allowed_params = ['is_active',
                           'last_login',
@@ -3117,7 +3092,7 @@ class NcmClientv3(BaseNcmClient):
         user = users[0]
         user.pop('links', None)
 
-        patch_url = f'{self.base_url}/users/{user["id"]}/'
+        patch_url = f'{self.base_url}/users/{user["id"]}'
 
         allowed_params = ['first_name',
                           'last_name',
@@ -3156,7 +3131,7 @@ class NcmClientv3(BaseNcmClient):
         user = users[0]
         user.pop('links', None)
 
-        delete_url = f'{self.base_url}/users/{user["id"]}/'
+        delete_url = f'{self.base_url}/users/{user["id"]}'
 
         ncm = self._v3_request('delete', delete_url)
         result = self._return_handler(ncm.status_code, ncm.text, call_type)
@@ -3814,9 +3789,9 @@ class NcmClientv3(BaseNcmClient):
         if resource_id:
             if not isinstance(resource_id, str):
                 raise TypeError("resource_id must be a string")
-            get_url = f"{self._v3_host_root()}/beta/exchange_resources/{resource_id}"
+            get_url = f"{self.base_url}/beta/exchange_resources/{resource_id}"
         else:
-            get_url = f"{self._v3_host_root()}/beta/exchange_resources"
+            get_url = f"{self.base_url}/beta/exchange_resources"
 
         params = {}
         if site_name:
@@ -3941,7 +3916,7 @@ class NcmClientv3(BaseNcmClient):
         if resource_type not in valid_resource_types:
             raise ValueError(f"Invalid resource_type. Must be one of: {', '.join(valid_resource_types)}")
 
-        post_url = f'{self._v3_host_root()}/beta/exchange_resources'
+        post_url = f'{self.base_url}/beta/exchange_resources'
 
         allowed_params = {
             'protocols': (list, type(None)),
@@ -4067,7 +4042,7 @@ class NcmClientv3(BaseNcmClient):
         resource_type = current_resource['type']
         site_id = current_resource['relationships']['exchange_site']['data']['id']
 
-        put_url = f'{self._v3_host_root()}/beta/exchange_resources/{resource_id}'
+        put_url = f'{self.base_url}/beta/exchange_resources/{resource_id}'
 
         allowed_params = {
             'name': str,
@@ -4185,7 +4160,7 @@ class NcmClientv3(BaseNcmClient):
 
         results = []
         for rid in resource_ids:
-            delete_url = f'{self._v3_host_root()}/beta/exchange_resources/{rid}'
+            delete_url = f'{self.base_url}/beta/exchange_resources/{rid}'
             ncm = self._v3_request('delete', delete_url)
             if ncm.status_code == 204:
                 results.append({'resource_id': rid, 'status': 'deleted'})
