@@ -135,9 +135,12 @@ client = ncm.NcmClient(api_keys=api_keys)
 ## v3 Methods
 
 ### Users
+Calls `/api/v3/users`. Before 2026-11-19 these used a trailing slash and failed
+(`JSONDecodeError` on an HTML 404); fixed in the repo copy, still broken in PyPI
+`ncm` 0.0.73. See `known-issues.md`.
 - `get_users(**kwargs)`
 - `create_user(email, first_name, last_name, **kwargs)`
-- `update_user(email, **kwargs)`
+- `update_user(email, **kwargs)` — sends PATCH; the spec documents PUT (unverified)
 - `delete_user(email)`
 - `update_user_role(email, new_role)`
 
@@ -159,10 +162,18 @@ client = ncm.NcmClient(api_keys=api_keys)
 - `create_exchange_site(name, exchange_network_id, router_id, **kwargs)`
 - `update_exchange_site(site_id=, name=, **kwargs)`
 - `delete_exchange_site(site_id=, site_name=)`
-- `get_exchange_resources(**kwargs)`
+- `get_exchange_resources(site_id=, exchange_network_id=, resource_id=, site_name=, **kwargs)`
+  — the list call needs a site or network (the API requires one)
 - `create_exchange_resource(resource_name, resource_type, site_id=, ...)`
 - `update_exchange_resource(resource_id, **kwargs)`
 - `delete_exchange_resource(resource_id=, site_name=, site_id=)`
+
+The exchange_resources methods called a URL without `/api/v3` (Cloudflare `530`)
+until 2026-11-19; fixed in the repo copy, still broken in PyPI `ncm` 0.0.73.
+
+### Public SIM Management
+- `get_public_sim_mgmt_assets(**kwargs)`, `get_public_sim_mgmt_rate_plans(**kwargs)`
+  — both endpoints are `404` live (2026-11-19); expect these to fail.
 
 ## Common kwargs
 

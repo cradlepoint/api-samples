@@ -718,3 +718,48 @@ concluding a filter does not exist" guidance.
 
 - Added known issue: SSH Remote Connect profiles can exist with a null `username` (54 of 114 in one account, created 2017–2026), but the v3 API rejects a missing or null SSH username on both POST and PUT (verified live: `400 "username is required for ssh_profile"`). These profiles can't be copied as-is through the API.
 - `api-v3-endpoints.md`: SSH `username` is now noted as required on POST and PUT (verified), with existing records possibly null.
+
+## 2026-11-19 — Endpoint corrections from live probing; SDK URL fixes
+
+Found while reviewing `postman-collection/NCM_API_OAS3.yaml` (report:
+`NCM_API_OAS3-review.md`). Everything below was confirmed with read-only
+`GET`/`OPTIONS` calls against a live account.
+
+- `api-overview.md`: `users` exists in both v2 (GET only) and v3 (CRUD). v2 `limit`
+  above 500 is silently clamped.
+- `api-v3-endpoints.md`:
+  - Replaced the "`users` is not a v3 endpoint" note with a `users` section:
+    `/api/v3/users`, type `users` or `collaborators`, and no trailing slash.
+  - `account_authorizations` is moved to `/api/v3/beta/`.
+  - exchange_resources: the list call requires a site or network filter, and the path
+    needs `/api/v3` even though the Swagger path doesn't have it.
+  - Public SIM Management is marked unreachable (404).
+  - Added Path Convention #3 (`page[size]` max 50) and noted which v3 paths tolerate
+    a trailing slash.
+- `api-v2-endpoints.md`:
+  - `users` now lists `/{id}/` and points to v3 for writes.
+  - `routers/{id}/` has no PATCH.
+  - alert_rules and alert_push_destinations are PATCH, not PUT, keyed by timeuuid,
+    and have item GETs.
+  - `test_alert_push_destinations` is plural.
+- `api-webhooks.md`: fixed the test endpoint name.
+- `common-patterns.md`:
+  - Softened the "spec settles base URL and path" claims (one spec has a v2 basePath
+    yet a v3 users API exists; the exchange_resources spec path is wrong).
+  - The precedence order now puts the live API first.
+  - New pattern: "Probing a Route Live With OPTIONS". Unknown v2 routes answer GET
+    with a misleading 401.
+- `known-issues.md`:
+  - Added a correction note to the 2026-09-28 `users` bullet.
+  - New entry: "Endpoint Corrections From Live Probing".
+  - New entry: "SDK v3 `exchange_resources` and `users` Methods Built URLs the API
+    Rejects", which also notes that PyPI `ncm` 0.0.73 is still affected.
+- `ncm-sdk-reference.md`: notes on the users and exchange_resources fixes, the
+  `get_exchange_resources` signature, and the Public SIM methods failing.
+- `.kiro/steering/ncm-api-development.md`: the Users routing row now lists v2 and v3.
+- SDK (`ncm/ncm/ncm.py` and the identical `ncm_mcp_servers/shared/ncm.py`):
+  - exchange_resources methods now use `{base_url}/beta/exchange_resources`, and the
+    `_v3_host_root()` helper is removed.
+  - Removed trailing slashes from the four v3 users URLs.
+  - Verified live: `get_exchange_resources(site_id=...)`, single-resource read,
+    `get_users()`, `get_users(email=...)`.

@@ -10,7 +10,7 @@ approach following RFC 8030.
 1. Create an Alert Push Destination via `alert_push_destinations` endpoint
    - Set `endpoint` to your webhook URL
    - Set `authentication` to a secret value for HMAC validation
-2. Test it via `test_alert_push_destination` endpoint
+2. Test it via `POST /api/v2/test_alert_push_destinations/` (plural — the singular path does not exist)
 3. Create an Alert Rule and link it to the push destination
    - Add the `destination_config_id` from step 1 to the `http_destinations` field in the alert rule
 

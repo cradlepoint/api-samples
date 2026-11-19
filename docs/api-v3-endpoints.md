@@ -18,10 +18,16 @@ verified against the official Swagger specs at
 1. **No trailing slash.** The v2 "URLs must end with `/`" rule is a v2 rule. Every
    v3 spec defines its paths **without** a trailing slash (e.g.
    `/api/v3/subscriptions`, not `/api/v3/subscriptions/`). Do not append one.
+   Some v3 services happen to tolerate it (`subscriptions/`, `asset_endpoints/`
+   return 200) but others do not (`users/` is a 404), so never rely on it.
 2. **Many v3 endpoints are not at the bare `/api/v3/` root.** The Private Cellular
    and NetCloud Exchange families live under `/api/v3/beta/...`, and `regrades`
    lives under `/api/v3/asset_endpoints/regrades`. The paths below are the real
    ones; do not "simplify" them to `/api/v3/<name>`.
+3. **`page[size]` max is 50 almost everywhere.** Above 50 is a `400` ("You
+   requested a size of 51, but 50 is the maximum"), verified 2026-11-19 on
+   subscriptions, asset_endpoints, regrades, lan_clients, lan_manager_options and
+   account_authorizations. `exchange_sites` (max 500) is the known exception.
 
 ## Authentication
 
@@ -55,9 +61,38 @@ Record attributes include `name`, `start_time`, `end_time`, `quantity`,
 relationships. Required on the record: `name`, `start_time`, `end_time`,
 `quantity`, `feature_list_id`.
 
-> **`users` is not a v3 endpoint.** It was previously listed here with full CRUD and
-> bearer auth. That is wrong — `users` is a **v2** endpoint (four `X-` header keys,
-> GET only). See `api-v2-endpoints.md`.
+### users
+
+```
+GET    /api/v3/users
+GET    /api/v3/users/{id}
+POST   /api/v3/users
+PUT    /api/v3/users/{id}
+DELETE /api/v3/users/{id}
+```
+
+NCM account users (collaborators). `users` exists in **both** API versions: this v3
+endpoint is the read/write one; v2 `/api/v2/users/` is GET only (see
+`api-v2-endpoints.md`). Verified live 2026-11-19: `/api/v3/users` and
+`/api/v3/beta/users` both return `200` with `Allow: GET, POST`. A trailing slash
+(`/api/v3/users/`) is a `404`.
+
+- Records come back as **either `"type": "users"` or `"type": "collaborators"`**
+  in the same list (requests use `"users"`). Don't filter responses on
+  `type == "users"`.
+- **No trailing slash.** Unlike `subscriptions` and `asset_endpoints`, which
+  tolerate `/`, `/api/v3/users/` is an HTML `404`.
+- Create/update attributes: `email`, `first_name`, `last_name` (required on
+  create), `is_active`, `pending_email`; `tenant` relationship.
+- Filters: `filter[email]`, `filter[first_name]`, `filter[last_name]`,
+  `filter[id]`, `filter[is_active]`, `filter[last_login]` (with `[gt]`/`[gte]`/
+  `[lt]`/`[lte]`/`[ne]`), `search`, `sort`.
+
+SDK: `get_users()`, `create_user()`, `update_user()`, `delete_user()` on the v3
+client. Before 2026-11-19 these built `/users/` URLs and failed with
+`JSONDecodeError` on the HTML 404; fixed in the repo copy (`get_users()` verified
+live). `update_user()` sends `PATCH`; the v3 spec documents only `PUT` for
+`/users/{id}`, and PATCH has not been verified.
 
 ### regrades
 
@@ -93,9 +128,13 @@ GET /api/v3/asset_endpoints
 ### account_authorizations
 
 ```
-GET /api/v3/account_authorizations
-PUT /api/v3/account_authorizations/{id}
+GET /api/v3/beta/account_authorizations
+GET /api/v3/beta/account_authorizations/{id}
+PUT /api/v3/beta/account_authorizations/{id}
 ```
+
+Under **`/beta/`**. The bare `/api/v3/account_authorizations` is a `404 no Route
+matched` (verified 2026-11-19). `page[size]` max 50.
 
 ## Private Cellular Networks (PCN)
 
@@ -184,6 +223,13 @@ DELETE /api/v3/beta/exchange_resources/{id}
 
 Filters: `filter[exchange_site]`, `filter[exchange_network]`, `filter[type]`,
 `filter[exchange_resource_template][is_null]`. `page[size]` default 20, max 50.
+
+The list GET **requires** `filter[exchange_site]` or `filter[exchange_network]`;
+without one it is a `400 "Either filter[exchange_network] or filter[exchange_site]
+is required"`. The path must include `/api/v3`: the official Swagger
+(`exchange_resources.json`) writes it as `/beta/exchange_resources`, but
+`https://api.cradlepointecm.com/beta/exchange_resources` is a Cloudflare `530`
+(verified 2026-11-19). See `known-issues.md`.
 
 ## Modem Software Upgrades
 
@@ -347,9 +393,11 @@ not define.
 
 ## Public SIM Management
 
-Paths follow the v3 no-trailing-slash convention. The exact base (bare `/api/v3/`
-vs `/api/v3/beta/`) was not cross-checked against a Swagger spec here — confirm
-against `swagger/spec/public_sim_mgmt_*.json` before relying on it.
+> **Not reachable.** Verified 2026-11-19: `public_sim_mgmt_assets` and
+> `public_sim_mgmt_rate_plans` both return `404 no Route matched` at `/api/v3/`
+> **and** `/api/v3/beta/`. The SDK still has `get_public_sim_mgmt_assets()` /
+> `get_public_sim_mgmt_rate_plans()`; expect them to fail. Kept here for reference
+> only.
 
 ### public_sim_mgmt_assets
 

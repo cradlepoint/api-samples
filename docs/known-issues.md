@@ -1563,6 +1563,9 @@ Cross-checking the specs surfaced four errors in that reference, now corrected:
   (`swagger/spec/users.json` → `basePath https://www.cradlepointecm.com/api/v2`,
   four `X-` header keys, GET only, filters `id`/`username`/`email`). Moved to
   `api-v2-endpoints.md`.
+  **Correction (2026-11-19):** this bullet over-corrected. A v3 users API also
+  exists at `/api/v3/users` (GET/POST, PUT/DELETE on `/{id}`). See "Endpoint
+  Corrections From Live Probing" below.
 - **`regrades` was listed at `/api/v3/regrades/`.** The real path is
   `/api/v3/asset_endpoints/regrades` (and `/{id}`). GET requires `filter[action]`
   (`UPGRADE`/`DOWNGRADE`/`LICENSE`/`UNLICENSE`) and `filter[status]`
@@ -2015,3 +2018,60 @@ the NCM UI. Consequences:
 - Any PUT to one of them must include a username, because PUT requires the full
   attribute set. You can't "just rename" such a profile without giving it one.
 - Not tested: whether `""` is accepted.
+
+### Endpoint Corrections From Live Probing (discovered 2026-11-19)
+While reviewing `postman-collection/NCM_API_OAS3.yaml` (full report:
+`NCM_API_OAS3-review.md`), read-only `GET`/`OPTIONS` calls against a production
+account contradicted several entries in this repo's docs. All of the following
+were confirmed live and the reference docs are now corrected:
+
+- **`users` exists in v3 too.** `/api/v3/users` and `/api/v3/beta/users` both
+  return `200` (`Allow: GET, POST`). The v2 `/api/v2/users/` is GET only. v3
+  records come back as either `"type": "users"` or `"type": "collaborators"` in
+  the same list. `/api/v3/users/` (trailing slash) is an HTML `404`.
+- **`account_authorizations` is under `/beta/`.** `/api/v3/account_authorizations`
+  is `404 no Route matched`; `/api/v3/beta/account_authorizations` works.
+- **v2 alert rules and push destinations update with PATCH, not PUT.** Item routes
+  are keyed by `alert_config_id` / `destination_config_id` (timeuuids) and return
+  `Allow: GET,PATCH,DELETE`.
+- **The webhook test endpoint is plural:** `/api/v2/test_alert_push_destinations/`
+  (`Allow: POST`). The singular path is `404` on `OPTIONS`.
+- **`routers/{id}/` has no PATCH** (`Allow: GET,PUT,DELETE`). `groups/{id}/` does
+  (`GET,PUT,DELETE,PATCH`).
+- **`public_sim_mgmt_assets` and `public_sim_mgmt_rate_plans` are `404`** at both
+  `/api/v3/` and `/api/v3/beta/`. The SDK methods for them will fail.
+- **`exchange_resources` needs the `/api/v3` prefix**, despite its official
+  Swagger path being `/beta/exchange_resources`. The un-prefixed URL is a
+  Cloudflare `530`. The list GET also requires `filter[exchange_site]` or
+  `filter[exchange_network]` (otherwise `400`).
+- **v2 `limit` above 500 is silently clamped**, not rejected (`meta.limit: 500`).
+  **v3 `page[size]` above 50 is a `400`** on most endpoints.
+
+Lesson: the official Swagger spec can be wrong too (the exchange_resources path),
+and reading "this spec has a v2 basePath" as "there is no v3 version" was a
+reasoning error, not a spec error. Probe surprising claims live with `OPTIONS`
+(see `common-patterns.md` → "Probing a Route Live With OPTIONS"). On v2, never use
+a `GET` to test whether a route exists: unknown v2 routes answer `GET` with
+`401 "Invalid Credentials"`.
+
+### SDK v3 `exchange_resources` and `users` Methods Built URLs the API Rejects (fixed 2026-11-19)
+Two URL bugs in `ncm/ncm/ncm.py` (and its identical copy
+`ncm_mcp_servers/shared/ncm.py`):
+
+- **exchange_resources.** `get_exchange_resources`, `create_exchange_resource`,
+  `update_exchange_resource` and `delete_exchange_resources` used a
+  `_v3_host_root()` helper that stripped `/api/v3` to follow the Swagger path, so
+  they called `https://api.cradlepointecm.com/beta/exchange_resources` → `530`.
+  Now `{base_url}/beta/exchange_resources`, and the helper is removed.
+- **users.** `get_users`, `create_user`, `update_user` and `delete_user` called
+  `/api/v3/users/` (trailing slash) → HTML `404`, surfacing as a
+  `JSONDecodeError`. Trailing slashes removed.
+
+Verified live after the fix: `get_exchange_resources(site_id=...)`, a single-resource
+read, `get_users()` and `get_users(email=...)` all return data. The write paths
+(create/update/delete) were not exercised. `update_user()` still sends `PATCH`,
+while the v3 spec documents only `PUT` for `/users/{id}`; that is unverified.
+
+**The published PyPI `ncm` package is still affected.** Version 0.0.73 (what
+`pip install ncm` gives you, including this repo's `.venv`) contains both bugs.
+Until a new release ships, import the repo copy or call the endpoints directly.

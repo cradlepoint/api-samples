@@ -932,26 +932,54 @@ spec URL out of its network requests.
 
 What the spec settles definitively:
 
-- **Version and base URL.** The `servers[].url` (v3) or `basePath` (v2) tells you
-  which API an endpoint belongs to. This is how `users` was confirmed to be a **v2**
-  endpoint (`basePath https://www.cradlepointecm.com/api/v2`) despite once being
-  documented as v3.
-- **Real path, including prefixes.** `paths` keys are the truth. v3 PCN/NCX live
-  under `/api/v3/beta/...`; `regrades` lives under `/api/v3/asset_endpoints/regrades`
-  — none of which you'd guess from the endpoint name.
+- **Version and base URL — for that one spec.** The `servers[].url` (v3) or
+  `basePath` (v2) tells you which API *that spec* belongs to, not that no other
+  version exists. `users.json` has a v2 `basePath`, which was once read as "users is
+  v2 only"; there is also a separate v3 users API at `/api/v3/users` (verified live
+  2026-11-19). Absence from one spec is not absence from the API.
+- **Real path, including prefixes — usually.** `paths` keys are normally the truth.
+  v3 PCN/NCX live under `/api/v3/beta/...`; `regrades` lives under
+  `/api/v3/asset_endpoints/regrades` — none of which you'd guess from the endpoint
+  name. But at least one spec is wrong: `exchange_resources.json` writes
+  `/beta/exchange_resources` with no `/api/v3`, and that URL is a `530`. Confirm a
+  surprising path live (see "Probing a Route Live With OPTIONS" below).
 - **Trailing slash.** v2 paths end in `/`; v3 spec paths do **not**. Match the spec.
 - **Methods, required filters, enums, page-size limits.** e.g. the v3 `regrades` GET
   requires `filter[action]` and `filter[status]` with fixed enum values; `page[size]`
   maximums vary per endpoint (subscriptions 50, exchange_sites 500).
 
-Precedence when sources disagree: **spec > SDK (`ncm/ncm/ncm.py`) > repo docs >
-Postman collection.** The Postman collection and some older scripts have drifted
+Precedence when sources disagree: **live API > spec > SDK (`ncm/ncm/ncm.py`) >
+repo docs > Postman collection.** The Postman collection and some older scripts have drifted
 (wrong prefixes, renamed params); treat them as historical. When the repo's endpoint
 reference and its own `known-issues.md` disagree, the known-issues log has usually
 been verified against a live call — believe it over the reference, and reconcile the
 reference. Guessing a field name when a spec was available is how `package_version`
 once became `available_version` (a silent failure that produces blank columns, not an
 error).
+
+## Probing a Route Live With OPTIONS
+
+To settle whether a route exists, or which methods it takes, without writing
+anything, send `OPTIONS` and read the `Allow` header. A `GET` is a poor probe on v2:
+an unknown v2 route answers `GET` with **`401 "Invalid Credentials"`**, which looks
+like an auth problem, not a missing route.
+
+| Probe | Unknown route | Real route |
+|---|---|---|
+| v2 `GET` | `401 Invalid Credentials` (misleading) | `200`, or `405` if GET isn't allowed |
+| v2 `OPTIONS` | `404 Resource not found` | `200` with `Allow: GET,PATCH,DELETE` etc. |
+| v3 `GET` | `404 no Route matched with those values` (JSON) or an HTML `404` | `200` / `400` naming a missing filter; the response also carries `Allow` |
+
+```python
+r = requests.options(f"{V2}/alert_rules/{alert_config_id}/", headers=v2_headers, timeout=30)
+print(r.status_code, r.headers.get("Allow"))   # 200 GET,PATCH,DELETE
+```
+
+v2 OPTIONS also returns a JSON body shaped like an error (`"exception"`, `"message":
+"GET,POST"`); ignore it and trust the status and `Allow` header. Probe item routes
+with a real ID taken from the collection. This is how the 2026-11-19 corrections
+were made (alert rules and push destinations are PATCH not PUT, routers have no
+PATCH, `test_alert_push_destinations` is plural).
 
 ## Restoring Group Inheritance by Removing a Device-Level Branch
 

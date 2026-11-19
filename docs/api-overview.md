@@ -20,9 +20,10 @@ There are two active API versions:
 - Base URL: `https://api.cradlepointecm.com/api/v3` (paths have **no** trailing slash)
 - Authentication: Bearer token
 - Content-Type: `application/vnd.api+json` (JSON:API spec)
-- Covers: subscriptions, regrades, private cellular (`/api/v3/beta/...`), NCX
-  sites/resources (`/api/v3/beta/...`)
-- Note: `users` is a **v2** endpoint, not v3.
+- Covers: subscriptions, regrades, users (CRUD), private cellular
+  (`/api/v3/beta/...`), NCX sites/resources (`/api/v3/beta/...`)
+- Note: `users` exists in **both** versions — v2 `/api/v2/users/` (GET only) and
+  v3 `/api/v3/users` (GET/POST, plus PUT/DELETE on `/{id}`). Verified live 2026-11-19.
 
 ## Authentication
 
@@ -92,7 +93,8 @@ All list endpoints return paginated results:
 ```
 
 Parameters:
-- `limit` — max records per page (default 20, max 500)
+- `limit` — max records per page (default 20, max 500). Larger values are
+  silently clamped to 500 (`meta.limit` shows `500`), not rejected.
 - `offset` — starting index for pagination
 
 To iterate all records, follow the `meta.next` URL until it is `null`.

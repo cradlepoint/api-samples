@@ -13,7 +13,7 @@ Base URL: `https://www.cradlepointecm.com/api/v2/`
 | Log Information | `activity_logs`, `router_logs` |
 | Online/Offline Status | `router_state_samples` |
 | Firmware | `firmwares`, `routers` |
-| Alerts | `alerts`, `router_alerts`, `alert_rules`, `alert_push_destinations`, `test_alert_push_destination` |
+| Alerts | `alerts`, `router_alerts`, `alert_rules`, `alert_push_destinations`, `test_alert_push_destinations` |
 | Groups | `groups` |
 | SDK Apps | `device_apps`, `device_app_bindings`, `device_app_states`, `device_app_versions` |
 | Device Configurations | `configuration_managers` |
@@ -40,11 +40,13 @@ Key fields: `id`, `name`, `account`, `resource_url`
 
 ```
 GET /api/v2/users/
+GET /api/v2/users/{id}/
 ```
 
-**GET only.** This is a v2 endpoint (four `X-` header keys), despite `users` also
-existing in NCM's UI as an account-management feature. It was previously
-mis-documented as a v3 CRUD endpoint — it is not.
+**GET only** in v2 (`Allow: GET` on both routes). To create, update or delete
+users, use the v3 `/api/v3/users` endpoint (see `api-v3-endpoints.md`). `users`
+exists in both versions; an earlier correction here that called it v2-only was
+itself wrong (verified live 2026-11-19).
 
 Filters: `id`, `username`, `email`, plus `limit` / `offset`.
 
@@ -54,9 +56,12 @@ Filters: `id`, `username`, `email`, plus `limit` / `offset`.
 GET /api/v2/routers/
 GET /api/v2/routers/{id}/
 PUT /api/v2/routers/{id}/
-PATCH /api/v2/routers/{id}/
 DELETE /api/v2/routers/{id}/
 ```
+
+**No PATCH.** `OPTIONS /api/v2/routers/{id}/` returns `Allow: GET,PUT,DELETE`
+(verified 2026-11-19). The collection is `Allow: GET` only. (`groups/{id}/`, by
+contrast, does allow PATCH.)
 
 Key fields:
 - `id` — router ID
@@ -209,26 +214,38 @@ Filters: `router`, `created_at`, `created_at__gt`, `created_at__lt`, `detected_a
 ## alert_rules
 
 ```
-GET /api/v2/alert_rules/
-POST /api/v2/alert_rules/
-PUT /api/v2/alert_rules/{id}/
-DELETE /api/v2/alert_rules/{id}/
+GET    /api/v2/alert_rules/
+POST   /api/v2/alert_rules/
+GET    /api/v2/alert_rules/{alert_config_id}/
+PATCH  /api/v2/alert_rules/{alert_config_id}/
+DELETE /api/v2/alert_rules/{alert_config_id}/
 ```
+
+Records are keyed by `alert_config_id` (a timeuuid), not an integer `id`. Updates
+are **PATCH, not PUT**: the item route returns `Allow: GET,PATCH,DELETE`
+(verified 2026-11-19).
 
 ## alert_push_destinations
 
 ```
-GET /api/v2/alert_push_destinations/
-POST /api/v2/alert_push_destinations/
-PUT /api/v2/alert_push_destinations/{id}/
-DELETE /api/v2/alert_push_destinations/{id}/
+GET    /api/v2/alert_push_destinations/
+POST   /api/v2/alert_push_destinations/
+GET    /api/v2/alert_push_destinations/{destination_config_id}/
+PATCH  /api/v2/alert_push_destinations/{destination_config_id}/
+DELETE /api/v2/alert_push_destinations/{destination_config_id}/
 ```
 
-## test_alert_push_destination
+Keyed by `destination_config_id` (timeuuid). Same as alert rules: **PATCH, not
+PUT** (`Allow: GET,PATCH,DELETE`, verified 2026-11-19).
+
+## test_alert_push_destinations
 
 ```
-POST /api/v2/test_alert_push_destination/
+POST /api/v2/test_alert_push_destinations/
 ```
+
+The path is **plural**. The singular `/test_alert_push_destination/` does not exist
+(`OPTIONS` → `404`); the plural returns `Allow: POST` (verified 2026-11-19).
 
 ## router_state_samples
 

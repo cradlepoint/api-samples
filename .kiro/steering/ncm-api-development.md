@@ -44,7 +44,7 @@ Before writing code, consult `docs/`:
 | Firmware | v2 → firmwares | `get_firmwares()` |
 | Reboot | v2 → reboot_activity | `reboot_device()`, `reboot_group()` |
 | Speed tests | v2 → speed_test | `create_speed_test()` |
-| Users | **v2** → users (GET only) | `get_users()` |
+| Users | v2 → users (GET only); v3 → `/api/v3/users` (CRUD, no trailing slash) | `get_users()`, `create_user()` (v3) |
 | Subscriptions | v3 → subscriptions (`/api/v3/subscriptions`, GET only) | `get_subscriptions()` |
 | Regrades | v3 → `/api/v3/asset_endpoints/regrades` | `regrade()` |
 | Private cellular | v3 → `/api/v3/beta/private_cellular_*` | `get_private_cellular_networks()` |
