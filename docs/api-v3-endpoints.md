@@ -240,8 +240,8 @@ Source of truth: the official spec at
 `https://developer.cradlepoint.com/swagger/spec/Modem_Software_Upgrades.json`
 (Swagger UI: `developer.cradlepoint.com/Swagger_UI?ep=Modem_Software_Upgrades`).
 
-These endpoints are **not** beta, despite the Postman collection and
-`scripts/test_modem_management_api.py` using `/api/v3/beta/...`. Paths carry no
+These endpoints are **not** beta, despite `scripts/test_modem_management_api.py`
+using `/api/v3/beta/...` (the Postman collection was corrected 2026-11-19). Paths carry no
 trailing slash. Auth is the standard v3 Bearer token; request and response bodies
 are `application/json`. See `known-issues.md` for the spec-vs-reality
 discrepancies — this family has more of them than any other v3 endpoint.

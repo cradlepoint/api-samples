@@ -20,6 +20,8 @@ web_apps/modem_upgrades/reports/
 
 # revert_device_firewall: per-run logs (contain device config that was removed)
 web_apps/revert_device_firewall/logs/
+# lan_manager_profile_manager: per-run logs (contain previous profile values)
+web_apps/lan_manager_profile_manager/logs/
 
 # Python caches
 __pycache__/

@@ -2075,3 +2075,61 @@ while the v3 spec documents only `PUT` for `/users/{id}`; that is unverified.
 **The published PyPI `ncm` package is still affected.** Version 0.0.73 (what
 `pip install ncm` gives you, including this repo's `.venv`) contains both bugs.
 Until a new release ships, import the repo copy or call the endpoints directly.
+
+### Required Parameters and Paths the Specs Get Wrong, Found by Running the Postman Collection (discovered 2026-11-19)
+Running every GET in `postman-collection/Ericsson NCM API Postman Collection.json`
+against a production account (read-only) turned up these. The collection is now
+fixed; the API behavior is what's worth knowing:
+
+- **`unmasked_wifi_passwords` is not beta.** `/api/v3/beta/unmasked_wifi_passwords`
+  is `404 "no Route matched"`. `/api/v3/unmasked_wifi_passwords?router=<id>` works;
+  without `router` it is `400 "router query param not present"`.
+- **`lan_clients` answers at both** `/api/v3/lan_clients` (the spec path) and
+  `/api/v3/beta/lan_clients`. Use the spec path.
+- **`esim_profile_activations` list requires `filter[type]`** (`esim_profile_activations`
+  or `bulk_esim_profile_activations`), although the spec marks it optional. Without
+  it: `400 "type is required."`
+- **PCN metrics need more than the spec says.** `private_cellular_core_metrics`
+  (and the radio/sim/sim_group metrics) require `interval` (`hour`|`day`),
+  `filter[start_time]`, `filter[end_time]` **and** `fields` (e.g.
+  `bits_uploaded,bits_downloaded`; an unknown name is `400 "... is not a valid
+  choice"`). `private_cellular_sim_connectivity_metrics` also requires
+  `filter[imsi_id]`, accepts only `interval=minute`, and rejects windows longer than
+  1 hour.
+- **`private_cellular_sim_events` requires `filter[imsi_id]`, `filter[start_time]`
+  and `filter[end_time]`**, all marked optional in the spec.
+- **v2 `router_alerts` rejects `type` as a filter** (`409 "Filtering not allowed for
+  type. The possible fields are router, created_at, created_at_timeuuid."`). The old
+  collection sent `?type=custom` and always failed.
+- **v2 `configuration_managers` accepts `router.mac` and `router.serial_number`**
+  filters as well as `router`, so a router can be resolved to its config manager
+  from a MAC or serial in one call.
+- **v2 time-series filter names are `created_at_timeuuid*`**, not
+  `created_at_string*` as the old collection had them.
+- **Literal `{{var}}` in a v3 query string gets an HTML 403** (a WAF page), not a
+  JSON error. If a v3 call returns an HTML 403, check for an unresolved Postman
+  variable before suspecting permissions.
+
+Accounts without Private Cellular return a bare HTML `500` on the PCN list
+endpoints, so a 500 there doesn't mean the request is malformed.
+
+### Throwing in a Postman Pre-request Script Doesn't Stop the Request in newman (discovered 2026-11-19)
+In newman 6.2.1, a pre-request script that throws logs "Error in prerequest-script"
+and **still sends the request**. The old collection's "unresolved variables" guard
+relied on throwing, so under newman (and CI) it sent literal `{{router_id}}` URLs
+anyway. `pm.execution.skipRequest()` does stop it: no request goes out and the
+item's test script doesn't run. Pair it with a failing `pm.test(...)` so the reason
+shows in Test Results and the runner summary:
+
+```javascript
+pm.test(message, function () { throw new Error(message); });
+pm.execution.skipRequest();
+```
+
+Verified with newman against a local mock that logged every hit. The Postman desktop
+app wasn't tested. The collection keeps a `throw` fallback for Postman versions
+without `skipRequest`.
+
+### v2 `speed_test/` Has No List GET (discovered 2026-11-19)
+`GET /api/v2/speed_test/` is `405 "method not allowed"`. Only `POST` creates a test;
+read results with `GET /api/v2/speed_test/{id}/` (`Allow: GET, DELETE`).

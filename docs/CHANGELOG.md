@@ -763,3 +763,24 @@ Found while reviewing `postman-collection/NCM_API_OAS3.yaml` (report:
   - Removed trailing slashes from the four v3 users URLs.
   - Verified live: `get_exchange_resources(site_id=...)`, single-resource read,
     `get_users()`, `get_users(email=...)`.
+
+## 2026-11-19 — Postman collection rebuilt; spec-vs-API parameter gaps
+
+Found while fixing `postman-collection/Ericsson NCM API Postman Collection.json`
+and running all of its GETs live (read-only).
+
+- Added known issue "Required Parameters and Paths the Specs Get Wrong, Found by
+  Running the Postman Collection": `unmasked_wifi_passwords` is not beta (beta path
+  404); `esim_profile_activations` list requires `filter[type]`; PCN metrics require
+  `fields` plus a time window, and connectivity metrics need `interval=minute`,
+  `filter[imsi_id]` and a window of 1 hour or less; `private_cellular_sim_events`
+  requires `filter[imsi_id]` and a time window; v2 `router_alerts` rejects a `type`
+  filter; v2 `configuration_managers` accepts `router.mac` / `router.serial_number`;
+  an unresolved `{{var}}` in a v3 query string returns an HTML WAF 403.
+- `api-v3-endpoints.md`: the modem upgrades section no longer says the Postman
+  collection uses `/api/v3/beta/...` (the collection is fixed).
+- Added known issue: throwing in a Postman pre-request script doesn't stop the
+  request under newman; `pm.execution.skipRequest()` does (verified against a local
+  mock). The collection's validation script uses it.
+- Added known issue: v2 `GET /api/v2/speed_test/` (list) is `405`; only POST and
+  item GET/DELETE exist.
