@@ -1654,6 +1654,26 @@ Zone firewall config (zones, filter policies, forwardings), IPS and app sets liv
 under `security`; `firewall` holds port forwarding and similar. Many devices carry
 both. Removing "the firewall config" by name alone will take out the wrong branch.
 
+### SDK 0.0.x `copy_router_configuration()` Can Send Invalid JSON (found 2026-11-26)
+
+0.0.x strips secrets from the copied config with string replacement on the
+serialized JSON: `', "wpapsk": "*"'`, then `'"wpapsk": "*"'`, and the same for
+`password`. When one of those is the **first** key of an object with more keys,
+only the second pattern matches and leaves a dangling comma:
+
+```
+{"password": "*", "username": "admin"}  ->  {, "username": "admin"}
+```
+
+NCM then rejects the whole PATCH. Most live configs avoid this because UUID-keyed
+entries list `_id_` first. Index-keyed entries such as `system.users.0` without an
+`_id_` hit it. Reproduced offline against the 0.0.74 source; not seen live.
+
+It also strips only those two fields, so certificate `key`/`x509`, NTP `key` and
+other masked secrets are copied as a literal `*`. Fixed in SDK 0.1, which filters
+every `"*"` value structurally. Workaround on 0.0.x: read the source config, strip
+`"*"` values yourself, and PATCH that.
+
 ### Private Cellular Endpoints Return an HTML 500 Without the Service (discovered 2026-11-26)
 
 On an account with no private cellular service, every

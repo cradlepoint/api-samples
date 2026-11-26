@@ -24,6 +24,11 @@ CLASSES = ['BaseNcmClient', 'NcmClientv2', 'NcmClientv3', 'NcmClientv2v3', 'NcmC
 # own tests in test_secret_filter.py).
 INTENTIONAL = {'copy_router_configuration'}
 
+# Methods that gained optional parameters (old calls are unaffected).
+EXTENDED_SIGNATURES = {
+    'NcmClientv2.copy_router_configuration',   # replace=False
+}
+
 # Realistic keyword arguments for methods the generic argument synthesis can't
 # get past input validation, so they reach the HTTP layer too.
 OVERRIDES = {
@@ -90,14 +95,26 @@ class SurfaceParity(unittest.TestCase):
         self.assertEqual(sorted(old - new), [], 'names missing from "from ncm import ncm"')
 
     def test_class_methods_and_signatures(self):
+        """
+        Every old signature is unchanged, or extended only by new optional
+        parameters after the old ones (so every existing call binds the same).
+        """
         for cls_name in CLASSES:
             old_cls, new_cls = getattr(REF, cls_name), getattr(ncm, cls_name)
             for name in public_methods(old_cls):
                 with self.subTest(cls=cls_name, method=name):
                     self.assertTrue(hasattr(new_cls, name), f'{cls_name}.{name} missing')
-                    old_sig = str(inspect.signature(getattr(old_cls, name)))
-                    new_sig = str(inspect.signature(getattr(new_cls, name)))
-                    self.assertEqual(old_sig, new_sig)
+                    old_params = list(inspect.signature(getattr(old_cls, name)).parameters.values())
+                    new_params = list(inspect.signature(getattr(new_cls, name)).parameters.values())
+                    self.assertEqual([str(p) for p in new_params[:len(old_params)]],
+                                     [str(p) for p in old_params],
+                                     'existing parameters changed')
+                    for extra in new_params[len(old_params):]:
+                        self.assertIsNot(extra.default, inspect.Parameter.empty,
+                                         f'new parameter {extra.name!r} must be optional')
+                    # Any extension must be one of the documented ones.
+                    if len(new_params) > len(old_params):
+                        self.assertIn(f'{cls_name}.{name}', EXTENDED_SIGNATURES)
 
     def test_module_function_signatures(self):
         for name in ('get_ncm_instance', 'set_api_keys', 'set_ncm_instance',

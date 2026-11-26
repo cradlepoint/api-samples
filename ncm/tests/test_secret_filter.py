@@ -107,28 +107,80 @@ class SessionFilter(unittest.TestCase):
         self.assertNotIn('"*"', json.dumps(patch['body']))
 
 
+def copy_responder(src_config):
+    """Source router 111 has ``src_config``; destination 222 has config manager 777."""
+    def responder(method, url, kw):
+        if method == 'GET' and 'router=111' in url:
+            return make_response(200, {"data": [{"configuration": src_config}],
+                                       "meta": {"next": None}})
+        if method == 'GET' and 'router=222' in url:
+            return make_response(200, {"data": [{"id": "777"}], "meta": {"next": None}})
+        return make_response(200, {"configuration": src_config})
+    return responder
+
+
 class CopyRouterConfiguration(unittest.TestCase):
 
-    def test_copies_with_put_and_without_secrets(self):
-        def responder(method, url, kw):
-            if method == 'GET' and 'router=111' in url:
-                return make_response(200, {"data": [{"configuration": config_with_secrets()}],
-                                           "meta": {"next": None}})
-            if method == 'GET' and 'router=222' in url:
-                return make_response(200, {"data": [{"id": "777"}], "meta": {"next": None}})
-            return make_response(200, {"configuration": EXPECTED_STRIPPED})
-
+    def _copy(self, src_config, client_module=ncm, **kwargs):
         with clean_env():
-            client = ncm.NcmClientv2(api_keys=dict(V2_KEYS), log_events=False)
-            with recording(responder) as rec:
-                result = client.copy_router_configuration(111, 222)
-
+            client = client_module.NcmClientv2(api_keys=dict(V2_KEYS), log_events=False)
+            with recording(copy_responder(src_config)) as rec:
+                result = client.copy_router_configuration(111, 222, **kwargs)
         writes = [c for c in rec.calls if c['method'] != 'GET']
         self.assertEqual(len(writes), 1)
-        self.assertEqual(writes[0]['method'], 'PUT')
-        self.assertEqual(writes[0]['url'], f'{BASE}/configuration_managers/777/')
-        self.assertEqual(writes[0]['body'], {"configuration": EXPECTED_STRIPPED})
+        return writes[0], result
+
+    def test_default_merges_with_patch_without_secrets(self):
+        write, result = self._copy(config_with_secrets())
+        self.assertEqual(write['method'], 'PATCH')
+        self.assertEqual(write['url'], f'{BASE}/configuration_managers/777/')
+        self.assertEqual(write['body'], {"configuration": EXPECTED_STRIPPED})
         self.assertEqual(result, 'Configuration Manager operation successful.')
+
+    def test_replace_true_uses_put_without_secrets(self):
+        write, result = self._copy(config_with_secrets(), replace=True)
+        self.assertEqual(write['method'], 'PUT')
+        self.assertEqual(write['url'], f'{BASE}/configuration_managers/777/')
+        self.assertEqual(write['body'], {"configuration": EXPECTED_STRIPPED})
+        self.assertEqual(result, 'Configuration Manager operation successful.')
+
+    def test_replace_false_explicit_is_default(self):
+        self.assertEqual(self._copy(config_with_secrets(), replace=False)[0]['method'], 'PATCH')
+
+    def test_default_matches_0_0_74_when_its_body_was_valid(self):
+        """Non-breaking: same method, URL and body as before wherever 0.0.74 worked."""
+        from _support import reference_module
+        ref = reference_module()
+        if ref is None:
+            self.skipTest('ncm 0.0.74 reference not available')
+        # Secrets not first in their objects, and only the two 0.0.74 removed.
+        src = [{"system": {"users": {"0": {"_id_": "00000000-a0ab-3e74-bcbd-02af091f1c50",
+                                           "password": "*"}}},
+                "wlan": {"radio": {"0": {"bss": {"0": {"ssid": "net", "wpapsk": "*"}}}}},
+                "wan": {"x": 1}}, [["lan", 0]]]
+        old_write, old_result = self._copy(src, client_module=ref)
+        new_write, new_result = self._copy(src)
+        self.assertEqual(new_write, old_write)
+        self.assertEqual(new_result, old_result)
+
+    def test_secret_as_first_key_still_sends_valid_json(self):
+        """0.0.74's string replacement produced '{, "username": ...}' here."""
+        src = [{"system": {"users": {"0": {"password": "*", "username": "admin"}}}}, []]
+        write, _ = self._copy(src)
+        self.assertIsInstance(write['body'], dict)   # parsed fine
+        self.assertEqual(write['body'],
+                         {"configuration": [{"system": {"users": {"0": {"username": "admin"}}}}, []]})
+
+    def test_module_level_passes_replace(self):
+        ncm.reset_ncm_instance()
+        try:
+            with clean_env():
+                ncm.set_api_keys(dict(V2_KEYS))
+                with recording(copy_responder(config_with_secrets())) as rec:
+                    ncm.copy_router_configuration(111, 222, replace=True)
+            self.assertEqual([c['method'] for c in rec.calls if c['method'] != 'GET'], ['PUT'])
+        finally:
+            ncm.reset_ncm_instance()
 
     def test_missing_destination_raises_like_before(self):
         def responder(method, url, kw):

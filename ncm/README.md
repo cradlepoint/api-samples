@@ -11,10 +11,15 @@ instead of living in one file.
   sets the secret to a literal `*`. Every config write now leaves those keys out, so
   the target keeps its existing secret. The filter is public as
   `ncm.strip_masked_secrets()`.
-- **`copy_router_configuration()` now replaces** the destination's device-level
-  config with the source's (a PUT) instead of merging into it (a PATCH). The
-  destination ends up matching the source. Its device-level secrets reset to group or
-  default values, so set them again in cleartext if needed.
+- **`copy_router_configuration()` gains `replace=False`.**
+  - **Default:** merges into the destination with a PATCH, as before. Settings only
+    the destination has, and its existing secrets, are kept.
+  - **`replace=True`:** replaces the destination's device-level config with a PUT, so
+    it ends up matching the source. Its device-level secrets reset to group or default
+    values.
+  - **Both modes** now leave out every masked secret. Before, only `wpapsk` and
+    `password` were removed, by string replacement that broke the JSON when one was
+    the first key in its object.
 - **New:**
   - `ncm.v2` / `ncm.v3` for explicit API version access (e.g.
     `ncm.v3.get_subscriptions()`)

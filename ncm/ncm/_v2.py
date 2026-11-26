@@ -514,37 +514,45 @@ class NcmClientv2(BaseNcmClient):
         result = self._return_handler(ncm.status_code, ncm.text, call_type)
         return result
 
-    def copy_router_configuration(self, src_router_id, dst_router_id):
+    def copy_router_configuration(self, src_router_id, dst_router_id,
+                                  replace=False):
         """
-        Replaces the destination router's device-level config with the source
-        router's (a PUT, so the destination ends up matching the source rather
-        than a merge of the two).
+        Copies the source router's device-level config to the destination.
 
         Masked secrets ("*" placeholders for passwords, PSKs, certificate keys,
-        NTP keys, ...) cannot be read back, so they are left out of the copy.
-        Because this is a full replacement, any device-level secret the
-        destination had is reset to its group/default value; set those again
-        in cleartext afterwards if needed.
+        NTP keys, ...) cannot be read back, so they are always left out of the
+        copy.
         :param src_router_id: Router ID to copy from
         :param dst_router_id: Router ID to copy to
-        :return: Result of the PUT
+        :param replace: False (default) merges the source config into the
+          destination's with a PATCH, as in earlier versions: settings only the
+          destination has are kept, and so are its existing secrets.
+          True replaces the destination's device-level config with a PUT, so it
+          ends up matching the source. Its device-level secrets reset to their
+          group/default values; set those again in cleartext if needed.
+        :return: Result of the PATCH or PUT
         """
         call_type = 'Configuration Manager'
         # Get the source router's device-level configuration
         src_config = self.get_configuration_managers(router=src_router_id,
                                                      fields='configuration')[0]
 
-        # Leave out masked "*" secrets (the session also enforces this)
+        # Leave out masked "*" secrets (the session also enforces this).
+        # Earlier versions removed only wpapsk/password by string replacement,
+        # which produced invalid JSON when one was the first key in its object.
         src_config = strip_masked_secrets(src_config)
 
         # Get destination router Configuration Manager ID
         dst_config_man_id = \
             self.get_configuration_managers(router=dst_router_id)[0]['id']
 
-        put_url = '{0}/configuration_managers/{1}/'.format(self.base_url,
-                                                           dst_config_man_id)
+        url = '{0}/configuration_managers/{1}/'.format(self.base_url,
+                                                       dst_config_man_id)
 
-        ncm = self.session.put(put_url, json=src_config)
+        if replace:
+            ncm = self.session.put(url, json=src_config)
+        else:
+            ncm = self.session.patch(url, json=src_config)
         result = self._return_handler(ncm.status_code, ncm.json(), call_type)
         return result
 

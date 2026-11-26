@@ -10,8 +10,11 @@ automatically by the reflexion system.
   against 0.0.74 read from git history. CI publishes it on merge; the patch bump makes
   it 0.1.1.
 - `ncm-sdk-reference.md`: new layout and a "What changed in 0.1" section.
-  `copy_router_configuration()` is documented as the 0.1 PUT, with the 0.0.x merge
-  behavior noted.
+  `copy_router_configuration()` gains `replace=False`. The default stays a PATCH merge
+  (non-breaking); `replace=True` is a PUT replacement. Both modes strip every masked
+  secret.
+- Added known issue: 0.0.x `copy_router_configuration()` sends invalid JSON when
+  `wpapsk`/`password` is the first key in its object.
 - Steering `ncm-api-development.md`: methods are read from `_v2.py`/`_v3.py`, and
   `ncm2/**` was dropped from the `fileMatchPattern` (also in `claude.md`).
 - Path references updated in `common-patterns.md`, `known-issues.md` (and the
