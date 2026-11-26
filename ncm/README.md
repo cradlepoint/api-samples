@@ -1,10 +1,27 @@
 # NCM API Client Documentation
 
-> **New in 0.1.0:** drop-in compatible with 0.0.x. Config writes never send NCM's
-> masked `"*"` secret placeholders, and `copy_router_configuration()` now replaces
-> the destination's config instead of merging into it. Also new: `ncm.v2` / `ncm.v3`
-> for explicit API version access, and `ncm.set_v2_keys()` / `ncm.set_v3_key()` /
-> `ncm.set_keys()`. See `COMPARISON.md` for details.
+## What's new in 0.1
+
+Drop-in compatible with 0.0.x: every import style, class, method, signature and
+return value is unchanged. The code is now split by API version (`_v2.py`, `_v3.py`)
+instead of living in one file.
+
+- **Config writes never send masked secrets.** NCM returns every secret (passwords,
+  Wi-Fi PSKs, certificate keys, NTP keys) as `"*"`. Writing one back either fails or
+  sets the secret to a literal `*`. Every config write now leaves those keys out, so
+  the target keeps its existing secret. The filter is public as
+  `ncm.strip_masked_secrets()`.
+- **`copy_router_configuration()` now replaces** the destination's device-level
+  config with the source's (a PUT) instead of merging into it (a PATCH). The
+  destination ends up matching the source. Its device-level secrets reset to group or
+  default values, so set them again in cleartext if needed.
+- **New:**
+  - `ncm.v2` / `ncm.v3` for explicit API version access (e.g.
+    `ncm.v3.get_subscriptions()`)
+  - `ncm.set_v2_keys()`, `ncm.set_v3_key()` and `ncm.set_keys()`
+  - v2 short-name aliases (`rename_router`, `delete_group`, ...)
+  - v3 private cellular methods (`get_private_cellular_networks()` and related)
+  - `delete_exchange_resources_for_site()`
 
 ## Overview
 
