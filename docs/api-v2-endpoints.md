@@ -118,7 +118,12 @@ Key fields:
 
 Filters: `id`, `id__in`, `router`, `router__in`, `synched`, `suspended`, `version_number`, `version_number__gt`, `version_number__lt`
 
-**Important**: PUT replaces entire config. PATCH merges changes. See `docs/api-configuration.md` for details.
+**Important**: Use PATCH for every change to configuration values. Send only the
+settings being changed, and delete a setting with a removals path. PUT replaces the
+entire config, so use it only when the user explicitly asks for that. Never PUT a
+config you read back: its secrets come back as `"*"`. Non-config operations keep their
+documented methods (resume suspended sync is `PUT {"suspended": false}`). See
+`docs/api-configuration.md`.
 
 ## locations
 

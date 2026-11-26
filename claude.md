@@ -16,7 +16,7 @@ directly:
 |---|---|
 | `.kiro/steering/project-setup.md` | Always — venv, credentials, setup, web apps |
 | `.kiro/steering/code-standards.md` | Touching `scripts/**/*.py` |
-| `.kiro/steering/ncm-api-development.md` | Touching Python in `scripts/`, `ncm/`, `ncm2/`, `web_apps/` |
+| `.kiro/steering/ncm-api-development.md` | Touching Python in `scripts/`, `ncm/`, `web_apps/` |
 | `.kiro/steering/web-ui-standards.md` | Touching `*.html`, `*.css`, or `web_apps/**` |
 | `.kiro/steering/setup-environment.md` | User asks to set up / install deps / fix imports, or `.venv/` is missing |
 | `.kiro/steering/reflexion-workflow.md` | Finishing a task, or asked for the full docs loop |

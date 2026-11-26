@@ -67,7 +67,7 @@ string key:
 
 Practical consequences:
 
-- You do **not** need PUT to delete one branch of a group config. Prefer PATCH
+- You do **not** need PUT to delete one branch of a group config. Use PATCH
   with removals — PUT resets unmentioned fields to defaults, which at
   `/groups/{id}/` scope wipes every other group-level setting.
 - UUID-keyed collections (`identities.*`, `lan`, `vpn.tunnels`,
@@ -93,6 +93,18 @@ the `_id_` field inside the object body, or you get a validation error.
 ### Passwords Return "*"
 Password fields always return `"*"` on GET. You cannot read existing passwords.
 Set new passwords by sending cleartext — they are encrypted automatically.
+
+The masking covers every secret field, not just ones named `password` or `wpapsk`.
+A live device config (2026-11-26) also returned `"*"` for:
+
+- `certmgmt.certs.*.key` and `certmgmt.certs.*.x509`
+- `system.ntp.servers.*.key`
+- `system.rtk.ntrip.password`
+- `system.users.*.password`
+
+Code that strips placeholders before a write must match the `"*"` value itself, not
+a list of field names. Never send a config you read back. See "PATCH Removals Delete
+a Device-Level Override".
 
 ### Config Rollback After 15 Minutes
 If a device applies a config but can't reach NCM within 15 minutes, it rolls back
@@ -756,9 +768,10 @@ The group config is already modified in NCM by the time the caller sees the
 error, so treating the `AttributeError` as "the write failed" and retrying will
 apply the PUT twice.
 
-Workaround: use `patch_group_configuration()` when a merge is acceptable. When a
-true PUT is required (the only way to honor the removals list and reset
-unmentioned fields), issue it directly and skip the wrapper:
+Workaround: use `patch_group_configuration()`. PATCH honors the removals list, so it
+covers both setting and deleting values. That makes it the right call for every
+config write. Use PUT only when the user explicitly asks to replace the group's whole
+config. In that case, issue it directly and skip the wrapper:
 
 ```python
 resp = client.session.put(
@@ -986,6 +999,8 @@ in `.gitignore`, protecting nothing while the real `csv_files/` went unignored; 
 while `ncm/` returns eleven. It exists only in this working tree, so a fresh clone
 will not have it. Do not `import` from `ncm2` in committed code, and do not cite it
 in docs as though contributors have it. Use `ncm/` — that is the packaged SDK.
+**Resolved 2026-11-26:** `ncm2/` was rebuilt from ncm 0.0.74 and merged into `ncm/`
+as SDK 0.1, and the `ncm2/**` steering pattern was removed.
 
 **6. `web_apps/mac_whitelist_copier/` is an empty directory.** Zero files, so it is
 not an app and git does not see it at all (git does not track empty directories).
@@ -1030,7 +1045,8 @@ Also UNVERIFIED: whether any endpoint *other* than `locations` has an incomplete
 table. One instance was found; the rest were not audited.
 
 Practical check before concluding a filter does not exist: grep the matching method's
-`allowed_params` in `ncm/ncm/ncm.py`, and grep `scripts/` and `web_apps/` for existing
+`allowed_params` in `ncm/ncm/_v2.py` / `_v3.py` (`ncm/ncm/ncm.py` before SDK 0.1),
+and grep `scripts/` and `web_apps/` for existing
 callers. Working code that predates the generated doc is the stronger evidence.
 
 ### v2 List Endpoints Return Duplicate Records — `/firmwares/`, `/products/` (discovered 2026-09-25)
@@ -1612,26 +1628,72 @@ device's override layer. A removals path there suppresses the path from what the
 - A `security`-rooted path sitting in a device's removals list is itself blocking
   inheritance of the group's firewall config, so restoring inheritance means
   clearing those entries too — not just the `updates` branch.
-- **PATCH cannot do this.** PATCH merges `updates`, so no PATCH body removes a key
-  from it. The operation is read-modify-write with PUT, sending the device's complete
-  diff minus the one branch. PUT's "resets unmentioned fields to defaults" hazard
-  does not apply, because you are sending the whole document, not a fragment — and
-  the documented device-config reset is itself a PUT of `[{}, []]`
-  (`api-configuration.md`).
+- **Use PATCH with a removals path when the device has its own override.** See
+  "PATCH Removals Delete a Device-Level Override" below. Verified live 2026-11-26.
+  This corrects an earlier claim here that it needed a read-modify-write PUT.
+  **Don't do the full-diff PUT.** GET masks every secret as `"*"`, so the PUT echoes
+  `*` back as a literal value. NCM rejected it with
+  `400 ... cannot set wlan.radio.1.bss.0.wpapsk to *: too short`, and a secret with
+  no length rule could instead be overwritten with `*`.
 
-The "PATCH CAN Remove Config Items" entry above remains accurate: PATCH does accept
-removals, and that is the right tool for pruning a group's own config. It is the
-wrong tool for restoring group inheritance on a device.
+The "PATCH CAN Remove Config Items" entry above remains accurate: PATCH accepts
+removals at both group and device scope. As of 2026-11-26 it is also the tool for
+deleting a device-level override. An earlier version of this entry said PATCH was
+the wrong tool for that, and it was wrong. Use PUT only when the user explicitly asks
+to replace the whole config.
 
 Verified end-to-end against 400 live devices while building
 `web_apps/revert_device_firewall/` (74 carried device-level `security` config). The
 read, diff and payload-construction paths were exercised against production data;
 the PUT itself was verified against a stubbed session rather than live devices.
+That app's full-diff PUT echoes masked secrets and needs porting to the PATCH
+pattern in `common-patterns.md`.
 
 Related trap: root-level `firewall` and root-level `security` are different things.
 Zone firewall config (zones, filter policies, forwardings), IPS and app sets live
 under `security`; `firewall` holds port forwarding and similar. Many devices carry
 both. Removing "the firewall config" by name alone will take out the wrong branch.
+
+### Private Cellular Endpoints Return an HTML 500 Without the Service (discovered 2026-11-26)
+
+On an account with no private cellular service, every
+`GET /api/v3/beta/private_cellular_{networks,cores,radios,radio_groups,sims}`
+returned `500` with an HTML "Server Error (500)" page, not a JSON:API error. The
+non-beta paths are `404 "no Route matched"`, so the beta route is the right one, and
+the 500 is not a wrong-URL error. That the 500 means "service not on this account" is
+an inference: the error page gives no reason, and these endpoints have not yet been
+tried on an account that has the service.
+
+Any client that parses the error body as JSON fails with `JSONDecodeError`
+instead of an `HTTPError`. The SDK's shared v3 error path does this. Probe the
+status first if a script needs to tell "no PCN on this account" apart from a real
+failure.
+
+### PATCH Removals Delete a Device-Level Override (discovered 2026-11-26)
+
+To clear one device-level setting so it reverts to default, PATCH only the removal
+path. Never send the rest of the config:
+
+```python
+client.patch_configuration_managers(router_id, {"configuration": [{}, [
+    ["wan", "rules2", "00000005-a81d-3590-93ca-8b1fcfeb8e15", "modem"]]]})
+```
+
+Observed on a live device with no group (router 5697374, rule override
+`{"_id_": ..., "modem": {"selected_profile": 10}}`):
+
+- The path came out of the stored updates dict. The rule's whole entry disappeared
+  from `configuration[0]` because nothing but `_id_` remained.
+- The removals list in `configuration[1]` was **unchanged**, so no standing removal
+  was persisted.
+- `pending` carried only the removal path. The device synced, and `actual` no longer
+  shows the rule override.
+
+PATCH with `null` (`{"modem": {"selected_profile": null}}`) does **not** delete
+anything. It stores an explicit `null` override.
+
+Not yet verified for a device in a group, where the path also exists in the group's
+config. The asymmetry described above may still apply there.
 
 ### Not Every Router Has a `configuration_managers` Record (discovered 2026-10-05)
 

@@ -1,6 +1,6 @@
 ---
 inclusion: fileMatch
-fileMatchPattern: "{scripts/**/*.py,ncm/**/*.py,ncm2/**/*.py,web_apps/**/*.py}"
+fileMatchPattern: "{scripts/**/*.py,ncm/**/*.py,web_apps/**/*.py}"
 description: NCM API development — endpoint routing, SDK usage, critical rules. Pull in #reflexion-workflow for the full self-improving docs loop.
 ---
 
@@ -21,7 +21,7 @@ Before writing code, consult `docs/`:
 
 ## Approach Selection
 
-1. **NCM SDK** (`from ncm import ncm`) — preferred. Handles pagination, retries, auth. Always read `ncm/ncm/ncm.py` to discover methods before writing custom code.
+1. **NCM SDK** (`from ncm import ncm`) — preferred. Handles pagination, retries, auth. Always read the SDK to discover methods before writing custom code: v2 methods are in `ncm/ncm/_v2.py`, v3 in `ncm/ncm/_v3.py`.
 2. **`scripts/utils/session.py`** — direct API calls with auto retry/pagination.
 3. **Raw `requests`** — only when SDK/session don't cover the use case.
 
@@ -31,8 +31,8 @@ Before writing code, consult `docs/`:
 |------|-----|-------------|
 | Routers | v2 → routers | `get_routers()`, `get_router_by_id()` |
 | Router state | v2 → router_state_samples | `get_router_state_samples()` |
-| Push device config | api-configuration | `patch_configuration_managers()`, `put_configuration_managers()` |
-| Push group config | api-configuration | `patch_group_configuration()`, `put_group_configuration()` |
+| Push device config | api-configuration | `patch_configuration_managers()` (PUT only on explicit request, see rule 3) |
+| Push group config | api-configuration | `patch_group_configuration()` (PUT only on explicit request, see rule 3) |
 | Locations | v2 → locations | `get_locations()`, `get_historical_locations()` |
 | Alerts | v2 → alerts | `get_alerts()`, `get_router_alerts()` |
 | Webhooks | api-webhooks | Direct API: `alert_push_destinations` |
@@ -59,7 +59,18 @@ call fail opaquely.
 
 1. **Trailing slash**: ALL v2 URLs must end with `/`
 2. **Config manager ID ≠ Router ID**: Look up config manager ID first
-3. **PATCH vs PUT**: PATCH merges, PUT replaces — use PATCH for incremental changes
+3. **Config writes are always PATCH.** Covers the `configuration` field of device
+   configs (`configuration_managers`) and group configs (`groups`). The rule applies
+   only to changes to actual configuration values. Non-config operations keep their
+   documented methods: resuming suspended sync is `PUT {"suspended": false}`. Send only the settings being changed. Set values in
+   the updates dict. Delete a setting with a removals path:
+   `{"configuration": [{}, [["wan", "rules2", "<uuid>", "modem"]]]}`.
+   Use PUT only when the user explicitly asks to replace or wipe the whole config.
+   - **Never read-modify-write a config with PUT.** GET masks every password, PSK
+     and key as `"*"`, so echoing the config back sends `*` as the literal secret.
+     That either fails validation or overwrites the secret.
+   - Never include settings you aren't changing, especially passwords or secrets.
+   - See `known-issues.md` → "PATCH Removals Delete a Device-Level Override".
 4. **`_id_` fields**: Include UUID `_id_` inside the object when using UUID keys
 5. **Deprecations**: Verify endpoint isn't deprecated before using
 6. **Retries**: Exponential backoff on transient errors
