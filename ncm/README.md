@@ -1,5 +1,11 @@
 # NCM API Client Documentation
 
+> **New in 0.1.0:** drop-in compatible with 0.0.x. Config writes never send NCM's
+> masked `"*"` secret placeholders, and `copy_router_configuration()` now replaces
+> the destination's config instead of merging into it. Also new: `ncm.v2` / `ncm.v3`
+> for explicit API version access, and `ncm.set_v2_keys()` / `ncm.set_v3_key()` /
+> `ncm.set_keys()`. See `COMPARISON.md` for details.
+
 ## Overview
 
 The NCM_Client provides easy access to the Cradlepoint NCM API, supporting both the v2 and v3 APIs, with v3 coverage substantially expanded relative to the prior v2-centric documentation. It includes a singleton pattern for simple usage and module-level function access for convenience.
