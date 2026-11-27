@@ -1635,6 +1635,11 @@ device's override layer. A removals path there suppresses the path from what the
   `*` back as a literal value. NCM rejected it with
   `400 ... cannot set wlan.radio.1.bss.0.wpapsk to *: too short`, and a secret with
   no length rule could instead be overwritten with `*`.
+  **On SDK 0.1+ it fails differently.** The client session strips `"*"` values from
+  every config write, so the same PUT is no longer rejected. It succeeds without the
+  secrets, and because PUT replaces the whole device diff, the device's own
+  secrets reset to group or default values. Port any read-modify-write PUT to a
+  PATCH removal *before* upgrading a script to `ncm>=0.1`.
 
 The "PATCH CAN Remove Config Items" entry above remains accurate: PATCH accepts
 removals at both group and device scope. As of 2026-11-26 it is also the tool for
@@ -1646,8 +1651,12 @@ Verified end-to-end against 400 live devices while building
 `web_apps/revert_device_firewall/` (74 carried device-level `security` config). The
 read, diff and payload-construction paths were exercised against production data;
 the PUT itself was verified against a stubbed session rather than live devices.
-That app's full-diff PUT echoes masked secrets and needs porting to the PATCH
-pattern in `common-patterns.md`.
+**Superseded 2026-11-27:** the app now PATCHes a single removal path when that's
+enough, and only PUTs (guarded against masked secrets) when `security` removals
+entries must be cleared. See `common-patterns.md` → "Restoring Group Inheritance by
+Removing a Device-Level Branch". A live read-only scan (1,723 routers, 281 affected)
+found 258 of the affected devices carry device-level secrets, so the old full-diff
+PUT could not have worked on most of the fleet.
 
 Related trap: root-level `firewall` and root-level `security` are different things.
 Zone firewall config (zones, filter policies, forwardings), IPS and app sets live
@@ -1988,6 +1997,23 @@ Two generally-applicable takeaways:
   `fastapi`/`uvicorn` but were still exposed until Starlette was pinned too). Verify by
   dry-running `pip install -r <file>` against the known-good venv: a clean no-op resolve
   confirms the pins match the verified set rather than silently upgrading anything.
+
+### SDK v2 List Methods Return Only the First 500 Records Unless `limit='all'` (verified 2026-11-27)
+`NcmClientv2.__parse_kwargs` sets `limit = 500` whenever the caller passes no
+`limit`, and `__get_json` stops paginating once it has that many. A bare
+`get_groups()`, `get_routers()`, `get_routers_for_group()` and so on therefore
+silently returns **at most 500** records, even when `meta.next` is present. Same
+behavior in 0.0.x and 0.1.x.
+
+Verified live: `get_groups()` returned 500 on an account where
+`get_groups(limit='all')` returned 6,087. `web_apps/rma_wizard/` used a bare
+`get_groups()` for its group dropdown and showed only the first 500. It now fetches
+every group with parallel offset pages (see `common-patterns.md` → "Parallel
+Speculative Offset Pagination"): all 6,087 in 17 s, against 59 s for
+`limit='all'`, which follows `meta.next` one page at a time.
+
+Pass `limit='all'` whenever you need the complete set. This is the v2 counterpart
+of the v3 entry below, which caps at 50.
 
 ### SDK v3 List Helpers Return Only the First 50 Records Unless `limit=0` (discovered 2026-10-31)
 `NcmClientv3.__get_json` sets `limit = 50` whenever the caller passes no `limit`,
