@@ -55,9 +55,6 @@
         .sidebar { width: 280px; flex-shrink: 0; display: flex; flex-direction: column; gap: 0.75rem; overflow-y: auto; padding-right: 2px; }
         .sidebar .panel-header { padding: 0.6rem 1rem; }
         .sidebar .panel-body { padding: 0.75rem 1rem; }
-        .sidebar #runSummary { font-size: 0.75rem; }
-        .sidebar #actionNotice { font-size: 0.6875rem; line-height: 1.3; padding: 0.5rem 0.7rem; border-left-width: 3px; }
-        .sidebar #actionNotice:empty { display: none; }
         .content-area { flex: 1; display: flex; flex-direction: column; gap: 1rem; min-width: 0; min-height: 0; overflow-y: auto; padding-bottom: 1rem; }
 
         .panel { background: var(--light-surface); border: 1px solid var(--border-color); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
@@ -104,6 +101,12 @@
         #fName { width: 16rem; }
         #fAddress { width: 11rem; }
         #fUsername { width: 10rem; }
+        #eType { width: 6rem; }
+        #ePort { width: 6rem; }
+        #eResolution { width: 7rem; }
+        #eName { width: 14rem; }
+        #eAddress { width: 11rem; }
+        #eUsername { width: 10rem; }
         .form-grid label { display: block; font-size: 0.8125rem; font-weight: 500; margin-bottom: 0.25rem; }
         .form-grid .req::after { content: ' *'; color: var(--danger-color); }
         .form-grid .hint { font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.2rem; }
@@ -259,6 +262,7 @@
                     <nav class="nav-list" aria-label="Actions">
                         <button class="nav-btn active" data-action="create"><span class="nav-title">Create profile</span><span class="nav-hint">Define a profile and push it to routers or groups</span></button>
                         <button class="nav-btn" data-action="copy"><span class="nav-title">Copy profile</span><span class="nav-hint">Copy profiles from one router to many</span></button>
+                        <button class="nav-btn" data-action="edit"><span class="nav-title">Edit profiles</span><span class="nav-hint">Find a profile by router, group or name and change its values</span></button>
                         <button class="nav-btn danger" data-action="delete"><span class="nav-title">Delete profiles</span><span class="nav-hint">By router, group, or profile name</span></button>
                         <button class="nav-btn danger" data-action="disable"><span class="nav-title">Disable LAN Manager</span><span class="nav-hint">Turn LAN Manager off on routers or groups</span></button>
                         <button class="nav-btn danger" data-action="orphans"><span class="nav-title">Orphaned profiles <span id="orphanCount" class="badge orphan" style="display:none;"></span></span><span class="nav-hint">Profiles on routers that no longer exist</span></button>
@@ -269,11 +273,9 @@
             <div class="panel">
                 <div class="panel-header"><h2>Run</h2></div>
                 <div class="panel-body" style="display:flex;flex-direction:column;gap:0.6rem;">
-                    <p id="runSummary" class="meta-text">Nothing selected</p>
                     <button class="btn btn-secondary btn-block" id="previewBtn" disabled>Preview (read-only)</button>
                     <button class="btn btn-primary btn-block" id="runBtn" disabled>Run</button>
                     <button class="btn btn-secondary btn-block" id="cancelBtn" style="display:none;">Cancel run</button>
-                    <div class="notice" id="actionNotice"></div>
                 </div>
             </div>
 
@@ -309,14 +311,21 @@
             <!-- Copy: source router + profiles -->
             <div class="panel" id="sourcePanel" style="display:none;">
                 <div class="panel-header">
-                    <h2>1 · Source router</h2>
-                    <div class="search-wrap" style="width:300px;">
-                        <input type="text" class="search-input" id="sourceSearch" placeholder="Search router name, group, account, router ID, group ID…" aria-label="Search source router">
-                        <button class="clear-x" data-clear="sourceSearch" aria-label="Clear search">✕</button>
+                    <h2 id="sourceTitle">1 · Source router</h2>
+                    <div class="mode-toggle" role="group" aria-label="Find source by">
+                        <button type="button" data-smode="routers" class="active">Routers</button>
+                        <button type="button" data-smode="groups">Groups</button>
+                        <button type="button" data-smode="name">Profile name</button>
                     </div>
                 </div>
-                <div class="panel-sub" id="sourceSummary">Pick the router that has the correct profile. Only routers with profiles are listed.</div>
-                <div class="panel-body flush scroll-box" id="sourceList" style="max-height:260px;"></div>
+                <div class="panel-sub">
+                    <div class="search-wrap" style="width:320px;">
+                        <input type="text" class="search-input" id="sourceSearch" placeholder="Search router name, group, account, router ID, group ID…" aria-label="Search source">
+                        <button class="clear-x" data-clear="sourceSearch" aria-label="Clear search">✕</button>
+                    </div>
+                    <span id="sourceSummary" style="margin-left:auto;">Pick the router that has the correct profile.</span>
+                </div>
+                <div class="panel-body flush scroll-box" id="sourceList" style="max-height:300px;"></div>
                 <div id="sourceProfilesWrap" style="display:none;border-top:1px solid var(--border-color);">
                     <div class="panel-sub"><strong id="sourceRouterLabel"></strong><span>— tick the profile(s) to copy</span><button class="btn btn-secondary btn-sm" id="sourceChangeBtn" style="margin-left:auto;">Change router</button></div>
                     <div class="panel-body flush scroll-box" id="sourceProfiles" style="max-height:260px;"></div>
@@ -368,11 +377,21 @@
             <!-- Delete by router/group: which names -->
             <div class="panel" id="delNamesPanel" style="display:none;">
                 <div class="panel-header">
-                    <h2>3 · Profiles to delete</h2>
+                    <h2>2 · Profiles to delete</h2>
                     <label style="font-size:0.8125rem;display:flex;gap:0.4rem;align-items:center;cursor:pointer;"><input type="checkbox" id="delAllChk"> Delete <strong>all</strong> profiles on these routers</label>
                 </div>
                 <div class="panel-sub" id="delNamesSummary">Profile names found on the selected routers (case-insensitive). Tick the ones to delete.</div>
                 <div class="panel-body flush scroll-box" id="delNamesList"></div>
+            </div>
+
+            <!-- Edit: which profile name to edit -->
+            <div class="panel" id="editNamesPanel" style="display:none;">
+                <div class="panel-header">
+                    <h2>2 · Profile to edit</h2>
+                    <span id="editStaged" class="meta-text"></span>
+                </div>
+                <div class="panel-sub" id="editNamesSummary">Profile names found on the selected routers (case-insensitive). Click <strong>Edit</strong> to change one.</div>
+                <div class="panel-body flush scroll-box" id="editNamesList"></div>
             </div>
 
             <!-- Preview -->
@@ -453,6 +472,42 @@
     </div>
 </div>
 
+<div class="modal" id="editModal">
+    <div class="modal-card">
+        <div class="modal-head"><h2 id="editModalTitle">Edit profile</h2><button class="modal-close" id="editModalCloseBtn" aria-label="Close">×</button></div>
+        <div class="modal-body">
+            <p class="meta-text" id="editModalSub" style="margin-bottom:1.1rem;"></p>
+            <div class="form-grid">
+                <div><label for="eType" class="req">Type</label><select id="eType" class="select-input"></select></div>
+                <div class="fg-name"><label for="eName" class="req">Name</label><input id="eName" class="text-input" maxlength="32" autocomplete="off"><div class="hint">Max 32 characters</div></div>
+                <div><label for="ePort" class="req">Port</label><input id="ePort" class="text-input" type="number" min="1" max="65535"><div class="hint" id="ePortHint"></div></div>
+                <div data-efield="address"><label for="eAddress" class="req">Address</label><input id="eAddress" class="text-input" placeholder="192.168.0.10" autocomplete="off"><div class="hint">IPv4 address of the LAN device</div></div>
+                <div data-efield="username"><label for="eUsername" id="eUsernameLabel">Username</label><input id="eUsername" class="text-input" maxlength="64" autocomplete="off"></div>
+                <div data-efield="resolution"><label for="eResolution" class="req">Resolution</label><input id="eResolution" class="text-input" list="resolutionList" placeholder="1024x768" autocomplete="off"></div>
+            </div>
+            <div class="form-errors" id="editFormErrors"></div>
+            <div class="notice" style="margin-top:1rem;">Changing the <strong>Name</strong> renames it: the old profile is replaced on every selected router that has it. The edited profile is pushed to all those routers, so they all end up identical.</div>
+            <div style="display:flex;justify-content:flex-end;gap:0.6rem;margin-top:1.5rem;">
+                <button class="btn btn-secondary" id="editCancelBtn">Cancel</button>
+                <button class="btn btn-primary" id="editSaveBtn">Stage edit</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="confirmModal">
+    <div class="modal-card">
+        <div class="modal-head"><h2 id="confirmTitle">Confirm</h2><button class="modal-close" id="confirmCloseBtn" aria-label="Close">×</button></div>
+        <div class="modal-body">
+            <div id="confirmBody" style="font-size:0.9375rem;line-height:1.6;"></div>
+            <div style="display:flex;justify-content:flex-end;gap:0.6rem;margin-top:1.5rem;">
+                <button class="btn btn-secondary" id="confirmCancelBtn">Cancel</button>
+                <button class="btn btn-primary" id="confirmOkBtn">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal" id="helpModal">
     <div class="modal-card wide">
         <div class="modal-head"><h2>User guide</h2><button class="modal-close" id="closeHelpBtn" aria-label="Close">×</button></div>
@@ -475,6 +530,13 @@
                 <li>Tick the wrong variants (or individual routers inside them) as the destination.</li>
                 <li>Preview, then Run. The wrong ones are overwritten with the correct one.</li>
             </ol>
+            <h3>Editing (Edit profiles)</h3>
+            <p>Edit works like Delete: find the profiles by <strong>router</strong>, <strong>group</strong>, or <strong>profile name</strong>.</p>
+            <ul>
+                <li><strong>Routers / Groups:</strong> the list below shows the profile names on the selected routers. Click <strong>Edit</strong> next to a name to open a popup pre-filled from the most common version of it. Saving pushes the edited profile to every selected router with that name, so they all end up identical.</li>
+                <li><strong>Profile name:</strong> search a name and it splits into <strong>variants</strong> (same name, but different type / port / address / etc.), exactly like Delete. Name matching ignores case, so <em>Test</em> and <em>test</em> land in the same variant when their settings are identical. Click <strong>Edit this variant</strong> to change <em>only that variant</em> (its routers), or <strong>Edit</strong> on a single row to change <em>just that one router's profile</em>. Other kinds of profile sharing the name are left untouched — different kinds are never forced to become one. The filter box searches the profile name as well as router name, group, account and IDs.</li>
+            </ul>
+            <p>Matching is by name (case-insensitive) and overwritten in place, so each router keeps one profile for that name. Change the Name field only to rename — a new name creates a new profile rather than editing the old one.</p>
             <h3>Deleting</h3>
             <ul>
                 <li><strong>Routers / Groups:</strong> pick routers, then tick which profile names to delete from them (or all).</li>
@@ -503,14 +565,28 @@
 
     let action = 'create';
     const dest = { mode: 'routers', routers: new Set(), groups: new Set(), profileIds: new Set(),
-                   nameKey: null, variants: [], loadingVariants: false };
-    const source = { routerId: null, profiles: [], selected: new Set(), loading: false };
+                   nameKey: null, variants: [], loadingVariants: false, groupId: null };
+    const source = { mode: 'routers', routerId: null, profiles: [], selected: new Set(), loading: false,
+                     groupId: null, nameKey: null, variants: [], loadingVariants: false };
     const delNames = new Set();
     let delAll = false;
     const orphanSel = new Set();
+    // Edit: the single staged profile ({type, name, port, ...}) and the
+    // name_key of the profile the user chose to edit.
+    //   - Routers/Groups mode: the edit applies to every selected router that
+    //     carries that name (targets derived from editKey via editCandidates).
+    //   - Profile name mode: the user drills into variants and edits ONE
+    //     variant; editRouterIds holds exactly that variant's routers, so
+    //     different kinds of profile sharing a name are never forced to match.
+    let editSpec = null;
+    let editKey = null;
+    let editRouterIds = null;
+    let editFingerprint = null;
+    let editProfileId = null;
     const sorts = {
         destRouters: { key: 'name', dir: 1 }, destGroups: { key: 'name', dir: 1 },
         destNames: { key: 'count', dir: -1 }, source: { key: 'name', dir: 1 },
+        sourceGroups: { key: 'name', dir: 1 }, sourceNames: { key: 'count', dir: -1 },
         orphans: { key: 'router_id', dir: 1 },
     };
     let pollTimer = null;
@@ -570,10 +646,35 @@
     }
     const helpModal = wireModal('helpModal', 'helpBtn', 'closeHelpBtn');
     const settingsModal = wireModal('settingsModal', null, 'closeSettingsBtn');
+
+    // Styled replacement for window.confirm(). Resolves true/false.
+    // opts: { title, bodyHtml, okText, okClass, cancelText }
+    const confirmModal = $('confirmModal');
+    let confirmResolve = null;
+    function closeConfirm(result) {
+        confirmModal.classList.remove('show');
+        if (confirmResolve) { const r = confirmResolve; confirmResolve = null; r(result); }
+    }
+    $('confirmOkBtn').addEventListener('click', () => closeConfirm(true));
+    $('confirmCancelBtn').addEventListener('click', () => closeConfirm(false));
+    $('confirmCloseBtn').addEventListener('click', () => closeConfirm(false));
+    confirmModal.addEventListener('click', (e) => { if (e.target === confirmModal) closeConfirm(false); });
+    function confirmDialog(opts) {
+        opts = opts || {};
+        $('confirmTitle').textContent = opts.title || 'Confirm';
+        $('confirmBody').innerHTML = opts.bodyHtml || '';
+        const ok = $('confirmOkBtn');
+        ok.textContent = opts.okText || 'Confirm';
+        ok.className = 'btn ' + (opts.okClass || 'btn-primary');
+        $('confirmCancelBtn').textContent = opts.cancelText || 'Cancel';
+        confirmModal.classList.add('show');
+        ok.focus();
+        return new Promise((resolve) => { confirmResolve = resolve; });
+    }
     function openSettings() { settingsModal.classList.add('show'); refreshCredProfiles(); loadCurrentCreds(); }
     $('settingsBtn').addEventListener('click', openSettings);
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') { helpModal.classList.remove('show'); settingsModal.classList.remove('show'); }
+        if (e.key === 'Escape') { helpModal.classList.remove('show'); settingsModal.classList.remove('show'); $('editModal').classList.remove('show'); if (confirmModal.classList.contains('show')) closeConfirm(false); }
     });
 
     // -------------------------------------------------------- generic helpers
@@ -622,9 +723,10 @@
             || fold(r.account_name).includes(q) || String(r.id).includes(q)
             || String(r.group_id || '').includes(q);
     }
-    // Profile rows (variants): same fields, from the profile's router.
+    // Profile rows (variants): the profile name plus the router's fields.
     function profileRouterMatches(p, q) {
-        return !q || fold(p.router_name).includes(q) || fold(p.group_name).includes(q)
+        return !q || fold(p.name).includes(q)
+            || fold(p.router_name).includes(q) || fold(p.group_name).includes(q)
             || fold(p.account_name).includes(q) || String(p.router_id).includes(q)
             || String(p.group_id || '').includes(q) || String(p.id).includes(q);
     }
@@ -711,23 +813,39 @@
     const NOTICES = {
         create: 'Enables LAN Manager where needed, then creates or updates the profile on each router. Existing same-name profiles (any case) are replaced, never duplicated.',
         copy: 'Copies the ticked profile(s) exactly. Enables LAN Manager where needed. Existing same-name profiles (any case) are replaced, never duplicated. The source router is not changed.',
+        edit: 'Find a profile by router, group, or name, edit its values in the popup, and apply it to the matching routers. In Profile-name mode you edit one variant at a time, so only that variant\'s routers change. Enables LAN Manager where needed. Routers keep one profile for that name.',
         delete: 'Deletes profiles only. <strong>LAN Manager stays as it is.</strong>',
         disable: 'Sets LAN Manager to disabled. Profiles are <strong>not</strong> deleted. Routers without a LAN Manager record are skipped.',
         orphans: 'Deletes the ticked profiles by ID. These routers are not in your v2 router list.',
     };
+    // Selections belong to the action that made them. Carrying "3 routers
+    // selected" from Delete into Disable is misleading and dangerous, so wipe
+    // every selection whenever the action actually changes.
+    function clearSelections() {
+        dest.routers.clear(); dest.groups.clear(); dest.profileIds.clear();
+        dest.nameKey = null; dest.variants = []; dest.groupId = null;
+        source.routerId = null; source.selected.clear(); source.profiles = [];
+        delNames.clear(); delAll = false;
+        $('delAllChk').checked = false;
+        orphanSel.clear();
+        editSpec = null; editKey = null; editRouterIds = null; editFingerprint = null; editProfileId = null;
+        clearDestSearch();
+    }
     function setAction(next) {
+        const changed = next !== action;
         action = next;
+        if (changed) clearSelections();
         document.querySelectorAll('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.action === action));
         $('profilePanel').style.display = action === 'create' ? 'flex' : 'none';
         $('sourcePanel').style.display = action === 'copy' ? 'flex' : 'none';
         $('orphanPanel').style.display = action === 'orphans' ? 'flex' : 'none';
         $('destPanel').style.display = action === 'orphans' ? 'none' : 'flex';
+        // Edit and Delete both find profiles the same way: by router, group, or
+        // profile name. Profile name is irrelevant to Disable only.
         $('modeNameBtn').style.display = action === 'disable' ? 'none' : '';
         if (action === 'disable' && dest.mode === 'name') setDestMode('routers');
-        $('destTitle').textContent = { create: '2 · Destination', copy: '2 · Destination', delete: '1 · Delete from', disable: 'Routers' }[action] || '';
-        $('actionNotice').innerHTML = NOTICES[action];
-        $('actionNotice').className = 'notice' + (action === 'create' || action === 'copy' ? '' : ' danger');
-        $('runBtn').className = 'btn btn-block ' + (action === 'create' || action === 'copy' ? 'btn-primary' : 'btn-danger');
+        $('destTitle').textContent = { create: '2 · Destination', copy: '2 · Destination', edit: '1 · Find profiles', delete: '1 · Delete from', disable: 'Routers' }[action] || '';
+        $('runBtn').className = 'btn btn-block ' + (action === 'create' || action === 'copy' || action === 'edit' ? 'btn-primary' : 'btn-danger');
         $('previewPanel').style.display = 'none';
         // Results from a finished run belong to the action that produced them.
         // Clear them when switching actions, but keep a run that's still in
@@ -792,6 +910,8 @@
     $('sourceSearch').addEventListener('input', renderSource);
     function renderSource() {
         if (action !== 'copy') return;
+        // A chosen source router always shows its profiles, regardless of how
+        // it was found (router list, group drill, or profile-name drill).
         if (source.routerId) {
             $('sourceList').style.display = 'none';
             $('sourceProfilesWrap').style.display = 'block';
@@ -806,6 +926,14 @@
         }
         $('sourceList').style.display = 'block';
         $('sourceProfilesWrap').style.display = 'none';
+        $('sourceSearch').placeholder = source.mode === 'routers' ? 'Search router name, group, account, router ID, group ID…'
+            : (source.mode === 'groups' ? (source.groupId ? 'Filter routers in this group…' : 'Search group name, account, group ID…')
+                : (source.nameKey ? 'Filter: router name, group, account, router ID…' : 'Search profile name, or a router ID / group ID…'));
+        if (source.mode === 'groups') { renderSourceGroups(); return; }
+        if (source.mode === 'name') { renderSourceNames(); return; }
+        renderSourceRouters();
+    }
+    function renderSourceRouters() {
         $('sourceSummary').textContent = 'Pick the router that has the correct profile. Only routers with profiles are listed.';
         const q = fold($('sourceSearch').value);
         const rows = sortRows(inv.routers.filter((r) => r.profile_count > 0 && routerMatches(r, q)), sorts.source);
@@ -823,10 +951,151 @@
         if (rows.length > 500) html += '<tr><td colspan="6" class="meta-text" style="text-align:center;">Showing 500 of ' + rows.length + ' — refine the search</td></tr>';
         $('sourceList').innerHTML = html + '</tbody></table>';
     }
+    // Groups mode: pick a group, then one of its routers that has profiles.
+    function renderSourceGroups() {
+        const q = fold($('sourceSearch').value);
+        if (source.groupId) {
+            const g = groupById.get(source.groupId) || { name: '', id: source.groupId };
+            $('sourceSummary').textContent = 'Routers with profiles in ' + (g.name || 'this group') + '. Pick one.';
+            const rows = sortRows(inv.routers.filter((r) => r.group_id === source.groupId && r.profile_count > 0 && routerMatches(r, q)), sorts.source);
+            let html = '<div class="panel-sub" style="border-bottom:1px solid var(--border-color);"><button class="link-btn" data-sback="group">← All groups</button>'
+                + '<span>' + esc(g.name || '(unnamed group)') + ' <span class="cell-mono">' + esc(source.groupId) + '</span></span></div>';
+            if (!rows.length) { $('sourceList').innerHTML = html + emptyState(q ? 'No router with profiles in this group matches.' : 'No routers with profiles in this group.'); return; }
+            html += '<table class="pick-table"><thead><tr><th class="nosort" style="width:36px;"></th>'
+                + th('source', 'name', 'Router') + th('source', 'account_name', 'Account')
+                + th('source', 'profile_count', 'Profiles') + th('source', 'id', 'ID') + '</tr></thead><tbody>';
+            rows.slice(0, 500).forEach((r) => {
+                html += '<tr data-id="' + esc(r.id) + '"><td><input type="radio" name="srcRouter" tabindex="-1" aria-label="Select ' + esc(r.name) + '"></td>'
+                    + '<td class="truncate" title="' + esc(r.name) + '">' + esc(r.name || '(unnamed)') + '</td>'
+                    + '<td class="truncate">' + esc(r.account_name || '—') + '</td>'
+                    + '<td>' + esc(r.profile_count) + '</td><td class="cell-mono">' + esc(r.id) + '</td></tr>';
+            });
+            $('sourceList').innerHTML = html + '</tbody></table>';
+            return;
+        }
+        $('sourceSummary').textContent = 'Pick a group, then a router in it. Only groups with profiled routers are listed.';
+        // Groups that contain at least one router carrying profiles.
+        const groupsWithProfiles = new Set(inv.routers.filter((r) => r.profile_count > 0 && r.group_id).map((r) => r.group_id));
+        const rows = sortRows(inv.groups.filter((g) => groupsWithProfiles.has(g.id)
+            && (!q || fold(g.name).includes(q) || fold(g.account_name).includes(q) || String(g.id).includes(q))), sorts.sourceGroups);
+        if (!rows.length) { $('sourceList').innerHTML = emptyState(q ? 'No group with profiles matches that search.' : 'No groups have routers with profiles.'); return; }
+        let html = '<table class="pick-table"><thead><tr>'
+            + th('sourceGroups', 'name', 'Group') + th('sourceGroups', 'account_name', 'Account')
+            + th('sourceGroups', 'device_count', 'Routers') + th('sourceGroups', 'id', 'ID') + '</tr></thead><tbody>';
+        rows.slice(0, 500).forEach((g) => {
+            html += '<tr data-gid="' + esc(g.id) + '" style="cursor:pointer;">'
+                + '<td class="truncate" title="' + esc(g.name) + '"><strong>' + esc(g.name || '(unnamed)') + '</strong></td>'
+                + '<td class="truncate">' + esc(g.account_name || '—') + '</td>'
+                + '<td>' + esc(g.device_count) + '</td><td class="cell-mono">' + esc(g.id) + '</td></tr>';
+        });
+        $('sourceList').innerHTML = html + '</tbody></table>';
+    }
+    // Profile-name mode: pick a name, drill into its variants, pick the router
+    // to copy from (reuses the same /api/variants grouping as the destination).
+    function renderSourceNames() {
+        const q = fold($('sourceSearch').value);
+        if (source.nameKey) {
+            renderSourceVariants();
+            return;
+        }
+        $('sourceSummary').textContent = 'Click a profile name to see the routers that have it.';
+        const isId = /^\d+$/.test(q);
+        const rows = sortRows(nameIndex.filter((e) => !q || e.key.includes(q)
+            || (isId && (e.routers.has(q) || e.groups.has(q)))), sorts.sourceNames);
+        if (!rows.length) { $('sourceList').innerHTML = emptyState(q ? 'No profile name matches that search.' : 'No profiles yet.'); return; }
+        let html = '<table class="pick-table"><thead><tr>'
+            + th('sourceNames', 'display', 'Profile name (spellings)') + th('sourceNames', 'count', 'Profiles')
+            + th('sourceNames', 'router_count', 'Routers') + '</tr></thead><tbody>';
+        rows.slice(0, 1000).forEach((e) => {
+            html += '<tr data-sname="' + esc(e.key) + '" style="cursor:pointer;"><td class="truncate" style="max-width:420px;" title="' + esc(e.display) + '"><strong>' + esc(e.display) + '</strong></td>'
+                + '<td>' + esc(e.count) + '</td><td>' + esc(e.router_count) + '</td></tr>';
+        });
+        $('sourceList').innerHTML = html + '</tbody></table>';
+    }
+    function renderSourceVariants() {
+        const q = fold($('sourceSearch').value);
+        let html = '<div class="panel-sub" style="border-bottom:1px solid var(--border-color);"><button class="link-btn" data-sback="name">← All profile names</button>'
+            + '<span>Pick the router to copy "' + esc(source.nameKey) + '" from</span></div>';
+        if (source.loadingVariants) { $('sourceList').innerHTML = html + '<div class="empty-state"><div class="spinner"></div><p>Grouping profiles…</p></div>'; return; }
+        // Flatten every variant's routers into one pickable list; a non-orphan
+        // router is required (orphans have no live router to read from).
+        const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        let rowsHtml = '';
+        let shownCount = 0;
+        source.variants.forEach((v, i) => {
+            const tag = i < 26 ? letters[i] : String(i + 1);
+            const names = Array.from(new Set(v.profiles.map((p) => p.name)));
+            const shown = v.profiles.filter((p) => profileRouterMatches(p, q));
+            if (!shown.length) return;
+            rowsHtml += '<tr class="muted"><td colspan="5" style="background:var(--light-bg);"><strong>Variant ' + tag + '</strong> · '
+                + esc(names.join(' / ')) + ' · ' + esc(v.summary) + '</td></tr>';
+            shown.forEach((p) => {
+                shownCount++;
+                const blocked = !!p.orphan;
+                rowsHtml += '<tr' + (blocked ? ' class="muted"' : ' data-spid="' + esc(p.id) + '" data-srid="' + esc(p.router_id) + '" style="cursor:pointer;"') + '>'
+                    + '<td class="truncate" title="' + esc(p.router_name) + '">' + (p.orphan ? '<span class="badge orphan">router not in v2</span>' : esc(p.router_name || '(unnamed)')) + '</td>'
+                    + '<td class="truncate">' + groupCell(p.group_name, p.group_id) + '</td>'
+                    + '<td class="truncate">' + esc(p.account_name || '—') + '</td>'
+                    + '<td class="cell-mono">router ' + esc(p.router_id) + '</td><td class="cell-mono">profile ' + esc(p.id) + '</td></tr>';
+            });
+        });
+        if (!shownCount) { $('sourceList').innerHTML = html + emptyState(source.variants.length ? 'No routers in these variants match the filter.' : 'No profiles with that name.'); return; }
+        html += '<table class="pick-table"><thead><tr><th class="nosort">Router</th><th class="nosort">Group</th><th class="nosort">Account</th><th class="nosort">Router ID</th><th class="nosort">Profile ID</th></tr></thead><tbody>'
+            + rowsHtml + '</tbody></table>';
+        $('sourceList').innerHTML = html;
+    }
+    async function loadSourceVariants(key) {
+        source.nameKey = key;
+        source.loadingVariants = true;
+        renderSource();
+        try {
+            const data = await api('/api/variants', { json: { name: key } });
+            if (source.nameKey !== key) return;
+            source.variants = data.variants || [];
+        } catch (err) {
+            notify('Could not group profiles: ' + err.message, 'error');
+            source.variants = [];
+        } finally {
+            source.loadingVariants = false;
+            renderSource();
+        }
+    }
+    function clearSourceSearch() {
+        $('sourceSearch').value = '';
+        $('sourceSearch').dispatchEvent(new Event('input'));
+    }
     $('sourceList').addEventListener('click', (e) => {
+        const back = e.target.closest('[data-sback]');
+        if (back) {
+            if (back.dataset.sback === 'group') source.groupId = null;
+            else { source.nameKey = null; source.variants = []; }
+            clearSourceSearch();
+            renderSource();
+            return;
+        }
+        const gtr = e.target.closest('tr[data-gid]');
+        if (gtr) { source.groupId = gtr.dataset.gid; clearSourceSearch(); renderSource(); return; }
+        const ntr = e.target.closest('tr[data-sname]');
+        if (ntr) { clearSourceSearch(); loadSourceVariants(ntr.dataset.sname); return; }
+        const vtr = e.target.closest('tr[data-spid]');
+        if (vtr) { pickSource(vtr.dataset.srid, vtr.dataset.spid); return; }
         const tr = e.target.closest('tr[data-id]');
         if (tr) pickSource(tr.dataset.id, null);
     });
+    function setSourceMode(mode) {
+        source.mode = mode;
+        // Switching how you find the source returns you to picking one: the
+        // toggle lives above the find area, so it must not leave a chosen
+        // router's profile list showing.
+        source.routerId = null; source.selected.clear(); source.profiles = [];
+        source.groupId = null; source.nameKey = null; source.variants = [];
+        document.querySelectorAll('#sourcePanel .mode-toggle button').forEach((b) => b.classList.toggle('active', b.dataset.smode === mode));
+        $('sourceSearch').value = '';
+        $('sourceSearch').dispatchEvent(new Event('input'));
+        renderSource();
+        updateRunState();
+    }
+    document.querySelectorAll('#sourcePanel .mode-toggle button').forEach((b) => b.addEventListener('click', () => setSourceMode(b.dataset.smode)));
     async function pickSource(routerId, preselectProfileId) {
         source.routerId = routerId;
         source.selected = new Set(preselectProfileId ? [preselectProfileId] : []);
@@ -879,6 +1148,7 @@
     // ------------------------------------------------------------ destination
     function setDestMode(mode) {
         dest.mode = mode;
+        dest.groupId = null;
         document.querySelectorAll('#destPanel .mode-toggle button').forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
         $('destSearch').value = '';
         $('destSearch').dispatchEvent(new Event('input'));
@@ -890,8 +1160,19 @@
 
     function visibleDestRows() {
         const q = fold($('destSearch').value);
-        if (dest.mode === 'routers') return sortRows(inv.routers.filter((r) => routerMatches(r, q)), sorts.destRouters);
-        if (dest.mode === 'groups') return sortRows(inv.groups.filter((g) => !q || fold(g.name).includes(q) || fold(g.account_name).includes(q) || String(g.id).includes(q)), sorts.destGroups);
+        // Edit and Delete act on existing profiles, so they only list routers
+        // that carry one and groups that contain such a router — the same
+        // "has profiles" filter Copy uses on its source. Create, Copy's
+        // destination and Disable target any router, so they list everything.
+        const onlyProfiled = action === 'edit' || action === 'delete';
+        if (dest.mode === 'routers') return sortRows(inv.routers.filter((r) => (!onlyProfiled || r.profile_count > 0) && routerMatches(r, q)), sorts.destRouters);
+        if (dest.mode === 'groups') {
+            const profiledGroups = onlyProfiled
+                ? new Set(inv.routers.filter((r) => r.profile_count > 0 && r.group_id).map((r) => r.group_id))
+                : null;
+            return sortRows(inv.groups.filter((g) => (!profiledGroups || profiledGroups.has(g.id))
+                && (!q || fold(g.name).includes(q) || fold(g.account_name).includes(q) || String(g.id).includes(q))), sorts.destGroups);
+        }
         // Names match by substring; a numeric query also lists the names found
         // on that exact router ID or group ID.
         const isId = /^\d+$/.test(q);
@@ -903,16 +1184,29 @@
         if (action === 'orphans') return;
         const box = $('destList');
         $('destSearch').placeholder = dest.mode === 'routers' ? 'Search router name, group, account, router ID, group ID…'
-            : (dest.mode === 'groups' ? 'Search group name, account, group ID…'
-                : (dest.nameKey ? 'Filter routers: name, group, account, router ID, group ID…'
+            : (dest.mode === 'groups' ? (action === 'edit' && dest.groupId ? 'Filter routers in this group, or a profile name…' : 'Search group name, account, group ID…')
+                : (dest.nameKey ? 'Filter: profile name, router name, group, account, router ID, group ID…'
                     : 'Search profile name, or a router ID / group ID…'));
-        // The bare name list has nothing to tick; every other view does.
-        $('destAllBtn').style.display = dest.mode === 'name' && !dest.nameKey ? 'none' : '';
+        // The bare name list has nothing to tick; neither does the edit group
+        // list or its drilled-in router/profile view (edit acts per profile).
+        const noBulk = (dest.mode === 'name' && !dest.nameKey) || (action === 'edit' && dest.mode === 'groups');
+        $('destAllBtn').style.display = noBulk ? 'none' : '';
         if (!inv.routers.length && !inv.profiles.length) { updateDestSummary(); return; }
 
         if (dest.mode === 'name' && dest.nameKey) { renderVariants(); updateDestSummary(); return; }
+        // Edit + Groups drills down: pick a group, then see the routers in it
+        // and their profiles, and edit one profile at a time. Selecting a whole
+        // group as a bulk edit target doesn't make sense, so there is no group
+        // checkbox for edit — clicking a group row drills in.
+        if (action === 'edit' && dest.mode === 'groups' && dest.groupId) { renderEditGroupRouters(); updateDestSummary(); return; }
         const rows = visibleDestRows();
-        if (!rows.length) { box.innerHTML = emptyState($('destSearch').value ? 'Nothing matches that search.' : 'Nothing to show.'); updateDestSummary(); return; }
+        if (!rows.length) {
+            const onlyProfiled = action === 'edit' || action === 'delete';
+            const emptyMsg = $('destSearch').value
+                ? (onlyProfiled ? 'No ' + (dest.mode === 'groups' ? 'group' : 'router') + ' with profiles matches that search.' : 'Nothing matches that search.')
+                : (onlyProfiled ? 'No ' + (dest.mode === 'groups' ? 'groups have routers with' : 'routers have') + ' profiles yet (per the cached inventory).' : 'Nothing to show.');
+            box.innerHTML = emptyState(emptyMsg); updateDestSummary(); return;
+        }
 
         let html = '<table class="pick-table"><thead><tr>';
         const cap = 1000;
@@ -930,9 +1224,18 @@
                     + '<td>' + esc(r.profile_count) + '</td><td class="cell-mono">' + esc(r.id) + '</td></tr>';
             });
         } else if (dest.mode === 'groups') {
-            html += '<th class="nosort" style="width:36px;"></th>' + th('destGroups', 'name', 'Group') + th('destGroups', 'account_name', 'Account')
+            // Edit drills into a group's routers (click a row); every other
+            // action selects whole groups with a checkbox.
+            const drill = action === 'edit';
+            html += (drill ? '' : '<th class="nosort" style="width:36px;"></th>') + th('destGroups', 'name', 'Group') + th('destGroups', 'account_name', 'Account')
                 + th('destGroups', 'device_count', 'Routers') + th('destGroups', 'id', 'ID') + '</tr></thead><tbody>';
             rows.slice(0, cap).forEach((g) => {
+                if (drill) {
+                    html += '<tr data-gid="' + esc(g.id) + '" style="cursor:pointer;">'
+                        + '<td class="truncate" title="' + esc(g.name) + '"><strong>' + esc(g.name || '(unnamed)') + '</strong></td>'
+                        + '<td class="truncate">' + esc(g.account_name || '—') + '</td><td>' + esc(g.device_count) + '</td><td class="cell-mono">' + esc(g.id) + '</td></tr>';
+                    return;
+                }
                 const on = dest.groups.has(g.id);
                 html += '<tr data-id="' + esc(g.id) + '"' + (on ? ' class="selected"' : '') + '><td><input type="checkbox" tabindex="-1"' + (on ? ' checked' : '') + ' aria-label="Select ' + esc(g.name) + '"></td>'
                     + '<td class="truncate" title="' + esc(g.name) + '">' + esc(g.name || '(unnamed)') + '</td>'
@@ -951,15 +1254,81 @@
         updateDestSummary();
     }
 
+    // Edit + Groups drill: the routers in the chosen group, each with its
+    // profiles and a per-profile Edit button. Edit changes one profile on one
+    // router, so group membership is just a way to find the right router —
+    // nothing is edited in bulk. The search box filters by router (name/ID/
+    // account) or by profile name.
+    function renderEditGroupRouters() {
+        const box = $('destList');
+        const g = groupById.get(dest.groupId) || { name: '', id: dest.groupId };
+        const q = fold($('destSearch').value);
+        let html = '<div class="panel-sub" style="border-bottom:1px solid var(--border-color);"><button class="link-btn" data-gback="1">← All groups</button>'
+            + '<span>' + esc(g.name || '(unnamed group)') + ' <span class="cell-mono">' + esc(dest.groupId) + '</span></span></div>';
+        // Routers in this group that carry at least one profile. Orphan
+        // profiles are skipped — their router isn't in v2, so it can't be in
+        // a group list anyway.
+        const routers = inv.routers.filter((r) => r.group_id === dest.groupId)
+            .map((r) => ({ r: r, profiles: (profilesByRouter.get(r.id) || []).filter((p) => !p.orphan) }))
+            .filter((x) => x.profiles.length);
+        // A profile-name query keeps routers that hold a matching profile and
+        // narrows each router's rows to the matches; a router query matches the
+        // router itself and keeps all its profiles.
+        const matched = routers.map((x) => {
+            if (!q) return x;
+            if (routerMatches(x.r, q)) return x;
+            const profiles = x.profiles.filter((p) => (p.name_key || '').includes(q) || fold(p.name).includes(q));
+            return profiles.length ? { r: x.r, profiles: profiles } : null;
+        }).filter(Boolean);
+        if (!routers.length) { box.innerHTML = html + emptyState('No routers in this group have profiles (per the cached inventory).'); return; }
+        if (!matched.length) { box.innerHTML = html + emptyState('No router or profile in this group matches that search.'); return; }
+        matched.sort((a, b) => (a.r.name || '').localeCompare(b.r.name || ''));
+        matched.forEach((x) => {
+            const r = x.r;
+            html += '<div class="variant"><div class="variant-head">'
+                + '<span class="variant-name">' + esc(r.name || '(unnamed)') + '</span>'
+                + '<span class="variant-summary cell-mono">router ' + esc(r.id) + '</span>'
+                + '<span class="variant-count">' + plural(x.profiles.length, 'profile') + '</span>'
+                + '</div><div class="variant-body"><table class="pick-table"><tbody>';
+            x.profiles.forEach((p) => {
+                const rowEdited = editSpec && editProfileId === p.id;
+                html += '<tr class="' + (rowEdited ? 'selected' : '') + '">'
+                    + '<td class="truncate" title="' + esc(p.name) + '"><strong>' + esc(p.name || '(unnamed)') + '</strong>'
+                    + (rowEdited ? ' <span class="badge info">edited</span>' : '') + '</td>'
+                    + '<td>' + esc(typeLabel(p.type)) + '</td><td class="cell-mono">' + esc(p.summary) + '</td>'
+                    + '<td class="cell-mono">profile ' + esc(p.id) + '</td>'
+                    + '<td style="width:120px;text-align:right;"><button class="btn btn-secondary btn-sm" data-edit-router-profile="' + esc(p.id) + '">'
+                    + (rowEdited ? 'Re-edit' : 'Edit') + '</button></td></tr>';
+            });
+            html += '</tbody></table></div></div>';
+        });
+        box.innerHTML = html;
+    }
+
     $('destList').addEventListener('click', (e) => {
         if (e.target.closest('th')) return;
         const nameRow = e.target.closest('tr[data-name]');
-        // The box held the name query; inside variants it filters routers instead.
+        // Clicking a profile name drills into its per-router variants, the same
+        // for Edit as for Delete/Copy. Edit then changes ONE variant at a time,
+        // so different kinds of profile that happen to share a name are never
+        // flattened into one and forced to match.
         if (nameRow) { clearDestSearch(); loadVariants(nameRow.dataset.name); return; }
+        // Edit + Groups: drill into a group, step back out, or edit one of a
+        // router's profiles.
+        const gRow = e.target.closest('tr[data-gid]');
+        if (gRow) { dest.groupId = gRow.dataset.gid; clearDestSearch(); renderAll(); return; }
+        const gBack = e.target.closest('[data-gback]');
+        if (gBack) { dest.groupId = null; clearDestSearch(); renderAll(); return; }
+        const editRP = e.target.closest('[data-edit-router-profile]');
+        if (editRP) { openEditGroupProfile(editRP.dataset.editRouterProfile); return; }
         const back = e.target.closest('[data-back]');
         if (back) { dest.nameKey = null; dest.variants = []; dest.profileIds.clear(); clearDestSearch(); renderAll(); return; }
         const useSrc = e.target.closest('[data-use-source]');
         if (useSrc) { useVariantAsSource(Number(useSrc.dataset.useSource)); return; }
+        const editVar = e.target.closest('[data-edit-variant]');
+        if (editVar) { openEditVariant(Number(editVar.dataset.editVariant)); return; }
+        const editProf = e.target.closest('[data-edit-profile]');
+        if (editProf) { openEditProfile(Number(editProf.dataset.editProfile), editProf.dataset.editPid); return; }
         const vchk = e.target.closest('input[data-variant]');
         if (vchk) {
             const v = dest.variants[Number(vchk.dataset.variant)];
@@ -1060,27 +1429,43 @@
             const tag = i < 26 ? letters[i] : String(i + 1);
             const names = Array.from(new Set(v.profiles.map((p) => p.name)));
             const srcHere = action === 'copy' && v.profiles.some((p) => p.router_id === source.routerId && source.selected.has(p.id));
+            // Edit acts on a whole variant through its button; there is nothing
+            // to tick, so the select checkbox is dropped. The variant currently
+            // staged for edit is flagged instead.
+            const editHere = action === 'edit' && editSpec && editKey === dest.nameKey && editFingerprint === v.fingerprint;
             html += '<div class="variant"><div class="variant-head">'
-                + '<input type="checkbox" data-variant="' + i + '"' + (ids.length && picked === ids.length ? ' checked' : '') + (ids.length ? '' : ' disabled') + ' aria-label="Select variant ' + tag + '">'
+                + (action === 'edit' ? ''
+                    : '<input type="checkbox" data-variant="' + i + '"' + (ids.length && picked === ids.length ? ' checked' : '') + (ids.length ? '' : ' disabled') + ' aria-label="Select variant ' + tag + '">')
                 + '<span class="variant-tag">Variant ' + tag + '</span>'
                 + '<span class="variant-name">' + esc(names.join(' / ')) + '</span>'
                 + '<span class="variant-summary">' + esc(v.summary) + '</span>'
                 + (srcHere ? '<span class="badge info">copy source</span>' : '')
+                + (editHere ? '<span class="badge info">edited</span>' : '')
                 + '<span class="variant-count">' + plural(v.router_count, 'router')
                 + (filtering ? ' · ' + shown.length + ' shown' : '')
-                + (picked ? ' · ' + picked + ' selected' : '') + '</span>'
+                + (action !== 'edit' && picked ? ' · ' + picked + ' selected' : '') + '</span>'
                 + (action === 'copy' ? '<button class="btn btn-secondary btn-sm" data-use-source="' + i + '">Use as source</button>' : '')
+                + (action === 'edit' ? '<button class="btn btn-secondary btn-sm" data-edit-variant="' + i + '">' + (editHere ? 'Re-edit' : 'Edit this variant') + '</button>' : '')
                 + '</div><div class="variant-body"><table class="pick-table"><tbody>';
             shown.forEach((p) => {
-                const on = dest.profileIds.has(p.id);
+                const on = action !== 'edit' && dest.profileIds.has(p.id);
                 const blocked = action !== 'delete' && p.orphan;
                 const isSrc = action === 'copy' && p.router_id === source.routerId;
-                html += '<tr data-pid="' + esc(p.id) + '" class="' + (on ? 'selected' : '') + (blocked ? ' muted' : '') + '">'
-                    + '<td style="width:36px;"><input type="checkbox" tabindex="-1"' + (on ? ' checked' : '') + (blocked ? ' disabled' : '') + ' aria-label="Select ' + esc(p.router_name || p.router_id) + '"></td>'
+                // Edit mode: each non-orphan row gets its own Edit button so a
+                // single profile can be changed without touching the rest of
+                // the variant. The staged single profile is flagged.
+                const rowEdited = action === 'edit' && editSpec && editProfileId === p.id;
+                html += '<tr' + (action === 'edit' ? '' : ' data-pid="' + esc(p.id) + '"') + ' class="' + (on || rowEdited ? 'selected' : '') + (blocked ? ' muted' : '') + '">'
+                    + (action === 'edit' ? '<td style="width:36px;"></td>'
+                        : '<td style="width:36px;"><input type="checkbox" tabindex="-1"' + (on ? ' checked' : '') + (blocked ? ' disabled' : '') + ' aria-label="Select ' + esc(p.router_name || p.router_id) + '"></td>')
                     + '<td class="truncate" title="' + esc(p.router_name) + '">' + (p.orphan ? '<span class="badge orphan">router not in v2</span>' : esc(p.router_name || '(unnamed)'))
-                    + (isSrc ? ' <span class="badge info">source</span>' : '') + '</td>'
+                    + (isSrc ? ' <span class="badge info">source</span>' : '')
+                    + (rowEdited ? ' <span class="badge info">edited</span>' : '') + '</td>'
                     + '<td class="truncate">' + groupCell(p.group_name, p.group_id) + '</td><td class="truncate">' + esc(p.account_name || '—') + '</td>'
-                    + '<td class="cell-mono">router ' + esc(p.router_id) + '</td><td class="cell-mono">profile ' + esc(p.id) + '</td></tr>';
+                    + '<td class="cell-mono">router ' + esc(p.router_id) + '</td><td class="cell-mono">profile ' + esc(p.id) + '</td>'
+                    + (action === 'edit'
+                        ? '<td style="width:120px;text-align:right;">' + (p.orphan ? '' : '<button class="btn btn-secondary btn-sm" data-edit-profile="' + i + '" data-edit-pid="' + esc(p.id) + '">' + (rowEdited ? 'Re-edit' : 'Edit') + '</button>') + '</td>'
+                        : '') + '</tr>';
             });
             html += '</tbody></table></div></div>';
         });
@@ -1110,7 +1495,9 @@
         let text;
         const n = destRouterIds().length;
         if (dest.mode === 'routers') text = dest.routers.size ? plural(dest.routers.size, 'router') + ' selected' : 'Nothing selected';
+        else if (dest.mode === 'groups' && action === 'edit') text = dest.groupId ? 'Pick a profile to edit' : 'Click a group to see its routers and profiles';
         else if (dest.mode === 'groups') text = dest.groups.size ? plural(dest.groups.size, 'group') + ' selected — ' + plural(n, 'router') : 'Nothing selected';
+        else if (action === 'edit') text = dest.nameKey ? 'Pick a variant to edit' : 'Click a profile name to see its variants';
         else text = dest.profileIds.size ? plural(dest.profileIds.size, 'profile') + ' on ' + plural(n, 'router') + ' selected' : (dest.nameKey ? 'Tick variants or routers' : 'Click a profile name to see its variants');
         $('destSummary').textContent = text;
     }
@@ -1151,6 +1538,292 @@
         renderAll();
     });
     $('delAllChk').addEventListener('change', (e) => { delAll = e.target.checked; renderAll(); });
+
+    // ------------------------------------------------- edit: pick a profile
+    // Build {key -> {names, routers, profiles}} for the current selection.
+    // In routers/groups mode that's the names on the selected routers; in
+    // name mode it's the one name the user clicked (dest.nameKey).
+    function editCandidates() {
+        const agg = new Map();
+        const add = (p, rid) => {
+            let e = agg.get(p.name_key);
+            if (!e) { e = { key: p.name_key, names: new Set(), routers: new Set(), profiles: [] }; agg.set(p.name_key, e); }
+            e.names.add(p.name); e.routers.add(rid); e.profiles.push(p);
+        };
+        if (dest.mode === 'name') {
+            if (editKey) inv.profiles.forEach((p) => { if (p.name_key === editKey && !p.orphan) add(p, p.router_id); });
+        } else {
+            new Set(destRouterIds()).forEach((rid) => (profilesByRouter.get(rid) || []).forEach((p) => { if (!p.orphan) add(p, rid); }));
+        }
+        return agg;
+    }
+    function renderEditNames() {
+        // Groups drills to a single profile (like Profile name), so it stages
+        // one edit at a time rather than showing a bulk name list.
+        const staged = dest.mode === 'name' || dest.mode === 'groups';
+        // Shown for edit in Routers mode (the name list), and in Groups / Profile
+        // name mode only once an edit is staged (so the user can see/apply it).
+        const show = action === 'edit' && (!staged || (editKey && editSpec));
+        $('editNamesPanel').style.display = show ? 'flex' : 'none';
+        if (!show) return;
+        if (staged) { renderEditStagedOnly(); return; }
+        const agg = editCandidates();
+        // A staged edit only makes sense while its profile is still in the
+        // selection. If the user changes routers/groups so the name is gone,
+        // drop the stale staged edit rather than showing "→ 0 routers".
+        if (editKey && !agg.has(editKey)) { editSpec = null; editKey = null; }
+        const rids = new Set(destRouterIds());
+        if (!rids.size) { $('editNamesList').innerHTML = emptyState('Select routers or groups first, or switch to Profile name.'); $('editStaged').textContent = ''; return; }
+        if (!agg.size) { $('editNamesList').innerHTML = emptyState('The selected routers have no profiles (per the cached inventory).'); return; }
+        const rows = Array.from(agg.values()).sort((a, b) => b.profiles.length - a.profiles.length || a.key.localeCompare(b.key));
+        let html = '<table class="pick-table"><thead><tr><th class="nosort">Profile name (spellings)</th><th class="nosort">Profiles</th><th class="nosort">Routers</th><th class="nosort" style="width:90px;"></th></tr></thead><tbody>';
+        rows.forEach((e) => {
+            const on = editKey === e.key;
+            html += '<tr class="' + (on ? 'selected' : '') + '">'
+                + '<td><strong>' + esc(Array.from(e.names).join(' / ')) + '</strong>' + (on && editSpec ? ' <span class="badge info">edited</span>' : '') + '</td>'
+                + '<td>' + e.profiles.length + '</td><td>' + e.routers.size + '</td>'
+                + '<td><button class="btn btn-secondary btn-sm" data-edit-key="' + esc(e.key) + '">Edit</button></td></tr>';
+        });
+        $('editNamesList').innerHTML = html + '</tbody></table>';
+        updateEditSummary(agg);
+    }
+    // Name mode: show the one staged edit (a whole variant or a single
+    // profile) and how many routers it hits. The target is locked to those
+    // routers (editTargetRouterIds).
+    function renderEditStagedOnly() {
+        const ids = editTargetRouterIds();
+        const n = ids.length;
+        const scope = editProfileId ? 'only this profile' : 'only this variant';
+        $('editStaged').innerHTML = 'Edit staged: <strong>' + esc(editSpec.name) + '</strong> → ' + plural(n, 'router');
+        // The edited values live in the header row below (with the buttons).
+        // This line states intent and scope only — no repeat of the values.
+        $('editNamesSummary').innerHTML = 'Will be applied to ' + plural(n, 'router') + ' — ' + scope + '. Preview or Run below.';
+        const routerRows = ids.map((id) => routerById.get(id)).filter(Boolean)
+            .sort((a, b) => fold(a.name) < fold(b.name) ? -1 : (fold(a.name) > fold(b.name) ? 1 : 0));
+        let html = '<div class="panel-sub" style="border-bottom:1px solid var(--border-color);">'
+            + '<strong>' + esc(editSpec.name) + '</strong> <span class="badge info">edited</span>'
+            + '<span class="cell-mono" style="margin-left:0.5rem;">' + esc(describeSpec(editSpec)) + '</span>'
+            + '<span style="margin-left:auto;display:flex;gap:0.4rem;">'
+            + '<button class="btn btn-secondary btn-sm" data-edit-reopen="1">Re-edit</button>'
+            + '<button class="btn btn-secondary btn-sm" id="editClearInline">Clear</button></span></div>';
+        if (!routerRows.length) {
+            html += emptyState('No matching routers in the current inventory.');
+        } else {
+            html += '<table class="pick-table"><thead><tr><th class="nosort">Router</th><th class="nosort">Group</th>'
+                + '<th class="nosort">Account</th><th class="nosort">Router ID</th></tr></thead><tbody>';
+            routerRows.forEach((r) => {
+                html += '<tr><td class="truncate" title="' + esc(r.name) + '">' + esc(r.name || '(unnamed)') + '</td>'
+                    + '<td class="truncate">' + groupCell(r.group_name, r.group_id) + '</td>'
+                    + '<td class="truncate">' + esc(r.account_name || '—') + '</td>'
+                    + '<td class="cell-mono">' + esc(r.id) + '</td></tr>';
+            });
+            html += '</tbody></table>';
+        }
+        $('editNamesList').innerHTML = html;
+        const clr = $('editClearInline');
+        if (clr) clr.addEventListener('click', () => { editSpec = null; editKey = null; editRouterIds = null; editFingerprint = null; editProfileId = null; renderAll(); });
+    }
+    // Human summary of a form spec, like describe_settings on the backend.
+    function describeSpec(s) {
+        const parts = [typeLabel(s.type), 'port ' + s.port];
+        if (s.address) parts.push(s.address);
+        if (s.username) parts.push('user ' + s.username);
+        if (s.resolution) parts.push(s.resolution);
+        return parts.join(' · ');
+    }
+    function updateEditSummary(agg) {
+        agg = agg || editCandidates();
+        if (editSpec && editKey) {
+            const e = agg.get(editKey);
+            const n = e ? e.routers.size : 0;
+            $('editStaged').innerHTML = 'Edit staged: <strong>' + esc(editSpec.name) + '</strong> → ' + plural(n, 'router');
+            $('editNamesSummary').innerHTML = 'Ready to apply the edited <strong>' + esc(editSpec.name) + '</strong> to ' + plural(n, 'router') + '. Preview or Run below, or Edit another profile to replace the staged change.';
+        } else {
+            $('editStaged').textContent = '';
+            $('editNamesSummary').innerHTML = 'Profile names found on the selected routers (case-insensitive). Click <strong>Edit</strong> to change one.';
+        }
+    }
+    $('editNamesList').addEventListener('click', (e) => {
+        const reopen = e.target.closest('[data-edit-reopen]');
+        if (reopen) {
+            // Groups drill: the staged edit is one inventory profile, re-opened
+            // straight from inventory (there are no variants to search).
+            if (dest.mode === 'groups') {
+                if (editProfileId) openEditGroupProfile(editProfileId);
+                else notify('That profile is no longer available. Pick it again from the list.', 'error');
+                return;
+            }
+            // Name mode: re-open the staged edit — a single profile if one is
+            // staged, otherwise the whole variant (matched by fingerprint).
+            if (editProfileId) {
+                const i = dest.variants.findIndex((v) => v.profiles.some((p) => p.id === editProfileId));
+                if (i >= 0) openEditProfile(i, editProfileId);
+                else notify('That profile is no longer available. Pick it again from the list.', 'error');
+            } else {
+                const i = dest.variants.findIndex((v) => v.fingerprint === editFingerprint);
+                if (i >= 0) openEditVariant(i);
+                else notify('That variant is no longer available. Pick it again from the list.', 'error');
+            }
+            return;
+        }
+        const btn = e.target.closest('[data-edit-key]');
+        if (btn) openEditModal(btn.dataset.editKey);
+    });
+
+    // The edit modal — its own small form, prefilled from the chosen profile.
+    const editModal = $('editModal');
+    function buildEditTypeSelect() {
+        $('eType').innerHTML = cfg.types.map((t) => '<option value="' + esc(t.id) + '">' + esc(t.label) + '</option>').join('');
+    }
+    function editTypeDef() { return typeDef($('eType').value); }
+    function onEditTypeChange() {
+        const def = editTypeDef();
+        document.querySelectorAll('#editModal [data-efield]').forEach((el) => {
+            el.style.display = def.fields.includes(el.dataset.efield) ? '' : 'none';
+        });
+        $('eUsernameLabel').className = def.required.includes('username') ? 'req' : '';
+        $('ePort').max = $('eType').value === 'serial' ? 8 : 65535;
+        $('ePortHint').textContent = $('eType').value === 'serial' ? 'Serial port number, 1–8' : 'Default ' + def.default_port;
+    }
+    function editFormSpec() {
+        const t = $('eType').value;
+        const def = typeDef(t);
+        const spec = { type: t, name: $('eName').value.trim(), port: $('ePort').value.trim() };
+        def.fields.forEach((f) => { spec[f] = $('e' + f.charAt(0).toUpperCase() + f.slice(1)).value.trim(); });
+        return spec;
+    }
+    function editFormProblems() {
+        const s = editFormSpec();
+        const def = typeDef(s.type);
+        const p = [];
+        if (!s.name) p.push('Name is required');
+        else if (s.name.length > 32) p.push('Name must be 32 characters or fewer');
+        const port = Number(s.port);
+        if (!s.port || !Number.isInteger(port)) p.push('Port must be a whole number');
+        else if (s.type === 'serial' ? (port < 1 || port > 8) : (port < 1 || port > 65535)) p.push(s.type === 'serial' ? 'Serial port must be 1–8' : 'Port must be 1–65535');
+        def.required.forEach((f) => { if (!s[f]) p.push(f.charAt(0).toUpperCase() + f.slice(1) + ' is required'); });
+        if (s.address && !/^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/.test(s.address)) p.push('Address must be an IPv4 address');
+        return p;
+    }
+    // Shared prefill: load one profile's type + settings into the edit form.
+    function fillEditForm(type, name, s) {
+        s = s || {};
+        $('eType').value = type;
+        onEditTypeChange();
+        $('eName').value = name || '';
+        $('ePort').value = s.port != null ? s.port : '';
+        $('eAddress').value = s.address || '';
+        $('eUsername').value = s.username || '';
+        $('eResolution').value = s.resolution || '';
+        $('editFormErrors').textContent = '';
+    }
+    // Routers/Groups mode: edit a name across the selected routers (editKey).
+    // The most common variant seeds the form and saving makes them all match.
+    function openEditModal(key) {
+        const agg = editCandidates();
+        const e = agg.get(key);
+        if (!e) { notify('That profile is no longer in the selection. Refresh and try again.', 'error'); return; }
+        const variants = {};
+        e.profiles.forEach((p) => { variants[p.fingerprint] = variants[p.fingerprint] || { p: p, n: 0 }; variants[p.fingerprint].n += 1; });
+        const common = Object.values(variants).sort((a, b) => b.n - a.n)[0].p;
+        fillEditForm(common.type, common.name, common.settings);
+        const spellings = e.names.size > 1 ? ' Spellings on these routers: ' + Array.from(e.names).join(', ') + '.' : '';
+        const nVar = Object.keys(variants).length;
+        const varNote = nVar > 1 ? ' These routers hold ' + plural(nVar, 'different version') + ' of this profile — the most common one is loaded, and saving makes them all match.' : '';
+        $('editModalSub').textContent = 'Editing "' + common.name + '" on ' + plural(e.routers.size, 'router') + '.' + spellings + varNote;
+        editModal.dataset.source = 'name';
+        editModal.dataset.key = key;
+        editModal.classList.add('show');
+        $('eName').focus();
+    }
+    // Profile name mode: edit ONE drilled-in variant. The change lands only on
+    // that variant's routers, so other kinds of profile sharing the name are
+    // left untouched.
+    function openEditVariant(i) {
+        const v = dest.variants[i];
+        if (!v) { notify('That variant is no longer available. Refresh and try again.', 'error'); return; }
+        const rids = Array.from(new Set(v.profiles.map((p) => p.router_id)));
+        fillEditForm(v.type, (v.profiles[0] || {}).name, v.settings);
+        $('editModalSub').textContent = 'Editing this variant (' + esc(v.summary) + ') on ' + plural(rids.length, 'router')
+            + '. Only this variant changes — other profiles sharing the name are left alone.';
+        editModal.dataset.source = 'variant';
+        editModal.dataset.key = dest.nameKey;
+        editModal.dataset.variantFp = v.fingerprint;
+        editModal.dataset.routerIds = JSON.stringify(rids);
+        editModal.dataset.pid = '';
+        editModal.classList.add('show');
+        $('eName').focus();
+    }
+    // Profile name mode: edit ONE profile on ONE router, independent of its
+    // variant. Only that router's profile changes.
+    function openEditProfile(i, pid) {
+        const v = dest.variants[i];
+        const p = v && v.profiles.find((x) => x.id === pid);
+        if (!p) { notify('That profile is no longer available. Refresh and try again.', 'error'); return; }
+        fillEditForm(p.type, p.name, p.settings);
+        $('editModalSub').textContent = 'Editing one profile (' + esc(p.summary) + ') on '
+            + esc(p.router_name || ('router ' + p.router_id)) + '. Only this router changes.';
+        editModal.dataset.source = 'profile';
+        editModal.dataset.key = dest.nameKey;
+        editModal.dataset.variantFp = '';
+        editModal.dataset.routerIds = JSON.stringify([p.router_id]);
+        editModal.dataset.pid = p.id;
+        editModal.classList.add('show');
+        $('eName').focus();
+    }
+    // Edit + Groups drill: edit ONE profile on ONE router, found via its group.
+    // Locks to exactly that router and profile, so nothing else is touched —
+    // the same single-profile staging the name drill uses (source 'profile').
+    function openEditGroupProfile(pid) {
+        const p = inv.profiles.find((x) => x.id === pid);
+        if (!p) { notify('That profile is no longer available. Refresh and try again.', 'error'); return; }
+        fillEditForm(p.type, p.name, p.settings);
+        const r = routerById.get(p.router_id);
+        $('editModalSub').textContent = 'Editing one profile (' + esc(p.summary) + ') on '
+            + esc((r && r.name) || p.router_name || ('router ' + p.router_id)) + '. Only this router changes.';
+        editModal.dataset.source = 'profile';
+        editModal.dataset.key = p.name_key;
+        editModal.dataset.variantFp = '';
+        editModal.dataset.routerIds = JSON.stringify([p.router_id]);
+        editModal.dataset.pid = p.id;
+        editModal.classList.add('show');
+        $('eName').focus();
+    }
+    function validateEditForm() {
+        const p = editFormProblems();
+        $('editFormErrors').textContent = p.length ? p.join(' · ') : '';
+        return p.length === 0;
+    }
+    ['eName', 'ePort', 'eAddress', 'eUsername', 'eResolution'].forEach((id) => $(id).addEventListener('input', validateEditForm));
+    $('eType').addEventListener('change', () => { onEditTypeChange(); validateEditForm(); });
+    function closeEditModal() { editModal.classList.remove('show'); }
+    $('editModalCloseBtn').addEventListener('click', closeEditModal);
+    $('editCancelBtn').addEventListener('click', closeEditModal);
+    editModal.addEventListener('click', (e) => { if (e.target === editModal) closeEditModal(); });
+    $('editSaveBtn').addEventListener('click', () => {
+        if (!validateEditForm()) { notify('Fix the highlighted fields first.', 'error'); return; }
+        editSpec = editFormSpec();
+        editKey = editModal.dataset.key;
+        const src = editModal.dataset.source;
+        if (src === 'variant') {
+            // Name-mode variant edit: lock the target to this variant's routers.
+            editFingerprint = editModal.dataset.variantFp;
+            editRouterIds = JSON.parse(editModal.dataset.routerIds || '[]');
+            editProfileId = null;
+        } else if (src === 'profile') {
+            // Name-mode single-profile edit: lock to exactly one router.
+            editFingerprint = null;
+            editRouterIds = JSON.parse(editModal.dataset.routerIds || '[]');
+            editProfileId = editModal.dataset.pid || null;
+        } else {
+            editFingerprint = null;
+            editRouterIds = null;
+            editProfileId = null;
+        }
+        closeEditModal();
+        notify('Edit staged for "' + editSpec.name + '". Preview or Run to apply it.', 'success');
+        renderAll();
+    });
 
     // ---------------------------------------------------------------- orphans
     $('orphanSearch').addEventListener('input', renderOrphans);
@@ -1197,9 +1870,21 @@
     });
 
     // ------------------------------------------------------------ run / state
+    // Routers the staged edit applies to. In Routers/Groups mode: the selected
+    // routers that carry the chosen name. In Profile-name mode: exactly the
+    // routers of the one variant being edited (editRouterIds).
+    function editTargetRouterIds() {
+        if (!editKey) return [];
+        // Name-mode variant edit: the staged edit is locked to exactly the
+        // routers of the chosen variant.
+        if (editRouterIds) return editRouterIds.slice();
+        const e = editCandidates().get(editKey);
+        return e ? Array.from(e.routers) : [];
+    }
     function requestBody() {
         const threads = parseInt($('threadsSelect').value, 10) || cfg.default_threads;
         if (action === 'create') return { specs: [formSpec()], target: destTarget(), threads: threads };
+        if (action === 'edit') return { specs: [editSpec], target: { mode: 'routers', ids: editTargetRouterIds() }, threads: threads };
         if (action === 'copy') return { source_profile_ids: Array.from(source.selected), source_router_id: source.routerId, target: destTarget(), threads: threads };
         if (action === 'delete') {
             if (dest.mode === 'name') return { target: destTarget(), threads: threads };
@@ -1216,6 +1901,12 @@
             if (p.length) return { ok: false, text: 'Fill in the profile: ' + p[0] };
             if (!nRouters) return { ok: false, text: 'Select a destination' };
             return { ok: !busy, text: 'Push "' + $('fName').value.trim() + '" to ' + plural(nRouters, 'router'), run: 'Push to ' + plural(nRouters, 'router') };
+        }
+        if (action === 'edit') {
+            if (!editSpec || !editKey) return { ok: false, text: 'Find a profile and click Edit' };
+            const n = editTargetRouterIds().length;
+            if (!n) return { ok: false, text: 'That profile is no longer in the selection' };
+            return { ok: !busy, text: 'Apply edited "' + editSpec.name + '" to ' + plural(n, 'router'), run: 'Apply to ' + plural(n, 'router') };
         }
         if (action === 'copy') {
             if (!source.routerId) return { ok: false, text: 'Pick a source router' };
@@ -1243,7 +1934,6 @@
     }
     function updateRunState() {
         const r = readiness();
-        $('runSummary').textContent = pollTimer ? 'A run is in progress…' : r.text;
         $('runBtn').disabled = !r.ok;
         $('previewBtn').disabled = !r.ok;
         $('runBtn').textContent = r.run || 'Run';
@@ -1252,6 +1942,7 @@
         renderSource();
         renderDest();
         renderDelNames();
+        renderEditNames();
         renderOrphans();
         updateRunState();
     }
@@ -1259,7 +1950,7 @@
     // ---------------------------------------------------------------- preview
     async function fetchPreview() {
         const body = requestBody();
-        if (action === 'create' || action === 'copy') return { kind: 'push', data: await api('/api/preview/push', { json: body }) };
+        if (action === 'create' || action === 'copy' || action === 'edit') return { kind: 'push', data: await api('/api/preview/push', { json: body }) };
         if (action === 'disable') {
             const rows = destRouterIds().map((id) => routerById.get(id)).filter(Boolean);
             return { kind: 'disable', data: { rows: rows } };
@@ -1320,20 +2011,39 @@
         try { preview = await fetchPreview(); renderPreview(preview); }
         catch (err) { notify('Could not prepare the run: ' + err.message, 'error'); updateRunState(); return; }
         const threads = parseInt($('threadsSelect').value, 10) || cfg.default_threads;
-        let msg;
+        let title, bodyHtml, okText, okClass = 'btn-primary';
+        // The per-action explanation that used to sit under the Run button now
+        // lives in this popup, styled to match the action (danger for the
+        // destructive ones, matching the Run button).
+        const noticeClass = action === 'create' || action === 'copy' || action === 'edit' ? 'notice' : 'notice danger';
+        const actionNotice = '<div class="' + noticeClass + '">' + NOTICES[action] + '</div>';
         if (preview.kind === 'push') {
-            const s = preview.data.specs.map((x) => '  • ' + x.settings.name + ' — ' + x.summary).join('\n');
-            msg = (action === 'copy' ? 'Copy' : 'Push') + ' to ' + plural(preview.data.rows.length, 'router') + ':\n' + s + '\n\n' + $('previewSummary').textContent
-                + '\n\nSame-name profiles (any case) are replaced. LAN Manager is enabled where needed.';
+            const verb = action === 'copy' ? 'Copy' : (action === 'edit' ? 'Apply edited values' : 'Push');
+            const specList = preview.data.specs.map((x) =>
+                '<li><strong>' + esc(x.settings.name) + '</strong> — <span class="cell-mono">' + esc(x.summary) + '</span></li>').join('');
+            title = verb + ' to ' + plural(preview.data.rows.length, 'router') + '?';
+            bodyHtml = '<p>' + esc($('previewSummary').textContent) + '</p>'
+                + '<ul style="margin:0.75rem 0 0.75rem 1.25rem;">' + specList + '</ul>'
+                + actionNotice;
+            okText = action === 'copy' ? 'Copy' : (action === 'edit' ? 'Apply' : 'Push');
         } else if (preview.kind === 'delete') {
-            msg = 'DELETE ' + $('previewSummary').textContent + '?\n\nThis cannot be undone from this app (previous values are written to the run log).'
-                + (action === 'delete' && dest.mode !== 'name' ? '\nEach router is re-read live, so matching profiles added since the last refresh are deleted too.' : '')
-                + '\nLAN Manager is not changed.';
+            title = 'Delete ' + $('previewSummary').textContent + '?';
+            bodyHtml = actionNotice
+                + '<p style="margin-top:0.75rem;">This cannot be undone from this app. Previous values are written to the run log so a change can be reversed by hand.</p>'
+                + (action === 'delete' && dest.mode !== 'name'
+                    ? '<p style="margin-top:0.75rem;">Each router is re-read live, so matching profiles added since the last refresh are deleted too.</p>' : '');
+            okText = 'Delete';
+            okClass = 'btn-danger';
         } else {
-            msg = 'Disable LAN Manager on ' + plural(preview.data.rows.length, 'router') + '?\n\nProfiles are kept.';
+            title = 'Disable LAN Manager on ' + plural(preview.data.rows.length, 'router') + '?';
+            bodyHtml = '<p>' + esc($('previewSummary').textContent) + '</p>' + actionNotice;
+            okText = 'Disable';
+            okClass = 'btn-danger';
         }
-        if (!confirm(msg + '\n\nThreads: ' + threads)) { updateRunState(); return; }
-        const url = { create: '/api/jobs/push', copy: '/api/jobs/push', delete: '/api/jobs/delete', orphans: '/api/jobs/delete', disable: '/api/jobs/lan-disable' }[action];
+        bodyHtml += '<p class="meta-text" style="margin-top:0.75rem;">Running with ' + plural(threads, 'thread') + '.</p>';
+        const go = await confirmDialog({ title: title, bodyHtml: bodyHtml, okText: okText, okClass: okClass });
+        if (!go) { updateRunState(); return; }
+        const url = { create: '/api/jobs/push', copy: '/api/jobs/push', edit: '/api/jobs/push', delete: '/api/jobs/delete', orphans: '/api/jobs/delete', disable: '/api/jobs/lan-disable' }[action];
         try {
             const data = await api(url, { json: requestBody() });
             $('logCurrent').innerHTML = 'Current run: <span class="cell-mono">' + esc(data.log_name) + '</span>';
@@ -1346,7 +2056,12 @@
         }
     });
     $('cancelBtn').addEventListener('click', async () => {
-        if (!confirm('Stop the run?\n\nRouters already changed stay changed.')) return;
+        const go = await confirmDialog({
+            title: 'Stop the run?',
+            bodyHtml: '<p>No further routers will be started. Routers already changed stay changed.</p>',
+            okText: 'Stop run', okClass: 'btn-danger', cancelText: 'Keep running',
+        });
+        if (!go) return;
         try { await api('/api/jobs/cancel', { method: 'POST' }); notify('Cancel requested.', 'info'); }
         catch (err) { notify('Cancel failed: ' + err.message, 'error'); }
     });
@@ -1381,7 +2096,12 @@
             else notify(job.label + ' ' + (job.state === 'canceled' ? 'canceled' : 'complete') + ' — ' + job.changed + ' changed, '
                 + job.unchanged + ' unchanged, ' + job.failed + ' failed.', job.failed ? 'error' : 'success');
             orphanSel.clear();
-            if (action === 'delete' && dest.mode === 'name') dest.profileIds.clear();
+            if ((action === 'delete' || action === 'edit') && dest.mode === 'name') dest.profileIds.clear();
+            // A staged edit is consumed by the run. Clear it so section 2 does
+            // not keep showing the just-applied change as still pending.
+            if (action === 'edit' && job.state === 'done') {
+                editSpec = null; editKey = null; editRouterIds = null; editFingerprint = null; editProfileId = null;
+            }
             await loadInventory('');   // server already re-read v3 after the run
             if (action === 'copy' && source.routerId) pickSource(source.routerId, null);
         }
@@ -1521,6 +2241,7 @@
         try {
             const missing = await reloadConfig();
             buildTypeSelect();
+            buildEditTypeSelect();
             buildThreads();
             setAction('create');
             refreshLogList();

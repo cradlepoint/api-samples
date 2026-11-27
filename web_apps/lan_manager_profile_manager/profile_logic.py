@@ -14,10 +14,13 @@ Rules this module encodes
   the rest are deleted. A type change (e.g. SSH -> HTTPS) creates the new
   profile first and only then deletes the old one(s), so a failed create never
   leaves the router with nothing.
-* **Variants compare type plus every setting.** Two profiles are the same
-  variant only if their type, exact name (case included), port, and the
-  type-specific fields (address / username / resolution) are all equal.
-  Timestamps and IDs are ignored.
+* **Variants compare type plus every setting, name case-insensitively.** Two
+  profiles are the same variant only if their type, port, and the type-specific
+  fields (address / username / resolution) are all equal and their names match
+  ignoring case/whitespace (so ``Test`` and ``test`` group together, but SSH
+  and Serial never do). Timestamps and IDs are ignored. Push/replace identity
+  (``fingerprint``) still treats name casing as significant, since pushing a
+  differently-cased name is a deliberate rename.
 """
 
 import ipaddress
@@ -109,7 +112,26 @@ def settings_of(stype, attrs):
 
 
 def fingerprint(stype, settings):
-    """Stable string identity for a (type, settings) pair."""
+    """Stable string identity for a (type, settings) pair.
+
+    Name casing is significant here: this drives push/replace, where pushing
+    ``Test`` onto an existing ``test`` is a deliberate rename and must count as
+    a change. Variant *grouping* is deliberately looser — see ``variant_key``.
+    """
+    return json.dumps([short_type(stype), settings], sort_keys=True)
+
+
+def variant_key(stype, settings):
+    """Grouping identity for a (type, settings) pair.
+
+    Like ``fingerprint`` but the name is compared case-insensitively (via
+    ``name_key``), so profiles that differ only in the casing of their name —
+    ``Test`` vs ``test`` — fall into the same variant. Type and every other
+    setting (port, address, username, resolution) still compare exactly, so
+    SSH / HTTP / Serial / etc. never group together.
+    """
+    settings = dict(settings or {})
+    settings["name"] = name_key(settings.get("name"))
     return json.dumps([short_type(stype), settings], sort_keys=True)
 
 
@@ -284,14 +306,20 @@ def verify_push(spec, existing):
 def group_variants(profiles):
     """Group profiles into variants of identical type + settings.
 
-    Returns a list of ``{"fingerprint", "type", "settings", "summary",
-    "profiles"}`` sorted largest first, so the common (usually correct) one
-    leads and the outliers follow.
+    Grouping is by ``variant_key``: type and all settings compare exactly,
+    except the name, which is compared case-insensitively. Returns a list of
+    ``{"fingerprint", "type", "settings", "summary", "profiles"}`` sorted
+    largest first, so the common (usually correct) one leads and the outliers
+    follow.
     """
     buckets = {}
     for p in profiles:
-        bucket = buckets.setdefault(p["fingerprint"], {
-            "fingerprint": p["fingerprint"],
+        # Group case-insensitively by name (variant_key), so "Test" and "test"
+        # with otherwise-identical settings fall into one variant. Type and the
+        # other settings still compare exactly.
+        vkey = variant_key(p["type"], p["settings"])
+        bucket = buckets.setdefault(vkey, {
+            "fingerprint": vkey,
             "type": p["type"],
             "settings": p["settings"],
             "summary": describe_settings(p["type"], p["settings"]),
