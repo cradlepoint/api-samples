@@ -90,7 +90,15 @@ def register(mcp, client):
         router_id: int = None,
         config_json: dict = None,
     ) -> dict:
-        """Perform a full configuration replacement on a router."""
+        """Replace a router's entire device-level configuration (PUT).
+
+        Use only when a full replacement is explicitly wanted; use patch_config
+        to change or remove individual settings. Anything not in config_json
+        resets to its group/default value. That includes device-level secrets
+        (passwords, Wi-Fi keys, certificate keys): NCM returns them as "*",
+        and "*" values are always left out of the write, so a config read back
+        from NCM and sent here loses them.
+        """
         try:
             err = validate_required_params(router_id=router_id, config_json=config_json)
             if err is not None:
@@ -105,7 +113,12 @@ def register(mcp, client):
         src_router_id: int = None,
         dst_router_id: int = None,
     ) -> dict:
-        """Copy configuration from one router to another."""
+        """Copy one router's device-level configuration onto another (merge).
+
+        Merges into the destination with a PATCH: settings only the destination
+        has are kept, and so are its own secrets. Masked "*" secrets from the
+        source are never copied.
+        """
         try:
             err = validate_required_params(
                 src_router_id=src_router_id, dst_router_id=dst_router_id

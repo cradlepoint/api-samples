@@ -106,6 +106,26 @@ web_app_template/
 - Modern web browser
 - Compatible with Cradlepoint NetCloud firmware 7.24+
 
+## Using the NCM SDK in an App Built From This Template
+
+The template itself doesn't call the NCM API, so it ships without the SDK. Don't
+copy an `ncm.py` into your app; vendored copies go stale. Use the `ncm` package
+from PyPI:
+
+- **App runs on your computer:** `import ncm` in your code, and list
+  `ncm>=0.1.1` in your app's `requirements.txt`.
+- **App runs on the router:** the router has no `pip`, so bundle the package
+  into the app folder when you package it, and don't commit the bundled copy
+  (gitignore `ncm/` and `ncm-*.dist-info/`):
+
+  ```bash
+  pip install -t <your_app> --python-version 3.8 --only-binary=:all: --no-deps ncm
+  rm -rf <your_app>/ncm/__pycache__ <your_app>/ncm-*.dist-info
+  ```
+
+  `cppython` on the router is Python 3.8. `--no-deps` assumes it provides
+  `requests`, which hasn't been confirmed on a router yet.
+
 ---
 
 ## Version

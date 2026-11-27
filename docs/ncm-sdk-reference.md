@@ -22,6 +22,11 @@ and method still works.
 - **`copy_router_configuration()` gains `replace=False`.** The default still merges
   (PATCH); `replace=True` replaces (PUT). Both modes now strip every masked secret
   correctly (details below).
+- **Upgrade caution:** code that PUTs back a full config it read changes how it
+  fails. On 0.0.x, NCM rejects that PUT (`wpapsk ... too short`). On 0.1 the filter
+  removes the `"*"` values, the PUT succeeds, and the device's own secrets reset.
+  Port such code to a PATCH removal before bumping it to `ncm>=0.1`
+  (`web_apps/revert_device_firewall/` was ported this way on 2026-11-27).
 - **New:** `ncm.v2` / `ncm.v3` (explicit API version), `ncm.set_v2_keys()` /
   `ncm.set_v3_key()` / `ncm.set_keys()`, the v2 short aliases (`rename_router`,
   `delete_group`, ...), the v3 `get_private_cellular_*` methods, and

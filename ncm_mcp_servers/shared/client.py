@@ -6,7 +6,7 @@ based on available credentials.
 
 from typing import Optional, Union
 
-from ncm_mcp_servers.shared.ncm import NcmClientv2, NcmClientv3, NcmClientv2v3
+from ncm import NcmClientv2, NcmClientv3, NcmClientv2v3
 from ncm_mcp_servers.shared.credentials import ApiCredentials, load_credentials
 
 

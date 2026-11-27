@@ -541,8 +541,10 @@ so their cards do not respond to search or display options. Same fix applies.
 
 ## Using the NCM SDK in an On-Router App Without Committing a Copy
 
-Apps with `package.ini` + `start.sh` (e.g. `web_apps/web_app_template/`,
-`web_apps/rma_wizard/`) run on the router under `cppython` (Python 3.8). The router
+Apps built to run on the router (`package.ini` + `start.sh` launching `cppython`,
+e.g. `web_apps/web_app_template/`, which also runs locally) run under Python 3.8.
+Check the app's own header before assuming: `web_apps/rma_wizard/` has a
+`package.ini` but is local-only, and imports the installed package. The router
 has no pip, so whatever the app imports must ship inside the app's package. Copying
 `ncm.py` into the app meets that, but the copy goes stale and spreads to every app
 started from it.
@@ -560,8 +562,8 @@ rm -rf web_apps/<app>/ncm/__pycache__ web_apps/<app>/ncm-*.dist-info
 - Verified 2026-11-26: the PyPI 0.0.73 wheel installs this way, and under a real
   Python 3.8 it imports through `import ncm` and `from ncm import ncm` and builds a
   client. SDK 0.1 passes its test suite on 3.8 too.
-- `--no-deps` relies on `cppython` providing `requests`/`urllib3`. `rma_wizard`'s
-  vendored SDK already depends on that, but it has not been re-verified on a router.
+- `--no-deps` relies on `cppython` providing `requests`/`urllib3`. Not yet verified
+  on a router.
 - Remove `__pycache__` after installing. pip compiles `.pyc` files with the venv's
   Python, and those shouldn't ship.
 
@@ -1066,8 +1068,12 @@ Points that matter:
   firewall config lives under `security`; `firewall` is port forwarding. Many devices
   have both.
 
-`web_apps/revert_device_firewall/` still uses the older full-diff PUT and needs
-porting to this pattern.
+Worked example: `web_apps/revert_device_firewall/` (`config_surgery.revert_plan()`).
+It PATCHes the removal path when the branch is only in `updates`. It falls back to a
+full-diff PUT only when branch-rooted removals entries must also be cleared, since
+PATCH can't delete removals entries, and it skips the device instead if the cleaned
+diff contains masked `"*"` secrets. On a 1,723-router fleet (2026-11-27), 247 of 281
+affected devices took the PATCH path, 3 the PUT, and 31 were skipped.
 
 ## Stacked Panels in `.content-area`: Scroll, Don't Crush
 

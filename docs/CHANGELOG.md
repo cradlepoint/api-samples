@@ -3,6 +3,35 @@
 This file tracks updates made to the documentation, especially those made
 automatically by the reflexion system.
 
+## 2026-11-27 — SDK v2 Lists Cap at 500 Without `limit='all'`
+
+- Added known issue: v2 list methods default `limit` to 500 and stop paginating
+  there, so bare calls silently truncate. Verified live: `get_groups()` returned 500
+  of 6,087 groups. This is the v2 counterpart of the existing v3 50-record entry.
+- `rma_wizard` hit this in its group dropdown. It now fetches all groups with
+  parallel offset pages (6,087 in 17 s vs 59 s for `limit='all'`), and the entry
+  records that.
+
+## 2026-11-27 — Apps Switched to the `ncm` Package; revert_device_firewall Ported
+
+- `common-patterns.md` → "Restoring Group Inheritance": `revert_device_firewall` is
+  now the worked example of the PATCH-first plan (PATCH the removal path; PUT only
+  to clear removals entries, skipping devices with masked secrets). Includes live
+  fleet counts.
+- `known-issues.md`: the old full-diff PUT note is superseded. A read-only scan found
+  258 of 281 affected devices carry device-level secrets, so that PUT could not have
+  worked on most of the fleet.
+- `common-patterns.md` → on-router bundling: corrected the claim that
+  `rma_wizard` runs on the router (it is local-only despite its `package.ini`).
+- `ncm-sdk-reference.md`: noted `revert_device_firewall` was ported.
+
+## 2026-11-27 — Upgrade Caution: Full-Diff PUTs Under SDK 0.1
+
+- `known-issues.md` and `ncm-sdk-reference.md`: a read-modify-write PUT that NCM
+  rejects on 0.0.x (`wpapsk ... too short`) succeeds on 0.1, because the secret
+  filter removes the `"*"` values. The PUT then resets the device's own secrets.
+  Port such code to a PATCH removal before pinning `ncm>=0.1`.
+
 ## 2026-11-26 — SDK 0.1 Replaces the Single-File SDK in `ncm/`
 
 - `ncm/` now holds SDK 0.1 (formerly `ncm2/`). The code is split into `_base.py`,

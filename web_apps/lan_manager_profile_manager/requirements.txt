@@ -9,8 +9,10 @@
 #
 # Versions are pinned to the set this app was verified against.
 
-# Cradlepoint NetCloud Manager API client (v2 + v3; pulls in requests + urllib3)
-ncm==0.0.73
+# Cradlepoint NetCloud Manager API client (v2 + v3; pulls in requests + urllib3).
+# Not pinned: always installs the latest SDK. 0.1.1 is the floor because it
+# never sends masked "*" secrets in config writes.
+ncm>=0.1.1
 
 # Imported directly for connection-error handling
 requests==2.34.2

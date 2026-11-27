@@ -81,7 +81,7 @@ def get_groups(api_keys: Dict[str, str]) -> Tuple[bool, Any]:
     """
     try:
         n2 = ncm.NcmClientv2(api_keys=api_keys)
-        groups = n2.get_groups()
+        groups = _get_all_groups(n2)
 
         if isinstance(groups, str) and groups.startswith('ERROR'):
             return False, "Error retrieving groups from NCM."
@@ -102,6 +102,42 @@ def get_groups(api_keys: Dict[str, str]) -> Tuple[bool, Any]:
 
     except Exception as e:
         return False, f"Error retrieving groups: {str(e)}"
+
+
+GROUP_PAGE_SIZE = 500   # v2 maximum page size
+GROUP_WORKERS = 8       # parallel page requests per round
+
+
+def _get_all_groups(n2) -> List[Dict]:
+    """Every group in the account, fetched in parallel pages.
+
+    A bare ``get_groups()`` returns at most 500 groups (the SDK's default
+    limit), and ``get_groups(limit='all')`` follows ``meta.next`` one page at a
+    time, which takes about a minute for ~6,000 groups. v2 gives no total
+    count, so request a round of offsets at once and stop after the first
+    empty page. Deduped by id, since v2 can repeat records across pages.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    def page(offset):
+        rows = n2.get_groups(limit=GROUP_PAGE_SIZE, offset=offset)
+        if isinstance(rows, str):          # an SDK error string
+            raise RuntimeError(rows)
+        return rows or []
+
+    groups: Dict[str, Dict] = {}
+    offset = 0
+    finished = False
+    with ThreadPoolExecutor(max_workers=GROUP_WORKERS) as pool:
+        while not finished:
+            offsets = [offset + i * GROUP_PAGE_SIZE for i in range(GROUP_WORKERS)]
+            for rows in pool.map(page, offsets):
+                if not rows:
+                    finished = True        # past the end; drain the round
+                for g in rows:
+                    groups[str(g.get('id'))] = g
+            offset += GROUP_PAGE_SIZE * GROUP_WORKERS
+    return list(groups.values())
 
 
 def get_routers_for_group(api_keys: Dict[str, str], group_id: str) -> Tuple[bool, Any]:

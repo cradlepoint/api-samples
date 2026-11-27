@@ -9,6 +9,9 @@ description = "Suite of focused MCP servers for Cradlepoint NCM API management"
 requires-python = ">=3.10"
 dependencies = [
     "mcp[cli]>=2.0.0,<3",
+    # NCM SDK from PyPI. Not pinned: always installs the latest. 0.1.1 is the
+    # floor because it never sends masked "*" secrets in config writes.
+    "ncm>=0.1.1",
     "requests==2.32.3",
     "urllib3==2.8.0",
 ]
@@ -33,10 +36,6 @@ disallow_untyped_defs = false
 check_untyped_defs = true
 ignore_missing_imports = true
 no_implicit_optional = false
-
-[[tool.mypy.overrides]]
-module = "ncm_mcp_servers.shared.ncm"
-ignore_errors = true
 
 [[tool.mypy.overrides]]
 module = [

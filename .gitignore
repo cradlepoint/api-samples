@@ -26,3 +26,5 @@ web_apps/lan_manager_profile_manager/logs/
 # Python caches
 __pycache__/
 *.pyc
+# Python build metadata
+*.egg-info/

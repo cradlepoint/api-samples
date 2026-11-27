@@ -8,4 +8,7 @@ starlette==1.6.0
 uvicorn==0.52.3
 jinja2==3.1.6
 itsdangerous==2.2.0
-ncm==0.0.73
+# Cradlepoint NetCloud Manager API client. Not pinned: always installs the
+# latest SDK. 0.1.1 is the floor because it never sends masked "*" secrets in
+# config writes.
+ncm>=0.1.1

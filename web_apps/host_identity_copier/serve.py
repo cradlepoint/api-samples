@@ -48,11 +48,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
-# Add project root to path for the vendored ncm SDK
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
-sys.path.insert(0, str(PROJECT_ROOT / 'ncm'))
-
+# NCM SDK from the installed `ncm` package (pip install ncm)
 import ncm  # noqa: E402
 
 PORT = 8070
