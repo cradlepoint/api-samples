@@ -1,0 +1,13 @@
+# RMA Configuration Migration Wizard — standalone dependencies
+#
+# Only what this app imports (everything else is the standard library):
+#
+#   python3 -m venv .venv
+#   source .venv/bin/activate          # .venv\Scripts\activate on Windows
+#   pip install -r requirements.txt
+#   python rma_wizard.py               # then open http://localhost:8080
+#
+# Cradlepoint NetCloud Manager API client (pulls in requests + urllib3).
+# Not pinned: always installs the latest SDK. 0.1.1 is the floor because it
+# never sends masked "*" secrets in config writes.
+ncm>=0.1.1

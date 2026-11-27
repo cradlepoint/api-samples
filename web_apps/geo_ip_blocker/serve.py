@@ -33,11 +33,7 @@ from fastapi.staticfiles import StaticFiles
 import uvicorn
 import httpx
 
-# Add project root to path for ncm import
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
-sys.path.insert(0, str(PROJECT_ROOT / 'ncm'))
-
+# NCM SDK from the installed `ncm` package (pip install ncm)
 import ncm
 
 # --- Constants ---

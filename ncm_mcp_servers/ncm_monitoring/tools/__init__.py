@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mcp.server import MCPServer
-    from ncm_mcp_servers.shared.ncm import NcmClientv2
+    from ncm import NcmClientv2
 
 from ncm_mcp_servers.ncm_monitoring.tools import (
     net_devices,

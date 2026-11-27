@@ -18,7 +18,7 @@ When a router fails in the field and is replaced via RMA, this wizard guides the
 ## Requirements
 
 - Python 3.6 or higher
-- `requests` library (used by ncm.py)
+- The NCM SDK (`pip install -r requirements.txt` installs the latest `ncm` from PyPI)
 - NCM API v2 credentials (X-CP-API-ID, X-CP-API-KEY, X-ECM-API-ID, X-ECM-API-KEY)
 - Web browser
 
@@ -26,6 +26,7 @@ When a router fails in the field and is replaced via RMA, this wizard guides the
 
 ```bash
 # From the rma_wizard directory
+pip install -r requirements.txt
 python rma_wizard.py
 
 # Open browser to http://localhost:8080
@@ -63,8 +64,7 @@ If either check fails, clear error messages are displayed to the operator.
 ```
 rma_wizard/
 ├── rma_wizard.py          # Web server with API endpoints
-├── ncm.py                 # NCM API client library
-├── package.ini            # SDK package metadata
+├── requirements.txt       # Dependencies (the ncm SDK)
 ├── index.html             # Single-page web interface
 ├── readme.md              # This file
 ├── assets/
