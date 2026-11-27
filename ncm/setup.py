@@ -3,7 +3,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 setup(
     name="ncm",
-    version="0.1.0",
+    version="0.1.1",
     author="Jon Gaudu - Ericsson",
     author_email="jon.gaudu@ericsson.com.com",
     description="Python client library for Cradlepoint NCM API",

@@ -33,4 +33,4 @@ Config writes never send NCM's masked "*" secret placeholders; see
 from .ncm import *  # noqa: F401,F403  (same public surface as ncm 0.0.74)
 from ._base import strip_masked_secrets, ConfigSafeSession  # noqa: F401
 
-__version__ = '0.1.0'
+__version__ = '0.1.1'
