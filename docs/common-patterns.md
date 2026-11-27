@@ -323,11 +323,11 @@ destination's current contents — the payload is no longer identical across gro
 Skip the PATCH entirely when a destination already matches, and compute a per-group
 summary of what changed so a dry-run mode can show it before anything is sent.
 
-Prefer PATCH over PUT here even when removing things: PATCH honors the removals
-list, whereas PUT additionally resets every unmentioned field to defaults, which at
-`/groups/{id}/` scope means wiping unrelated group settings. If you do need a real
-PUT, note that `put_group_configuration()` raises `AttributeError` after the write
-lands; see the entry in `known-issues.md`.
+Use PATCH here, including for removals. PATCH honors the removals list, whereas PUT
+also resets every unmentioned field to defaults, which at `/groups/{id}/` scope
+wipes unrelated group settings. PUT is for when the user explicitly asks to replace
+the whole group config. In that case, note that `put_group_configuration()` raises
+`AttributeError` after the write lands; see the entry in `known-issues.md`.
 
 ### Consolidating (fan-in) a UUID-keyed collection from many sources into one
 
@@ -538,6 +538,32 @@ length.
 `inventory_dashboard` (`updateStats()` counts from `inventoryData`) and
 `alert_dashboard` (counts from `alertsData`) still count from the full dataset,
 so their cards do not respond to search or display options. Same fix applies.
+
+## Using the NCM SDK in an On-Router App Without Committing a Copy
+
+Apps with `package.ini` + `start.sh` (e.g. `web_apps/web_app_template/`,
+`web_apps/rma_wizard/`) run on the router under `cppython` (Python 3.8). The router
+has no pip, so whatever the app imports must ship inside the app's package. Copying
+`ncm.py` into the app meets that, but the copy goes stale and spreads to every app
+started from it.
+
+Instead, write `import ncm` and bundle the package when you package the app:
+
+```bash
+pip install -t web_apps/<app> --python-version 3.8 --only-binary=:all: --no-deps "ncm==<tested version>"
+rm -rf web_apps/<app>/ncm/__pycache__ web_apps/<app>/ncm-*.dist-info
+```
+
+- Locally, `import ncm` resolves to the venv's installed package, so the repo needs
+  no copy. Gitignore `web_apps/*/ncm/` and `web_apps/*/ncm-*.dist-info/` so the
+  bundled copy is never committed.
+- Verified 2026-11-26: the PyPI 0.0.73 wheel installs this way, and under a real
+  Python 3.8 it imports through `import ncm` and `from ncm import ncm` and builds a
+  client. SDK 0.1 passes its test suite on 3.8 too.
+- `--no-deps` relies on `cppython` providing `requests`/`urllib3`. `rma_wizard`'s
+  vendored SDK already depends on that, but it has not been re-verified on a router.
+- Remove `__pycache__` after installing. pip compiles `.pyc` files with the venv's
+  Python, and those shouldn't ship.
 
 ## NCM SDK with FastAPI (async) — Avoiding Event Loop Blocking
 
@@ -948,7 +974,7 @@ What the spec settles definitively:
   requires `filter[action]` and `filter[status]` with fixed enum values; `page[size]`
   maximums vary per endpoint (subscriptions 50, exchange_sites 500).
 
-Precedence when sources disagree: **live API > spec > SDK (`ncm/ncm/ncm.py`) >
+Precedence when sources disagree: **live API > spec > SDK (`ncm/ncm/_v2.py`, `_v3.py`) >
 repo docs > Postman collection.** The Postman collection and some older scripts have drifted
 (wrong prefixes, renamed params); treat them as historical. When the repo's endpoint
 reference and its own `known-issues.md` disagree, the known-issues log has usually
@@ -983,85 +1009,65 @@ PATCH, `test_alert_push_destinations` is plural).
 
 ## Restoring Group Inheritance by Removing a Device-Level Branch
 
-The inverse of pushing config: a device has a root-level override (say `security`,
-the zone firewall branch) that shadows its group, and you want the device to inherit
-the group again. Read `known-issues.md` → "The Removals List Means Different Things
-at Group and Device Scope" first — the intuitive approach of adding the key to the
-removals list does the opposite of what you want at device scope.
+The inverse of pushing config: a device has its own override (say root-level
+`security`, the zone firewall branch) that shadows its group, and you want the device
+to inherit the group again. Read `known-issues.md` → "The Removals List Means
+Different Things at Group and Device Scope" and "PATCH Removals Delete a
+Device-Level Override" first.
 
-Read, modify, PUT. One batched read for the whole selection, since
-`configuration_managers` returns the config manager `id` and the `configuration`
-together, so there is no need for a separate `get_configuration_manager_id()` call
-per router:
+**PATCH only the removal path.** Never send anything else. Never PUT a
+read-modified config. GET masks every password, PSK and key as `"*"`, so a full-diff
+PUT sends `*` back as the literal secret. NCM rejected exactly that live
+(`cannot set wlan.radio.1.bss.0.wpapsk to *: too short`), and a secret with no length
+rule would be overwritten.
 
 ```python
 TARGET_KEY = 'security'
 
-def _removal_root(path):
-    """First segment of a removals entry (array-of-segments, or a string)."""
-    if isinstance(path, (list, tuple)):
-        return str(path[0]) if path else None
-    if isinstance(path, str):
-        return path.split('.')[0] or None
-    return None
-
-
-def strip_root_key(configuration, key=TARGET_KEY):
-    """Drop `key` from a device diff so the device inherits its group.
-
-    Removes it from the updates dict AND drops any `key`-rooted path from the
-    removals list — those entries are themselves device-level suppressions of
-    the group's value, so leaving them keeps blocking inheritance.
-    """
-    updates = copy.deepcopy(configuration[0]) if configuration else {}
-    removals = copy.deepcopy(configuration[1]) if len(configuration or []) > 1 else []
-    had = key in updates or any(_removal_root(p) == key for p in removals)
-    new_updates = {k: v for k, v in updates.items() if k != key}
-    new_removals = [p for p in removals if _removal_root(p) != key]
-    return [new_updates, new_removals], had, updates.get(key)
-
-
 # One batched read: the SDK chunks __in into groups of 100 and paginates.
 records = client.get_configuration_managers(
     router__in=','.join(router_ids),
-    fields='id,router,configuration,suspended,synched',
+    fields='id,router,configuration',
     limit='all',
 )
 
-for rec in records:
-    new_config, had, removed_branch = strip_root_key(rec['configuration'])
-    if not had:
-        continue        # nothing to do — do NOT write a no-op
-    # Log removed_branch: it is what you would need to restore by hand.
-    resp = client.session.put(
+for rec in records:   # map on rec['router']; a router may have no record
+    updates, removals = rec['configuration']
+    if TARGET_KEY not in updates:
+        continue        # nothing to do: do NOT write a no-op
+    if any(p and str(p[0]) == TARGET_KEY for p in removals):
+        # A persisted removals entry also blocks the group's value. Clearing one
+        # has not been verified via PATCH; stop and ask rather than guess.
+        print(f"router {rec['router']}: has {TARGET_KEY}-rooted removals, skipped")
+        continue
+    # Log updates[TARGET_KEY] as JSON first: it is the only record to restore from.
+    resp = client.session.patch(
         f"{client.base_url}/configuration_managers/{rec['id']}/",   # trailing slash
-        json={'configuration': new_config},
+        json={'configuration': [{}, [[TARGET_KEY]]]},
     )
     resp.raise_for_status()
-    # Confirm by re-reading; a 2xx alone does not prove the branch is gone.
+    # Confirm by re-reading; a 2xx means accepted, not applied.
     after = client.get_configuration_managers(id=rec['id'], fields='id,configuration')
     assert TARGET_KEY not in (after[0]['configuration'][0] or {})
 ```
 
 Points that matter:
 
-- **Skip clean devices.** Writing a no-op diff still counts as a config push and can
-  bump the device's sync state for no reason.
-- **Send the complete diff minus the branch**, never a fragment. That is what makes
-  PUT safe here despite its reset-unmentioned-fields behavior.
-- **Log the removed branch as JSON.** It is the only record of what was there, and
-  the only practical way to put it back.
-- **Verify with a re-read.** The PUT returning 2xx means accepted, not applied.
-- Use `client.session.put` directly rather than the SDK's
-  `put_configuration_managers(router_id, ...)`, which performs its own
-  `?router.id=` lookup on every call — wasteful when you already hold the config
-  manager ID, and doubly so under concurrency.
+- **The body is the removal path and nothing else.** No updates and no other
+  branches, so no secret or unrelated setting is ever sent.
+- **Skip clean devices.** Writing a no-op still counts as a config push and can bump
+  the device's sync state for no reason.
+- **Log the removed branch as JSON** before patching. It is the only practical way
+  to put it back.
+- **Verify with a re-read**, and check `removals` was not grown. Verified so far only
+  on a device with no group. Before a fleet run, test on one grouped device and
+  confirm it now inherits the group's value.
 - Root-level `firewall` and root-level `security` are different branches. Zone
   firewall config lives under `security`; `firewall` is port forwarding. Many devices
   have both.
 
-Worked example: `web_apps/revert_device_firewall/` (`config_surgery.py` holds the
-transform, dependency-free and separately testable).
+`web_apps/revert_device_firewall/` still uses the older full-diff PUT and needs
+porting to this pattern.
 
 ## Stacked Panels in `.content-area`: Scroll, Don't Crush
 

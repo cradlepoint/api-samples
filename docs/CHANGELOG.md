@@ -3,6 +3,70 @@
 This file tracks updates made to the documentation, especially those made
 automatically by the reflexion system.
 
+## 2026-11-26 — SDK 0.1 Replaces the Single-File SDK in `ncm/`
+
+- `ncm/` now holds SDK 0.1 (formerly `ncm2/`). The code is split into `_base.py`,
+  `_v2.py`, `_v3.py` and `ncm.py`, with parity tests in `ncm/tests/` that compare
+  against 0.0.74 read from git history. CI publishes it on merge; the patch bump makes
+  it 0.1.1.
+- `ncm-sdk-reference.md`: new layout and a "What changed in 0.1" section.
+  `copy_router_configuration()` gains `replace=False`. The default stays a PATCH merge
+  (non-breaking); `replace=True` is a PUT replacement. Both modes strip every masked
+  secret.
+- Added known issue: 0.0.x `copy_router_configuration()` sends invalid JSON when
+  `wpapsk`/`password` is the first key in its object.
+- Steering `ncm-api-development.md`: methods are read from `_v2.py`/`_v3.py`, and
+  `ncm2/**` was dropped from the `fileMatchPattern` (also in `claude.md`).
+- Path references updated in `common-patterns.md`, `known-issues.md` (and the
+  "`ncm2/` is untracked" item marked resolved) and `api-v2-full-reference.md`.
+
+## 2026-11-26 — Reflexion: PATCH Removals Clear a Device Override; Full-Diff PUT Echoes Masked Secrets
+
+- Corrected `known-issues.md`. The earlier claim "PATCH cannot do this" (removing a
+  key from a device's updates dict) was wrong. A PATCH of `[{}, [[path]]]` deleted
+  the override from the device's updates without persisting a removals entry.
+  Verified live on a router with no group.
+- Documented that a read-modify-write PUT of a device diff echoes masked `"*"`
+  secrets back. NCM rejects it (`wpapsk ... too short`) or could overwrite the
+  secret.
+- Documented that PATCHing `null` stores an explicit null rather than deleting.
+- Rewrote `common-patterns.md` → "Restoring Group Inheritance by Removing a
+  Device-Level Branch" around a PATCH that sends only the removal path. The old
+  full-diff PUT echoed masked secrets.
+- Policy across the steering file (`ncm-api-development.md` rule 3), `api-configuration.md`,
+  `common-patterns.md`, `known-issues.md` and `ncm-sdk-reference.md`: every change to
+  configuration values uses PATCH with only the settings being changed. PUT is only
+  for an explicit request to replace or wipe the whole config. Non-config operations
+  keep their documented methods; resume suspended sync stays `PUT {"suspended": false}`.
+- `ncm-sdk-reference.md`: `copy_router_configuration()` is a full-copy (explicit
+  replacement) operation but is implemented as a PATCH merge. Destination-only
+  settings survive. It strips only `wpapsk` and `password`, so other masked secrets
+  (cert `key`/`x509`, NTP `key`) copy as `*`, while the destination keeps its own
+  PSKs and passwords.
+
+## 2026-11-26 — Bundling the SDK Into On-Router Apps
+
+- Added common pattern "Using the NCM SDK in an On-Router App Without Committing a
+  Copy". `import ncm` resolves to the venv's package locally. At packaging time
+  `pip install -t <app> --python-version 3.8 --only-binary=:all: --no-deps ncm==X`
+  bundles it for `cppython`; the bundle is gitignored. Install and import were
+  verified under a real Python 3.8; not yet verified on a router.
+
+## 2026-11-26 — ncm2 (SDK 0.1.0) and Private Cellular 500s
+
+- Added known issue: on an account without the service, private cellular beta
+  endpoints return an HTML 500 (non-beta paths are 404). JSON-parsing error paths,
+  including the SDK's, raise `JSONDecodeError` instead of `HTTPError`.
+- `ncm-sdk-reference.md`: noted the unreleased 0.1.0 behavior of
+  `copy_router_configuration()` (PUT, secrets stripped) and the config-write
+  secret filter.
+
+## 2026-11-26 — Reflexion: Masked Secrets Go Beyond Password Fields
+
+- Extended `known-issues.md` → "Passwords Return \"*\"". A live device config also
+  masks cert `key`/`x509`, NTP server `key`, RTK NTRIP `password` and user
+  passwords. Strip placeholders by matching the `"*"` value, not by field name.
+
 ## 2026-11-02 — Reflexion: net_devices.uptime Is Usable Seconds, Not Just Null
 
 - Added known issue to `known-issues.md`: `net_devices.uptime` is a float of

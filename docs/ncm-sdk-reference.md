@@ -6,7 +6,28 @@
 pip install ncm
 ```
 
-Or use the local SDK at `ncm/ncm/ncm.py`.
+Or use the local SDK in `ncm/` (`pip install -e ncm`). As of 0.1, the code is split
+by API version: `ncm/ncm/_v2.py` (`NcmClientv2`), `ncm/ncm/_v3.py` (`NcmClientv3`),
+`ncm/ncm/ncm.py` (combined client, singleton, module-level `ncm.get_routers()`), and
+`ncm/ncm/_base.py` (HTTP plumbing and the masked-secret filter). Every 0.0.x import
+and method still works.
+
+### What changed in 0.1
+
+- **Config writes never send masked secrets.** Every PUT/PATCH/POST to
+  `/configuration_managers/` or `/groups/` has `"*"` values stripped from its
+  `configuration`, so the target keeps its existing secret. The filter is in the
+  client's session, so it also covers direct `client.session.put/patch` calls. The
+  helper is public as `ncm.strip_masked_secrets()`.
+- **`copy_router_configuration()` gains `replace=False`.** The default still merges
+  (PATCH); `replace=True` replaces (PUT). Both modes now strip every masked secret
+  correctly (details below).
+- **New:** `ncm.v2` / `ncm.v3` (explicit API version), `ncm.set_v2_keys()` /
+  `ncm.set_v3_key()` / `ncm.set_keys()`, the v2 short aliases (`rename_router`,
+  `delete_group`, ...), the v3 `get_private_cellular_*` methods, and
+  `delete_exchange_resources_for_site()`.
+- Tests are in `ncm/tests/`. `test_parity.py` checks every method against 0.0.74,
+  read from git history.
 
 ## Quick Start
 
@@ -83,14 +104,33 @@ client = ncm.NcmClient(api_keys=api_keys)
 - `create_group_by_parent_id(parent_account_id, group_name, product, firmware)`
 - `delete_group_by_id(group_id)`
 - `patch_group_configuration(group_id, config_json)`
-- `put_group_configuration(group_id, config_json)`
+- `put_group_configuration(group_id, config_json)`: replaces the whole group config.
+  Only use it when the user explicitly asks for that.
 
 ### Configuration
 - `get_configuration_managers(**kwargs)`
 - `get_configuration_manager_id(router_id)` — get config manager ID for a router
-- `patch_configuration_managers(router_id, config_json)` — PATCH config by router ID
-- `put_configuration_managers(router_id, config_json)` — PUT config by router ID
-- `copy_router_configuration(src_router_id, dst_router_id)`
+- `patch_configuration_managers(router_id, config_json)`: the default for every config
+  change. Send only the settings being changed; delete one with
+  `{"configuration": [{}, [[...path]]]}`.
+- `put_configuration_managers(router_id, config_json)`: replaces the device's whole
+  config. Only use it when the user explicitly asks for that, and never with a config
+  you read back, because its secrets come back as `"*"`.
+- `copy_router_configuration(src_router_id, dst_router_id, replace=False)`: copies the
+  source's device-level config to the destination, always without masked `"*"`
+  secrets.
+  - **`replace=False` (default):** a PATCH merge, as in 0.0.x. Settings only the
+    destination has survive, and so do its secrets. The destination therefore does
+    not necessarily end up identical to the source.
+  - **`replace=True`:** a PUT, so the destination ends up matching the source. Its
+    device-level secrets reset to group or default values; set them again in
+    cleartext if needed. Pass this only when the user explicitly wants a full
+    replacement.
+  - **0.0.x stripped secrets badly.** It removed only `wpapsk`/`password`, so
+    certificate `key`/`x509` and NTP `key` were copied as a literal `*`. Its string
+    replacement also produced invalid JSON (`{, "username": ...}`) when a secret was
+    the first key in its object.
+  - `replace` needs `ncm>=0.1`.
 - `resume_updates_for_router(router_id)`
 - `set_lan_ip_address(router_id, lan_ip, netmask=, lan_id=)`
 - `set_custom1(router_id, text)` / `set_custom2(router_id, text)`

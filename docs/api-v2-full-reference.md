@@ -574,7 +574,7 @@ GET /api/v2/locations/
 generated table, which listed only `id`, `id__in`, `limit` and `offset`. They are added
 here because the shipped client and scripts depend on them:
 
-- `ncm/ncm/ncm.py` → `get_locations()` declares
+- `ncm/ncm/_v2.py` (`ncm/ncm/ncm.py` before SDK 0.1) → `get_locations()` declares
   `allowed_params = ['id', 'id__in', 'router', 'router__in', 'limit', 'offset']`
 - `scripts/export_locations.py` and `web_apps/script_manager/scripts/Export Locations.py`
   both batch with `n2.get_locations(router__in=batch)`

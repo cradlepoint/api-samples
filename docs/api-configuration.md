@@ -76,12 +76,34 @@ PATCH  /api/v2/groups/{id}/
 
 ## PUT vs PATCH
 
+**Default to PATCH for every config write.** Send only the settings you are changing.
+Set or change values in the updates dict. Delete a setting with a removals path.
+Use PUT only when the user explicitly asks to replace or wipe the whole config.
+
+**Never read-modify-write with PUT.** GET returns every password, PSK and key as `"*"`
+(see Passwords below). A PUT of the config you just read sends `*` back as the literal
+secret, which NCM either rejects
+(`cannot set wlan.radio.1.bss.0.wpapsk to *: too short`) or stores.
+
 | Behavior | PUT | PATCH |
 |----------|-----|-------|
 | Unmentioned fields | Reset to defaults | Left unchanged |
-| Use case | Replace entire config | Adjust existing config |
+| Use case | Replace entire config (explicit request only) | Every other change |
 | Can remove items | Yes (via removals list) | Yes (via removals list) — see below |
 | Returns payload | Yes | No |
+
+### Removing one setting (PATCH)
+
+```json
+PATCH /api/v2/configuration_managers/{id}/
+{"configuration": [{}, [["wan", "rules2", "00000005-a81d-3590-93ca-8b1fcfeb8e15", "modem"]]]}
+```
+
+At device scope this deletes the device's own override for that path. No removals
+entry is persisted, and the setting reverts to its default (verified live on a device
+with no group). PATCHing `null` instead does **not** delete the setting; it stores an
+explicit `null`. See `known-issues.md` → "PATCH Removals Delete a Device-Level
+Override".
 
 ## _id_ Fields
 
@@ -204,12 +226,21 @@ PATCH /api/v2/configuration_managers/{id}/
 ```
 
 ### Clear Individual Config (reset to group/defaults)
+
+**Only when the user explicitly asks to wipe the device's entire individual config.**
+This deliberately discards every device-level setting. To clear one setting, use
+the PATCH removal above.
+
 ```json
 PUT /api/v2/configuration_managers/{id}/
 {"configuration": [{}, []]}
 ```
 
 ### Resume Suspended Sync
+
+This is a PUT. The PATCH-only rule covers changes to actual configuration values,
+and resuming sync only flips the record's `suspended` flag.
+
 ```json
 PUT /api/v2/configuration_managers/{id}/
 {"suspended": false}
@@ -243,7 +274,11 @@ rolls back to the previous working config and suspends sync.
 
 ## Passwords
 
-Password fields return `"*"` on GET. Set passwords by sending cleartext in PUT/PATCH — they are automatically encrypted.
+Password fields return `"*"` on GET. Set passwords by sending cleartext in a PATCH;
+NCM encrypts them automatically.
+
+Never send a config you read back to NCM. Every secret in it is the literal `"*"`. Only
+put a password field in a write body when you are deliberately setting that password.
 
 ## PATCH with Arrays vs Objects
 
@@ -259,5 +294,8 @@ Use objects with string keys for partial updates:
 
 1. Use NCM UI to create a config on one device (as template)
 2. GET the config: `GET /api/v2/configuration_managers/{id}/`
-3. Edit the downloaded config
-4. PUT/PATCH to other devices: `PUT /api/v2/configuration_managers/{other_id}/`
+3. Extract only the branches you want to apply, and strip every `"*"` secret
+   placeholder.
+4. PATCH that fragment to other devices: `PATCH /api/v2/configuration_managers/{other_id}/`.
+   Set any passwords explicitly in cleartext. Use PUT only if the user explicitly asks
+   to replace the target's whole config.
